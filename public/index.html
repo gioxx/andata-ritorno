@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Andata e Ritorno</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="theme-color" content="#3b6ea5">
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --fg:#1d2330; --muted:#6b7280; --accent:#3b6ea5; --school:#e8f0fa; --home:#eaf6ec; }
@@ -38,7 +40,7 @@
 </header>
 <main id="main"></main>
 <div class="bar" id="bar"></div>
-<input type="file" id="camera" accept="image/*" capture="environment" hidden>
+<input type="file" id="camera" accept="image/*" multiple hidden>
 
 <script>
 // Mockup only: data lives in localStorage. The real app will call the Worker API (see /worker).
@@ -96,7 +98,7 @@ function render() {
   const sel = [...selected].map(id => state.items.find(i => i.id === id)).filter(Boolean);
   const bar = document.getElementById('bar');
   if (!sel.length) {
-    bar.innerHTML = `<button id="add">📷 Aggiungi capo</button>`;
+    bar.innerHTML = `<button id="add">📷 Aggiungi capi</button>`;
   } else {
     const allSchool = sel.every(i => i.location === 'school');
     const allHome = sel.every(i => i.location === 'home');
@@ -130,11 +132,14 @@ document.addEventListener('click', e => {
 });
 
 document.getElementById('camera').addEventListener('change', async e => {
-  const file = e.target.files[0]; e.target.value = '';
-  if (!file) return;
-  const photo = await compress(file);
-  const label = prompt('Descrizione (opzionale)', '') || '';
-  state.items.push({ id: crypto.randomUUID(), child: currentChild, location: 'home', label, photo, movedAt: new Date().toISOString() });
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  // Single photo: ask for a description. Several photos: skip the prompt to keep bulk import quick.
+  const label = files.length === 1 ? (prompt('Descrizione (opzionale)', '') || '') : '';
+  for (const file of files) {
+    const photo = await compress(file);
+    state.items.push({ id: crypto.randomUUID(), child: currentChild, location: 'home', label, photo, movedAt: new Date().toISOString() });
+  }
   save(); render();
 });
 

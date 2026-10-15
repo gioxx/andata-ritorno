@@ -5,7 +5,10 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute andata-ritorno --remote --file=schema.sql",
-    "db:init:local": "wrangler d1 execute andata-ritorno --local --file=schema.sql"
+    "db:init:local": "wrangler d1 execute andata-ritorno --local --file=schema.sql",
+    "deploy:mockup": "wrangler deploy --config wrangler.mockup.toml"
   },
-  "devDependencies": { "wrangler": "^4" }
+  "devDependencies": {
+    "wrangler": "^4"
+  }
 }

@@ -18,6 +18,14 @@ npx serve public     # or: python3 -m http.server -d public
 
 Open on a phone (same LAN) to test the camera flow. Data stays in the browser.
 
+To share the mockup over HTTPS (installable PWA), deploy the static files only:
+
+```bash
+cd worker && npm install && npm run deploy:mockup
+```
+
+Target device for the mockup: Android (Chrome). iOS comes later.
+
 ## Deploy (Cloudflare free tier)
 
 ```bash
@@ -35,7 +43,7 @@ Then protect the Worker hostname with **Cloudflare Access** (Zero Trust → Appl
 
 - [ ] Replace localStorage in `public/index.html` with calls to `/api/*`
 - [ ] Multi-select move (done in mockup) wired to `POST /api/move`
-- [ ] PWA icons
+- [x] PWA icons
 - [ ] Per-item movement history view
 - [ ] Optional counters/categories (body, pants, spare outfit…)
 
