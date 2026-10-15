@@ -31,6 +31,9 @@
   .bar button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--accent); color:#fff; }
   .bar button.secondary { background:var(--bg); color:var(--fg); }
   .bar button:disabled { opacity:.4; }
+  footer { margin:20px 16px; padding:12px; border-radius:12px; background:var(--card); font-size:13px; color:var(--muted); }
+  footer .row { display:flex; gap:8px; margin-top:8px; }
+  footer button { flex:1; padding:10px; border:1px solid var(--accent); border-radius:8px; background:transparent; color:var(--accent); font-weight:600; }
 </style>
 </head>
 <body>
@@ -39,13 +42,23 @@
   <div class="tabs" id="tabs"></div>
 </header>
 <main id="main"></main>
+<footer>
+  <div><strong>Backup</strong> · <span id="backupInfo"></span></div>
+  <div id="persistInfo"></div>
+  <div class="row">
+    <button id="export">⬇ Esporta</button>
+    <button id="import">⬆ Importa</button>
+  </div>
+</footer>
 <div class="bar" id="bar"></div>
 <input type="file" id="camera" accept="image/*" multiple hidden>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
 
 <script>
 // Mockup only: data lives in localStorage. The real app will call the Worker API (see /worker).
 const CHILDREN = [{ id: 'nido', label: 'Nido' }, { id: 'materna', label: 'Materna' }];
 const KEY = 'ar-mockup-v1';
+const BACKUP_KEY = 'ar-mockup-last-backup';
 
 let state = load();
 let currentChild = 'nido';
@@ -108,6 +121,62 @@ function render() {
       ${allHome ? '' : '<button id="toHome">→ Casa</button>'}
       <button class="secondary" id="del">🗑</button>`;
   }
+  renderBackupInfo();
+}
+
+function renderBackupInfo() {
+  let last = null;
+  try { last = localStorage.getItem(BACKUP_KEY); } catch {}
+  document.getElementById('backupInfo').textContent =
+    `${state.items.length} capi · ultimo backup: ${last ? new Date(last).toLocaleString('it-IT') : 'mai'}`;
+}
+
+// Export everything (photos included) as a JSON file: share sheet on Android (e.g. Drive), download otherwise.
+async function exportBackup() {
+  const now = new Date();
+  const data = JSON.stringify({ app: 'andata-ritorno', version: 1, exportedAt: now.toISOString(), items: state.items });
+  const name = `andata-ritorno-${now.toISOString().slice(0, 10)}.json`;
+  const file = new File([data], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Backup Andata e Ritorno' });
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file); a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') return; // user closed the share sheet
+    return alert('Esportazione non riuscita: ' + e.message);
+  }
+  try { localStorage.setItem(BACKUP_KEY, now.toISOString()); } catch {}
+  renderBackupInfo();
+}
+
+// Merge a backup into current data: new items are added, existing ones keep the most recent move.
+async function importBackup(file) {
+  let items;
+  try {
+    const data = JSON.parse(await file.text());
+    items = (data.items || []).filter(i => i && i.id && i.photo && ['school', 'home'].includes(i.location) && CHILDREN.some(c => c.id === i.child));
+  } catch { return alert('File non valido'); }
+  if (!items.length) return alert('Nessun capo trovato nel file');
+  let added = 0, updated = 0;
+  for (const i of items) {
+    const existing = state.items.find(x => x.id === i.id);
+    if (!existing) { state.items.push(i); added++; }
+    else if ((i.movedAt || '') > (existing.movedAt || '')) { Object.assign(existing, i); updated++; }
+  }
+  save(); render();
+  alert(`Importati ${added} capi nuovi, ${updated} aggiornati`);
+}
+
+// Ask Chrome not to evict our storage under disk pressure.
+async function requestPersistence() {
+  const el = document.getElementById('persistInfo');
+  if (!navigator.storage?.persist) return;
+  const ok = await navigator.storage.persisted() || await navigator.storage.persist();
+  el.textContent = ok ? 'Memoria protetta ✓' : 'Memoria non protetta: fai backup spesso';
 }
 
 function move(location) {
@@ -122,6 +191,8 @@ document.addEventListener('click', e => {
   if (t.dataset.child) { currentChild = t.dataset.child; selected.clear(); }
   else if (t.dataset.id) { selected.has(t.dataset.id) ? selected.delete(t.dataset.id) : selected.add(t.dataset.id); }
   else if (t.id === 'add') return document.getElementById('camera').click();
+  else if (t.id === 'export') return exportBackup();
+  else if (t.id === 'import') return document.getElementById('importFile').click();
   else if (t.id === 'clear') selected.clear();
   else if (t.id === 'toSchool') return move('school');
   else if (t.id === 'toHome') return move('home');
@@ -143,8 +214,14 @@ document.getElementById('camera').addEventListener('change', async e => {
   save(); render();
 });
 
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (file) importBackup(file);
+});
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 render();
+requestPersistence().catch(() => {});
 </script>
 </body>
 </html>
