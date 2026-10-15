@@ -63,6 +63,7 @@ const BACKUP_KEY = 'ar-mockup-last-backup';
 let state = load();
 let currentChild = 'nido';
 let selected = new Set();
+let clipboardHasImage = null; // null = unknown (no permission yet): show Incolla anyway
 
 function load() {
   try { return JSON.parse(localStorage.getItem(KEY)) || { items: [] }; } catch { return { items: [] }; }
@@ -111,7 +112,8 @@ function render() {
   const sel = [...selected].map(id => state.items.find(i => i.id === id)).filter(Boolean);
   const bar = document.getElementById('bar');
   if (!sel.length) {
-    bar.innerHTML = `<button id="add">📷 Aggiungi capi</button>`;
+    const showPaste = navigator.clipboard?.read && clipboardHasImage !== false;
+    bar.innerHTML = `<button id="add">📷 Aggiungi capi</button>${showPaste ? '<button id="paste">📋 Incolla</button>' : ''}`;
   } else {
     const allSchool = sel.every(i => i.location === 'school');
     const allHome = sel.every(i => i.location === 'home');
@@ -191,6 +193,7 @@ document.addEventListener('click', e => {
   if (t.dataset.child) { currentChild = t.dataset.child; selected.clear(); }
   else if (t.dataset.id) { selected.has(t.dataset.id) ? selected.delete(t.dataset.id) : selected.add(t.dataset.id); }
   else if (t.id === 'add') return document.getElementById('camera').click();
+  else if (t.id === 'paste') return pasteFromClipboard();
   else if (t.id === 'export') return exportBackup();
   else if (t.id === 'import') return document.getElementById('importFile').click();
   else if (t.id === 'clear') selected.clear();
@@ -202,9 +205,10 @@ document.addEventListener('click', e => {
   render();
 });
 
-document.getElementById('camera').addEventListener('change', async e => {
-  const files = [...e.target.files]; e.target.value = '';
-  if (!files.length) return;
+// Add image files/blobs as new items (at home) for the current child.
+async function addFiles(files) {
+  files = files.filter(f => f.type.startsWith('image/'));
+  if (!files.length) return false;
   // Single photo: ask for a description. Several photos: skip the prompt to keep bulk import quick.
   const label = files.length === 1 ? (prompt('Descrizione (opzionale)', '') || '') : '';
   for (const file of files) {
@@ -212,6 +216,51 @@ document.getElementById('camera').addEventListener('change', async e => {
     state.items.push({ id: crypto.randomUUID(), child: currentChild, location: 'home', label, photo, movedAt: new Date().toISOString() });
   }
   save(); render();
+  return true;
+}
+
+// Paste an image copied elsewhere (e.g. Google Keep: long-press photo, Copy).
+async function pasteFromClipboard() {
+  if (!navigator.clipboard?.read) return alert('Incolla non supportato da questo browser');
+  try {
+    const files = [];
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find(t => t.startsWith('image/'));
+      if (type) files.push(new File([await item.getType(type)], 'incollata', { type }));
+    }
+    if (!await addFiles(files)) { alert("Negli appunti non c'è un'immagine. Copia prima la foto (es. da Keep), poi tocca Incolla."); checkClipboard(); }
+  } catch (e) {
+    alert(e.name === 'NotAllowedError'
+      ? 'Accesso agli appunti negato: consentilo quando Chrome lo chiede (o dalle impostazioni del sito).'
+      : 'Incolla non riuscito: ' + e.message);
+  }
+}
+
+// Once clipboard access is granted, peek at the clipboard when the app comes to the foreground
+// and show Incolla only if it holds an image. Before the first grant the state is unknown, so the button stays.
+async function checkClipboard() {
+  if (!navigator.clipboard?.read || !navigator.permissions) return;
+  const before = clipboardHasImage;
+  try {
+    const { state } = await navigator.permissions.query({ name: 'clipboard-read' });
+    if (state === 'denied') clipboardHasImage = false;
+    else if (state === 'granted') clipboardHasImage = (await navigator.clipboard.read()).some(i => i.types.some(t => t.startsWith('image/')));
+    else clipboardHasImage = null;
+  } catch { clipboardHasImage = null; } // e.g. document not focused, or permission name unsupported
+  if (clipboardHasImage !== before) render();
+}
+window.addEventListener('focus', checkClipboard);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkClipboard(); });
+
+document.getElementById('camera').addEventListener('change', e => {
+  const files = [...e.target.files]; e.target.value = '';
+  addFiles(files);
+});
+
+// Keyboard / context-menu paste (desktop, or Android when a paste event fires).
+document.addEventListener('paste', e => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); addFiles(files); }
 });
 
 document.getElementById('importFile').addEventListener('change', e => {
@@ -222,6 +271,7 @@ document.getElementById('importFile').addEventListener('change', e => {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 render();
 requestPersistence().catch(() => {});
+checkClipboard();
 </script>
 </body>
 </html>
