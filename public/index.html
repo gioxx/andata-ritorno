@@ -31,6 +31,16 @@
   .bar button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--accent); color:#fff; }
   .bar button.secondary { background:var(--bg); color:var(--fg); }
   .bar button:disabled { opacity:.4; }
+  dialog { border:0; border-radius:14px; padding:16px; width:min(92vw,360px); background:var(--card); color:var(--fg); }
+  dialog::backdrop { background:rgba(0,0,0,.5); }
+  dialog h3 { margin:0 0 10px; font-size:16px; }
+  dialog .preview { display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; }
+  dialog .preview img { width:72px; height:72px; object-fit:cover; border-radius:8px; flex:none; }
+  dialog input { width:100%; padding:10px; border:1px solid var(--muted); border-radius:8px; font-size:15px; background:var(--bg); color:var(--fg); margin-bottom:12px; }
+  dialog .row { display:flex; gap:8px; }
+  dialog .row button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--bg); color:var(--fg); }
+  dialog .row button.primary { background:var(--accent); color:#fff; }
+  dialog .cancel { display:block; width:100%; margin-top:8px; padding:8px; border:0; background:none; color:var(--muted); font-size:14px; }
   footer { margin:20px 16px; padding:12px; border-radius:12px; background:var(--card); font-size:13px; color:var(--muted); }
   footer .row { display:flex; gap:8px; margin-top:8px; }
   footer button { flex:1; padding:10px; border:1px solid var(--accent); border-radius:8px; background:transparent; color:var(--accent); font-weight:600; }
@@ -51,6 +61,18 @@
   </div>
 </footer>
 <div class="bar" id="bar"></div>
+<dialog id="newItem">
+  <form method="dialog">
+    <h3 id="newTitle"></h3>
+    <div class="preview" id="newPreview"></div>
+    <input id="newLabel" placeholder="Descrizione (opzionale)" autocomplete="off">
+    <div class="row">
+      <button value="school" class="primary">🏫 A scuola</button>
+      <button value="home">🏠 A casa</button>
+    </div>
+    <button value="" class="cancel">Annulla</button>
+  </form>
+</dialog>
 <input type="file" id="camera" accept="image/*" multiple hidden>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
@@ -139,17 +161,19 @@ async function exportBackup() {
   const data = JSON.stringify({ app: 'andata-ritorno', version: 1, exportedAt: now.toISOString(), items: state.items });
   const name = `andata-ritorno-${now.toISOString().slice(0, 10)}.json`;
   const file = new File([data], name, { type: 'application/json' });
+  const download = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  };
   try {
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Backup Andata e Ritorno' });
-    } else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(file); a.download = name; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    }
+    if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Backup Andata e Ritorno' });
+    else download();
   } catch (e) {
     if (e.name === 'AbortError') return; // user closed the share sheet
-    return alert('Esportazione non riuscita: ' + e.message);
+    // Android Chrome refuses to share some file types (NotAllowedError): save to Downloads instead.
+    try { download(); } catch (e2) { return alert('Esportazione non riuscita: ' + e2.message); }
+    alert('File salvato in Download: ' + name);
   }
   try { localStorage.setItem(BACKUP_KEY, now.toISOString()); } catch {}
   renderBackupInfo();
@@ -188,6 +212,7 @@ function move(location) {
 }
 
 document.addEventListener('click', e => {
+  if (e.target.closest('dialog')) return; // the new-item dialog handles its own buttons
   const t = e.target.closest('[data-child],[data-id],button');
   if (!t) return;
   if (t.dataset.child) { currentChild = t.dataset.child; selected.clear(); }
@@ -205,15 +230,34 @@ document.addEventListener('click', e => {
   render();
 });
 
-// Add image files/blobs as new items (at home) for the current child.
+// Ask where new photos go (school by default) and an optional description. Resolves to
+// { location, label }, or null if cancelled.
+function askNewItem(photos) {
+  const dlg = document.getElementById('newItem');
+  const child = CHILDREN.find(c => c.id === currentChild).label;
+  document.getElementById('newTitle').textContent =
+    photos.length === 1 ? `Nuovo capo · ${child}` : `${photos.length} nuovi capi · ${child}`;
+  document.getElementById('newPreview').innerHTML = photos.map(src => `<img src="${src}" alt="">`).join('');
+  const input = document.getElementById('newLabel');
+  input.value = '';
+  // Several photos: one description would be wrong for all of them, so skip it.
+  input.hidden = photos.length > 1;
+  dlg.returnValue = '';
+  dlg.showModal();
+  return new Promise(resolve => dlg.addEventListener('close', () =>
+    resolve(dlg.returnValue ? { location: dlg.returnValue, label: input.hidden ? '' : input.value.trim() } : null), { once: true }));
+}
+
+// Add image files/blobs as new items for the current child.
 async function addFiles(files) {
   files = files.filter(f => f.type.startsWith('image/'));
   if (!files.length) return false;
-  // Single photo: ask for a description. Several photos: skip the prompt to keep bulk import quick.
-  const label = files.length === 1 ? (prompt('Descrizione (opzionale)', '') || '') : '';
-  for (const file of files) {
-    const photo = await compress(file);
-    state.items.push({ id: crypto.randomUUID(), child: currentChild, location: 'home', label, photo, movedAt: new Date().toISOString() });
+  const photos = await Promise.all(files.map(f => compress(f)));
+  const choice = await askNewItem(photos);
+  if (!choice) return true;
+  const now = new Date().toISOString();
+  for (const photo of photos) {
+    state.items.push({ id: crypto.randomUUID(), child: currentChild, location: choice.location, label: choice.label, photo, movedAt: now });
   }
   save(); render();
   return true;
