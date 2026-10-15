@@ -53,7 +53,15 @@
   dialog .row button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--bg); color:var(--fg); }
   dialog .row button.primary { background:var(--accent); color:#fff; }
   dialog .cancel { display:block; width:100%; margin-top:8px; padding:8px; border:0; background:none; color:var(--muted); font-size:14px; }
-  #menu { margin:8px 8px auto auto; width:min(80vw,300px); }
+  /* Side drawer sliding in from the right */
+  #menu { margin:0; inset:0 0 0 auto; width:min(82vw,320px); height:100dvh; max-height:100dvh; max-width:none;
+    border-radius:16px 0 0 16px; padding:calc(16px + env(safe-area-inset-top)) 16px 16px;
+    transform:translateX(100%); transition:transform .25s ease, display .25s allow-discrete, overlay .25s allow-discrete; }
+  #menu[open] { transform:none; }
+  @starting-style { #menu[open] { transform:translateX(100%); } }
+  #menu::backdrop { background:rgba(0,0,0,0); transition:background .25s, display .25s allow-discrete, overlay .25s allow-discrete; }
+  #menu[open]::backdrop { background:rgba(0,0,0,.5); }
+  @starting-style { #menu[open]::backdrop { background:rgba(0,0,0,0); } }
   #menu h3 { display:flex; justify-content:space-between; align-items:center; }
   #menu .close { border:0; background:none; color:var(--muted); font-size:20px; padding:0 4px; }
   #menu .info { font-size:13px; color:var(--muted); margin-bottom:12px; line-height:1.5; }
@@ -177,6 +185,17 @@ function render() {
   }
   renderBackupInfo();
 }
+
+// Swipe right on the drawer to close it.
+(() => {
+  const menu = document.getElementById('menu');
+  let x0 = null;
+  menu.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  menu.addEventListener('touchend', e => {
+    if (x0 !== null && e.changedTouches[0].clientX - x0 > 60) menu.close();
+    x0 = null;
+  });
+})();
 
 function setTheme(choice) {
   if (choice === 'auto') delete document.documentElement.dataset.theme;
