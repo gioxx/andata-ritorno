@@ -14,7 +14,9 @@
   * { box-sizing:border-box; }
   body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); padding-bottom:90px; }
   header { position:sticky; top:0; background:var(--accent); color:#fff; padding:12px 16px; z-index:2; }
-  header h1 { margin:0 0 8px; font-size:18px; }
+  header .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  header h1 { margin:0; font-size:18px; }
+  #menuBtn { border:0; background:none; color:#fff; font-size:22px; line-height:1; padding:4px 8px; margin-right:-8px; }
   .tabs { display:flex; gap:6px; }
   .tabs button { flex:1; padding:8px; border:0; border-radius:8px; background:rgba(255,255,255,.2); color:#fff; font-weight:600; }
   .tabs button.active { background:#fff; color:var(--accent); }
@@ -45,25 +47,28 @@
   dialog .row button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--bg); color:var(--fg); }
   dialog .row button.primary { background:var(--accent); color:#fff; }
   dialog .cancel { display:block; width:100%; margin-top:8px; padding:8px; border:0; background:none; color:var(--muted); font-size:14px; }
-  footer { margin:20px 16px; padding:12px; border-radius:12px; background:var(--card); font-size:13px; color:var(--muted); }
-  footer .row { display:flex; gap:8px; margin-top:8px; }
-  footer button { flex:1; padding:10px; border:1px solid var(--accent); border-radius:8px; background:transparent; color:var(--accent); font-weight:600; }
+  #menu { margin:8px 8px auto auto; width:min(80vw,300px); }
+  #menu h3 { display:flex; justify-content:space-between; align-items:center; }
+  #menu .close { border:0; background:none; color:var(--muted); font-size:20px; padding:0 4px; }
+  #menu .info { font-size:13px; color:var(--muted); margin-bottom:12px; line-height:1.5; }
+  #menu .menuItem { display:block; width:100%; text-align:left; padding:12px; margin-bottom:6px; border:0; border-radius:10px; background:var(--bg); color:var(--fg); font-size:15px; font-weight:600; }
 </style>
 </head>
 <body>
 <header>
-  <h1>A/R · Andata e Ritorno</h1>
+  <div class="top">
+    <h1>A/R · Andata e Ritorno</h1>
+    <button id="menuBtn" aria-label="Menu">☰</button>
+  </div>
   <div class="tabs" id="tabs"></div>
 </header>
 <main id="main"></main>
-<footer>
-  <div><strong>Backup</strong> · <span id="backupInfo"></span></div>
-  <div id="persistInfo"></div>
-  <div class="row">
-    <button id="export">⬇ Esporta</button>
-    <button id="import">⬆ Importa</button>
-  </div>
-</footer>
+<dialog id="menu">
+  <h3>Backup <button class="close" id="menuClose" aria-label="Chiudi">✕</button></h3>
+  <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
+  <button class="menuItem" id="export">⬇ Esporta backup</button>
+  <button class="menuItem" id="import">⬆ Importa backup</button>
+</dialog>
 <div class="bar" id="bar"></div>
 <dialog id="newItem">
   <form method="dialog">
@@ -228,7 +233,16 @@ function move(location) {
 }
 
 document.addEventListener('click', e => {
-  if (e.target.closest('dialog')) return; // the new-item dialog handles its own buttons
+  if (e.target.closest('#newItem')) return; // the new-item dialog handles its own buttons
+  const menu = document.getElementById('menu');
+  if (e.target.id === 'menuClose') return menu.close();
+  if (e.target === menu) { // the dialog itself is the target for both its padding and the backdrop
+    const r = menu.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) menu.close();
+    return;
+  }
+  if (e.target.id === 'menuBtn') return menu.showModal();
+  if (menu.open && e.target.closest('#menu button')) menu.close();
   const t = e.target.closest('[data-child],[data-id],button');
   if (!t) return;
   if (t.dataset.child) { currentChild = t.dataset.child; selected.clear(); }

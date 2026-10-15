@@ -45,6 +45,7 @@ Then protect the Worker hostname with **Cloudflare Access** (Zero Trust → Appl
 - [ ] Multi-select move (done in mockup) wired to `POST /api/move`
 - [x] PWA icons
 - [ ] Per-item movement history view
+- [ ] Tap a section's item counter to select all items in that section (quick "move everything")
 - [ ] Optional counters/categories (body, pants, spare outfit…)
 
 ## API
