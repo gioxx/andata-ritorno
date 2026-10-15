@@ -27,6 +27,10 @@
   .item img { width:100%; height:100%; object-fit:cover; display:block; }
   .item span { position:absolute; bottom:0; left:0; right:0; font-size:11px; padding:2px 4px; background:rgba(0,0,0,.55); color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .empty { color:var(--muted); font-size:13px; }
+  .unsaved { display:flex; align-items:center; gap:8px; margin:12px 16px 0; padding:10px 12px; border-radius:12px; background:#fff4d6; color:#7a5200; font-size:14px; }
+  .unsaved span { flex:1; }
+  .unsaved button { padding:8px 12px; border:0; border-radius:8px; background:#b07800; color:#fff; font-weight:600; }
+  @media (prefers-color-scheme: dark) { .unsaved { background:#3a2f12; color:#f2d48a; } }
   .bar { position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:var(--card); box-shadow:0 -2px 8px rgba(0,0,0,.1); }
   .bar button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--accent); color:#fff; }
   .bar button.secondary { background:var(--bg); color:var(--fg); }
@@ -81,6 +85,7 @@
 const CHILDREN = [{ id: 'nido', label: 'Nido' }, { id: 'materna', label: 'Materna' }];
 const KEY = 'ar-mockup-v1';
 const BACKUP_KEY = 'ar-mockup-last-backup';
+const UNSAVED_KEY = 'ar-mockup-unsaved'; // changes made since the last export
 
 let state = load();
 let currentChild = 'nido';
@@ -128,7 +133,9 @@ function render() {
         <img src="${i.photo}" alt=""><span>${esc(i.label || '')}</span></div>`).join('')
       : '<div class="empty">Nessun capo</div>'}</div></section>`;
   };
-  document.getElementById('main').innerHTML =
+  const n = unsavedCount();
+  const banner = n ? `<div class="unsaved"><span>⚠ ${n === 1 ? '1 modifica non salvata' : `${n} modifiche non salvate`}</span><button id="exportNow">Esporta</button></div>` : '';
+  document.getElementById('main').innerHTML = banner +
     section('school', '🏫 A scuola', 'school') + section('home', '🏠 A casa', 'home');
 
   const sel = [...selected].map(id => state.items.find(i => i.id === id)).filter(Boolean);
@@ -146,6 +153,13 @@ function render() {
       <button class="secondary" id="del">🗑</button>`;
   }
   renderBackupInfo();
+}
+
+function unsavedCount() {
+  try { return Number(localStorage.getItem(UNSAVED_KEY)) || 0; } catch { return 0; }
+}
+function markChanged(n = 1) {
+  try { localStorage.setItem(UNSAVED_KEY, unsavedCount() + n); } catch {}
 }
 
 function renderBackupInfo() {
@@ -175,8 +189,8 @@ async function exportBackup() {
     try { download(); } catch (e2) { return alert('Esportazione non riuscita: ' + e2.message); }
     alert('File salvato in Download: ' + name);
   }
-  try { localStorage.setItem(BACKUP_KEY, now.toISOString()); } catch {}
-  renderBackupInfo();
+  try { localStorage.setItem(BACKUP_KEY, now.toISOString()); localStorage.removeItem(UNSAVED_KEY); } catch {}
+  render();
 }
 
 // Merge a backup into current data: new items are added, existing ones keep the most recent move.
@@ -193,6 +207,7 @@ async function importBackup(file) {
     if (!existing) { state.items.push(i); added++; }
     else if ((i.movedAt || '') > (existing.movedAt || '')) { Object.assign(existing, i); updated++; }
   }
+  markChanged(added + updated);
   save(); render();
   alert(`Importati ${added} capi nuovi, ${updated} aggiornati`);
 }
@@ -208,6 +223,7 @@ async function requestPersistence() {
 function move(location) {
   const now = new Date().toISOString();
   state.items.forEach(i => { if (selected.has(i.id)) { i.location = location; i.movedAt = now; } });
+  markChanged(selected.size);
   selected.clear(); save(); render();
 }
 
@@ -219,13 +235,13 @@ document.addEventListener('click', e => {
   else if (t.dataset.id) { selected.has(t.dataset.id) ? selected.delete(t.dataset.id) : selected.add(t.dataset.id); }
   else if (t.id === 'add') return document.getElementById('camera').click();
   else if (t.id === 'paste') return pasteFromClipboard();
-  else if (t.id === 'export') return exportBackup();
+  else if (t.id === 'export' || t.id === 'exportNow') return exportBackup();
   else if (t.id === 'import') return document.getElementById('importFile').click();
   else if (t.id === 'clear') selected.clear();
   else if (t.id === 'toSchool') return move('school');
   else if (t.id === 'toHome') return move('home');
   else if (t.id === 'del' && confirm('Eliminare i capi selezionati?')) {
-    state.items = state.items.filter(i => !selected.has(i.id)); selected.clear(); save();
+    state.items = state.items.filter(i => !selected.has(i.id)); markChanged(selected.size); selected.clear(); save();
   }
   render();
 });
@@ -259,6 +275,7 @@ async function addFiles(files) {
   for (const photo of photos) {
     state.items.push({ id: crypto.randomUUID(), child: currentChild, location: choice.location, label: choice.label, photo, movedAt: now });
   }
+  markChanged(photos.length);
   save(); render();
   return true;
 }
