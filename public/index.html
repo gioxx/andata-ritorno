@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Andata e Ritorno</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b6ea5">
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1d2330; --muted:#6b7280; --accent:#3b6ea5; --school:#e8f0fa; --home:#eaf6ec; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171c; --card:#1f242c; --fg:#e8eaee; --muted:#9aa3af; --school:#1d2a3a; --home:#1d3324; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); padding-bottom:90px; }
+  header { position:sticky; top:0; background:var(--accent); color:#fff; padding:12px 16px; z-index:2; }
+  header h1 { margin:0 0 8px; font-size:18px; }
+  .tabs { display:flex; gap:6px; }
+  .tabs button { flex:1; padding:8px; border:0; border-radius:8px; background:rgba(255,255,255,.2); color:#fff; font-weight:600; }
+  .tabs button.active { background:#fff; color:var(--accent); }
+  section { margin:12px 16px; padding:12px; border-radius:12px; }
+  section.school { background:var(--school); } section.home { background:var(--home); }
+  section h2 { margin:0 0 10px; font-size:15px; display:flex; justify-content:space-between; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; min-height:40px; }
+  .item { position:relative; background:var(--card); border-radius:10px; overflow:hidden; aspect-ratio:1; border:3px solid transparent; }
+  .item.selected { border-color:var(--accent); }
+  .item img { width:100%; height:100%; object-fit:cover; display:block; }
+  .item span { position:absolute; bottom:0; left:0; right:0; font-size:11px; padding:2px 4px; background:rgba(0,0,0,.55); color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .empty { color:var(--muted); font-size:13px; }
+  .bar { position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:var(--card); box-shadow:0 -2px 8px rgba(0,0,0,.1); }
+  .bar button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--accent); color:#fff; }
+  .bar button.secondary { background:var(--bg); color:var(--fg); }
+  .bar button:disabled { opacity:.4; }
+</style>
+</head>
+<body>
+<header>
+  <h1>A/R · Andata e Ritorno</h1>
+  <div class="tabs" id="tabs"></div>
+</header>
+<main id="main"></main>
+<div class="bar" id="bar"></div>
+<input type="file" id="camera" accept="image/*" capture="environment" hidden>
+
+<script>
+// Mockup only: data lives in localStorage. The real app will call the Worker API (see /worker).
+const CHILDREN = [{ id: 'nido', label: 'Nido' }, { id: 'materna', label: 'Materna' }];
+const KEY = 'ar-mockup-v1';
+
+let state = load();
+let currentChild = 'nido';
+let selected = new Set();
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || { items: [] }; } catch { return { items: [] }; }
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { alert('Storage full: ' + e.message); }
+}
+
+// Resize and compress a photo client-side to keep storage small.
+function compress(file, max = 600, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = img.width * scale; c.height = img.height * scale;
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      // Safari can't encode WebP and silently returns PNG (huge): fall back to JPEG.
+      let url = c.toDataURL('image/webp', quality);
+      if (!url.startsWith('data:image/webp')) url = c.toDataURL('image/jpeg', quality);
+      resolve(url);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+function render() {
+  document.getElementById('tabs').innerHTML = CHILDREN.map(c =>
+    `<button class="${c.id === currentChild ? 'active' : ''}" data-child="${c.id}">${c.label}</button>`).join('');
+
+  const items = state.items.filter(i => i.child === currentChild);
+  const section = (loc, title, cls) => {
+    const list = items.filter(i => i.location === loc);
+    return `<section class="${cls}"><h2>${title}<small>${list.length}</small></h2><div class="grid">${
+      list.length ? list.map(i => `<div class="item ${selected.has(i.id) ? 'selected' : ''}" data-id="${i.id}">
+        <img src="${i.photo}" alt=""><span>${esc(i.label || '')}</span></div>`).join('')
+      : '<div class="empty">Nessun capo</div>'}</div></section>`;
+  };
+  document.getElementById('main').innerHTML =
+    section('school', '🏫 A scuola', 'school') + section('home', '🏠 A casa', 'home');
+
+  const sel = [...selected].map(id => state.items.find(i => i.id === id)).filter(Boolean);
+  const bar = document.getElementById('bar');
+  if (!sel.length) {
+    bar.innerHTML = `<button id="add">📷 Aggiungi capo</button>`;
+  } else {
+    const allSchool = sel.every(i => i.location === 'school');
+    const allHome = sel.every(i => i.location === 'home');
+    bar.innerHTML = `
+      <button class="secondary" id="clear">Annulla (${sel.length})</button>
+      ${allSchool ? '' : '<button id="toSchool">→ Scuola</button>'}
+      ${allHome ? '' : '<button id="toHome">→ Casa</button>'}
+      <button class="secondary" id="del">🗑</button>`;
+  }
+}
+
+function move(location) {
+  const now = new Date().toISOString();
+  state.items.forEach(i => { if (selected.has(i.id)) { i.location = location; i.movedAt = now; } });
+  selected.clear(); save(); render();
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-child],[data-id],button');
+  if (!t) return;
+  if (t.dataset.child) { currentChild = t.dataset.child; selected.clear(); }
+  else if (t.dataset.id) { selected.has(t.dataset.id) ? selected.delete(t.dataset.id) : selected.add(t.dataset.id); }
+  else if (t.id === 'add') return document.getElementById('camera').click();
+  else if (t.id === 'clear') selected.clear();
+  else if (t.id === 'toSchool') return move('school');
+  else if (t.id === 'toHome') return move('home');
+  else if (t.id === 'del' && confirm('Eliminare i capi selezionati?')) {
+    state.items = state.items.filter(i => !selected.has(i.id)); selected.clear(); save();
+  }
+  render();
+});
+
+document.getElementById('camera').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const photo = await compress(file);
+  const label = prompt('Descrizione (opzionale)', '') || '';
+  state.items.push({ id: crypto.randomUUID(), child: currentChild, location: 'home', label, photo, movedAt: new Date().toISOString() });
+  save(); render();
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+render();
+</script>
+</body>
+</html>

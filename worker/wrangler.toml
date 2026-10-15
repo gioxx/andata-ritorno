@@ -1,0 +1,16 @@
+name = "andata-ritorno"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Serve the PWA from /public as static assets
+[assets]
+directory = "../public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "andata-ritorno"
+database_id = "REPLACE_WITH_D1_ID"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "andata-ritorno-photos"
