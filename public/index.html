@@ -108,7 +108,18 @@
     <button value="" class="cancel">Annulla</button>
   </form>
 </dialog>
-<input type="file" id="camera" accept="image/*" multiple hidden>
+<dialog id="source">
+  <form method="dialog">
+    <h3>Aggiungi capi</h3>
+    <div class="row">
+      <button type="button" data-source="camera" class="primary">📷 Scatta</button>
+      <button type="button" data-source="gallery">🖼️ Galleria</button>
+    </div>
+    <button value="" class="cancel">Annulla</button>
+  </form>
+</dialog>
+<input type="file" id="camera" accept="image/*" capture="environment" hidden>
+<input type="file" id="gallery" accept="image/*" multiple hidden>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
 <script>
@@ -282,6 +293,12 @@ function move(location) {
 
 document.addEventListener('click', e => {
   if (e.target.closest('#newItem')) return; // the new-item dialog handles its own buttons
+  const sourceBtn = e.target.closest('[data-source]');
+  if (sourceBtn) { // click the input inside the same tap, so the browser lets the picker open
+    document.getElementById('source').close();
+    return document.getElementById(sourceBtn.dataset.source).click();
+  }
+  if (e.target.closest('#source')) return;
   const menu = document.getElementById('menu');
   if (e.target.id === 'menuClose') return menu.close();
   if (e.target === menu) { // the dialog itself is the target for both its padding and the backdrop
@@ -297,7 +314,7 @@ document.addEventListener('click', e => {
   if (!t) return;
   if (t.dataset.child) { currentChild = t.dataset.child; selected.clear(); }
   else if (t.dataset.id) { selected.has(t.dataset.id) ? selected.delete(t.dataset.id) : selected.add(t.dataset.id); }
-  else if (t.id === 'add') return document.getElementById('camera').click();
+  else if (t.id === 'add') return document.getElementById('source').showModal();
   else if (t.id === 'paste') return pasteFromClipboard();
   else if (t.id === 'export' || t.id === 'exportNow') return exportBackup();
   else if (t.id === 'import') return document.getElementById('importFile').click();
@@ -377,7 +394,8 @@ async function checkClipboard() {
 window.addEventListener('focus', checkClipboard);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkClipboard(); });
 
-document.getElementById('camera').addEventListener('change', e => {
+// Camera (capture opens the rear camera directly) and gallery (multi-select) share one handler.
+for (const id of ['camera', 'gallery']) document.getElementById(id).addEventListener('change', e => {
   const files = [...e.target.files]; e.target.value = '';
   addFiles(files);
 });
