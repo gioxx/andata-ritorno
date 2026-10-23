@@ -8,7 +8,7 @@ import { reportError } from './dialogs.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
-  onAddTab() {}, onAdd() {}, onPaste() {}, onMenu() {}, onExport() {},
+  onAddTab() {}, onTabLongPress(_id) {}, onImportFile(_file) {}, onAdd() {}, onPaste() {}, onMenu() {}, onExport() {},
 }
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
@@ -92,6 +92,7 @@ export function renderApp(root, s = store) {
 function wire(root) {
   if (wired.has(root)) return
   wired.add(root)
+  wireLongPress(root)
   root.addEventListener('click', (e) => {
     const t = e.target.closest('[data-tab],[data-id],[data-section],[data-act]')
     if (!t) return
@@ -110,6 +111,31 @@ function wire(root) {
       case 'del': if (confirm('Eliminare i capi selezionati?')) return act(deleteSelected)
     }
   })
+}
+
+const LONG_PRESS_MS = 450
+
+/** Long-press on a tab chip opens its manager; the click that follows the release is swallowed. */
+function wireLongPress(root) {
+  let timer = 0, fired = false, x = 0, y = 0
+  const cancel = () => { clearTimeout(timer); timer = 0 }
+  root.addEventListener('pointerdown', (e) => {
+    const chip = e.target.closest('.chip[data-tab]')
+    if (!chip) return
+    fired = false; x = e.clientX; y = e.clientY
+    cancel()
+    timer = setTimeout(() => { fired = true; act(() => hooks.onTabLongPress(chip.dataset.tab)) }, LONG_PRESS_MS)
+  })
+  root.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - x, e.clientY - y) > 10) cancel() })
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(ev, cancel)
+  // Capture phase: runs before the delegated click handler below.
+  root.addEventListener('click', (e) => {
+    if (!fired) return
+    fired = false
+    e.stopImmediatePropagation(); e.preventDefault()
+  }, true)
+  // Android Chrome shows a context menu on long-press; the manager replaces it.
+  root.addEventListener('contextmenu', (e) => { if (e.target.closest('.chip[data-tab]')) e.preventDefault() })
 }
 
 /** Run an action; any failure (sync or async) goes to one user-facing handler. */

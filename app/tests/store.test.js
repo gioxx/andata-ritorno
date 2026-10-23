@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -108,5 +108,53 @@ describe('store', () => {
     db.transaction = real
     expect(store.items.length).toBe(4)
     expect(store.unsaved).toBe(0)
+  })
+})
+
+describe('tab management', () => {
+  it('addTab appends, becomes current and counts as a change', async () => {
+    await addTab('  Nido  ')
+    const t = store.tabs.at(-1)
+    expect(t.name).toBe('Nido')
+    expect(t.order).toBe(2)
+    expect(store.currentTabId).toBe(t.id)
+    expect(store.unsaved).toBe(1)
+    expect((await loadAll(db)).tabs).toHaveLength(3)
+  })
+
+  it('renameTab keeps items tabId and bumps updatedAt', async () => {
+    await renameTab('A', 'Nuovo')
+    expect(store.tabs.find((t) => t.id === 'A').name).toBe('Nuovo')
+    expect(store.tabs.find((t) => t.id === 'A').updatedAt).not.toBe(T0)
+    expect(store.items.filter((i) => i.tabId === 'A')).toHaveLength(3)
+    const { tabs, items } = await loadAll(db)
+    expect(tabs.find((t) => t.id === 'A').name).toBe('Nuovo')
+    expect(items.filter((i) => i.tabId === 'A')).toHaveLength(3)
+  })
+
+  it('reorderTabs rewrites order and touches only changed tabs', async () => {
+    await addTab('C')
+    const c = store.tabs.at(-1).id
+    await reorderTabs(['A', c, 'B'])
+    expect(store.tabs.map((t) => t.id)).toEqual(['A', c, 'B'])
+    expect(store.tabs.map((t) => t.order)).toEqual([0, 1, 2])
+    expect(store.tabs.find((t) => t.id === 'A').updatedAt).toBe(T0)
+    expect(store.tabs.find((t) => t.id === 'B').updatedAt).not.toBe(T0)
+    expect((await loadAll(db)).tabs.map((t) => t.id)).toEqual(['A', c, 'B'])
+  })
+
+  it('removeTab deletes its items, switches current tab and counts them', async () => {
+    await removeTab('A')
+    expect(store.tabs.map((t) => t.id)).toEqual(['B'])
+    expect(store.currentTabId).toBe('B')
+    expect(store.items.map((i) => i.id)).toEqual(['b1'])
+    expect(store.unsaved).toBe(3)
+  })
+
+  it('removeTab on the last tab rejects and changes nothing', async () => {
+    await removeTab('B')
+    await expect(removeTab('A')).rejects.toThrow('last-tab')
+    expect(store.tabs).toHaveLength(1)
+    expect(store.items).toHaveLength(3)
   })
 })

@@ -75,3 +75,19 @@ dialog .preview { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 12px
 dialog .preview img { height: 96px; width: 96px; flex: none; object-fit: cover; border-radius: var(--r-tile); background: var(--tile); }
 dialog input[type="text"] { width: 100%; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
 dialog input[hidden] { display: none; }
+
+/* ---- Tabs & welcome ---- */
+dialog .row.mgr-row { margin: 12px 0 8px; }
+dialog button:disabled { opacity: .4; cursor: default; }
+dialog button.danger { display: block; width: 100%; background: none; color: #c0392b; border: 1.5px solid currentColor; }
+dialog button.cancel-inline { background: var(--chip); }
+dialog #mgrSave { display: block; width: 100%; }
+dialog .note { margin: 8px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+.chip { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.welcome { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 24px 20px; }
+.welcome input[type="text"] { width: 100%; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
+.welcome .hint { font-size: 12px; color: var(--muted); margin-top: -6px; padding-left: 14px; }
+.welcome button { padding: 13px; border-radius: var(--r-pill); font-weight: 700; font-size: 14px; background: var(--chip); }
+.welcome button.primary { background: var(--accent); color: var(--bg); }
+.welcome button:disabled { opacity: .4; cursor: default; }
+.welcome .note { margin: 4px 0 0; font-size: 12px; color: var(--muted); text-align: center; }

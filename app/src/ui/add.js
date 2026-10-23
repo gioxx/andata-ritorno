@@ -10,7 +10,7 @@ let busy = false // one add dialog at a time
 /** Add image files/blobs as new items for the current tab. Resolves false if there was nothing to add. */
 async function addFiles(files) {
   if (!files.length) return false
-  if (busy) return true
+  if (busy) { alert('Aggiunta in corso, riprova tra un attimo'); return true }
   busy = true
   let urls = []
   try {

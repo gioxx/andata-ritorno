@@ -1,6 +1,6 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta } from './db.js'
+import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, deleteTab } from './db.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -144,6 +144,67 @@ export function addPhotos(photos, { location, label }) {
     await addItems(store.db, items, photos)
     store.items.push(...items)
     await bump(items.length)
+    notify()
+  })
+}
+
+/** Create a tab at the end and make it current. @param {string} name */
+export function addTab(name) {
+  return queue(async () => {
+    const now = new Date().toISOString()
+    const order = store.tabs.reduce((m, t) => Math.max(m, t.order), -1) + 1
+    const tab = { id: crypto.randomUUID(), name: name.trim(), order, createdAt: now, updatedAt: now }
+    await putTab(store.db, tab)
+    store.tabs.push(tab)
+    store.currentTabId = tab.id
+    store.selected.clear()
+    await bump(1)
+    notify()
+  })
+}
+
+export function renameTab(id, name) {
+  return queue(async () => {
+    const tab = store.tabs.find((t) => t.id === id)
+    if (!tab) throw new Error('not-found')
+    const next = { ...tab, name: name.trim(), updatedAt: new Date().toISOString() }
+    await putTab(store.db, next)
+    Object.assign(tab, next)
+    await bump(1)
+    notify()
+  })
+}
+
+/** Rewrite `order` as 0..n-1 following `ids`; only tabs whose order changed get a new updatedAt. */
+export function reorderTabs(ids) {
+  return queue(async () => {
+    const now = new Date().toISOString()
+    const byId = new Map(store.tabs.map((t) => [t.id, t]))
+    const changed = []
+    ids.forEach((id, order) => {
+      const t = byId.get(id)
+      if (t && t.order !== order) changed.push({ ...t, order, updatedAt: now })
+    })
+    if (!changed.length) return
+    for (const t of changed) await putTab(store.db, t)
+    for (const t of changed) Object.assign(byId.get(t.id), t)
+    store.tabs.sort((a, b) => a.order - b.order)
+    await bump(1)
+    notify()
+  })
+}
+
+/** Delete a tab with its items and photos; rejects (Error 'last-tab') for the only tab. */
+export function removeTab(id) {
+  return queue(async () => {
+    const n = store.items.filter((i) => i.tabId === id).length
+    await deleteTab(store.db, id)
+    const { tabs, items } = await loadAll(store.db)
+    store.tabs = tabs
+    store.items = items
+    store.selected.clear()
+    if (store.currentTabId === id || !tabs.some((t) => t.id === store.currentTabId)) store.currentTabId = tabs[0]?.id ?? null
+    await bump(Math.max(1, n))
     notify()
   })
 }
