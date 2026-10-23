@@ -7,4 +7,4 @@
  *   failures:Failure[], childMap?:Record<string,string> }} Incoming */
 /** @typedef {{ itemId:string, label:string, tabName:string, location:'school'|'home', reason:string }} Failure */
 /** @typedef {{ tabsPut:Tab[], itemsPut:Item[], photosPut:Map<string,Blob>, photosDelete:string[],
- *   added:number, updated:number }} ImportPlan */
+ *   added:number, updated:number, metaPut?:Array<[string, any]> }} ImportPlan */

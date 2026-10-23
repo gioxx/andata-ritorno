@@ -12,6 +12,12 @@ const item = (id, tabId, photoId = 'p-' + id) => ({
   id, tabId, location: 'school', label: id, photoId, createdAt: T0, movedAt: T0, updatedAt: T0,
 })
 const photo = (id, content = id) => ({ id, blob: new Blob([content], { type: 'image/jpeg' }), width: 1, height: 1 })
+async function expectBlob(b, text, type = 'image/jpeg') {
+  expect(b).toBeInstanceOf(Blob)
+  expect(b.type).toBe(type)
+  expect(b.size).toBe(text.length)
+  expect(await b.text()).toBe(text)
+}
 const count = (db, store) => db.count(store)
 
 async function seed(db) {
@@ -74,7 +80,7 @@ describe('db', () => {
     await seed(db)
     await replacePhoto(db, 'i1', photo('p-new'), T1)
     expect(await db.get('photos', 'p-i1')).toBeUndefined()
-    expect(await db.get('photos', 'p-new')).toBeDefined()
+    await expectBlob(await getPhoto(db, 'p-new'), 'p-new')
     const it = await db.get('items', 'i1')
     expect(it.photoId).toBe('p-new')
     expect(it.updatedAt).toBe(T1)
@@ -92,8 +98,7 @@ describe('db', () => {
     const db = await fresh()
     await seed(db)
     const b = await getPhoto(db, 'p-i1')
-    // jsdom Blob may not round-trip through fake-indexeddb as a Blob; check shape only
-    expect(b).toBeDefined()
+    await expectBlob(b, 'p-i1')
     expect(await getPhoto(db, 'nope')).toBeUndefined()
   })
 
@@ -110,14 +115,16 @@ describe('db', () => {
     await applyPlan(db, {
       tabsPut: [tab('C', 2)],
       itemsPut: [item('i9', 'C')],
-      photosPut: new Map([['p-i9', new Blob(['x'])]]),
+      photosPut: new Map([['p-i9', new Blob(['xyz'], { type: 'image/png' })]]),
+      metaPut: [['todo', [1]]],
       photosDelete: ['p-i1'],
       added: 1, updated: 0,
     })
     expect(await count(db, 'tabs')).toBe(3)
     expect(await count(db, 'items')).toBe(4)
     expect(await db.get('photos', 'p-i1')).toBeUndefined()
-    expect(await db.get('photos', 'p-i9')).toBeDefined()
+    await expectBlob(await getPhoto(db, 'p-i9'), 'xyz', 'image/png')
+    expect(await getMeta(db, 'todo')).toEqual([1])
   })
 
   it('applyPlan is atomic', async () => {
@@ -129,11 +136,39 @@ describe('db', () => {
       itemsPut: [item('ok', 'C'), { label: 'no id' }],
       photosPut: new Map([['p-new', new Blob(['x'])]]),
       photosDelete: ['p-i1'],
+      metaPut: [['todo', ['valid']]],
       added: 2, updated: 0,
     })).rejects.toThrow()
     const after = [await count(db, 'tabs'), await count(db, 'items'), await count(db, 'photos')]
     expect(after).toEqual(before)
     expect(await db.get('photos', 'p-i1')).toBeDefined()
+    expect(await getMeta(db, 'todo')).toBeUndefined()
+  })
+
+  it('async request failure rejects once with the original error and aborts', async () => {
+    const real = await fresh()
+    await seed(real)
+    // Make the items put an `add`, so an existing id fails asynchronously (ConstraintError).
+    const db = {
+      transaction: (...a) => {
+        const tx = real.transaction(...a)
+        return {
+          done: tx.done,
+          abort: () => tx.abort(),
+          objectStore: (n) => {
+            const s = tx.objectStore(n)
+            return n === 'items' ? { put: (v) => s.add(v) } : s
+          },
+        }
+      },
+    }
+    const before = await count(real, 'tabs')
+    await expect(applyPlan(db, {
+      tabsPut: [tab('C', 2)],
+      itemsPut: [item('i1', 'A')],
+      photosPut: new Map(), photosDelete: [], added: 0, updated: 0,
+    })).rejects.toMatchObject({ name: 'ConstraintError' })
+    expect(await count(real, 'tabs')).toBe(before)
   })
 
   it('versionchange closes the connection and calls the handler', async () => {

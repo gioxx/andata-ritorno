@@ -44,10 +44,32 @@ export async function putTab(db, tab) {
   await db.put('tabs', tab)
 }
 
-export async function deleteTab(db, tabId) {
+/**
+ * Run `fn(tx, track)` in one readwrite tx. `track` registers fire-and-forget
+ * requests; if anything fails (sync throw or async request error such as quota)
+ * the tx is aborted and the caller gets exactly one rejection, the original error,
+ * with no unhandled rejections left behind.
+ */
+async function withTx(db, stores, fn) {
+  const tx = db.transaction(stores, 'readwrite')
   const pending = []
-  const tx = db.transaction(['tabs', 'items', 'photos'], 'readwrite')
+  const track = (p) => { pending.push(p); return p }
+  let first
+  const record = (e) => { first ??= e }
   try {
+    await fn(tx, track)
+  } catch (e) {
+    record(e)
+    try { tx.abort() } catch { /* already finished */ }
+  }
+  // Settle every request and tx.done; the first error that surfaced wins.
+  const results = await Promise.allSettled([...pending, tx.done])
+  for (const r of results) if (r.status === 'rejected') record(r.reason)
+  if (first) throw first
+}
+
+export async function deleteTab(db, tabId) {
+  await withTx(db, ['tabs', 'items', 'photos'], async (tx) => {
     // Checked inside the tx so two concurrent deletes cannot both pass.
     if ((await tx.objectStore('tabs').count()) <= 1) throw new Error('last-tab')
     const items = await tx.objectStore('items').index('tabId').getAll(tabId)
@@ -56,10 +78,7 @@ export async function deleteTab(db, tabId) {
       await tx.objectStore('items').delete(it.id)
     }
     await tx.objectStore('tabs').delete(tabId)
-  } catch (e) {
-    await fail(tx, pending, e)
-  }
-  await tx.done
+  })
 }
 
 /**
@@ -67,15 +86,10 @@ export async function deleteTab(db, tabId) {
  * @param {Photo[]} photos
  */
 export async function addItems(db, items, photos) {
-  const pending = []
-  const tx = db.transaction(['items', 'photos'], 'readwrite')
-  try {
-    for (const p of photos) pending.push(tx.objectStore('photos').put(p))
-    for (const it of items) pending.push(tx.objectStore('items').put(it))
-  } catch (e) {
-    await fail(tx, pending, e)
-  }
-  await tx.done
+  await withTx(db, ['items', 'photos'], (tx, track) => {
+    for (const p of photos) track(tx.objectStore('photos').put(p))
+    for (const it of items) track(tx.objectStore('items').put(it))
+  })
 }
 
 export async function moveItems(db, ids, location, now) {
@@ -89,34 +103,24 @@ export async function updateItem(db, id, patch, now) {
 
 /** @param {Photo} photo */
 export async function replacePhoto(db, itemId, photo, now) {
-  const pending = []
-  const tx = db.transaction(['items', 'photos'], 'readwrite')
-  try {
+  await withTx(db, ['items', 'photos'], async (tx) => {
     const it = await tx.objectStore('items').get(itemId)
     if (!it) throw new Error('not-found')
     await tx.objectStore('photos').put(photo)
     if (it.photoId !== photo.id) await tx.objectStore('photos').delete(it.photoId)
     await tx.objectStore('items').put({ ...it, photoId: photo.id, updatedAt: now })
-  } catch (e) {
-    await fail(tx, pending, e)
-  }
-  await tx.done
+  })
 }
 
 export async function deleteItems(db, ids) {
-  const pending = []
-  const tx = db.transaction(['items', 'photos'], 'readwrite')
-  try {
+  await withTx(db, ['items', 'photos'], async (tx) => {
     for (const id of ids) {
       const it = await tx.objectStore('items').get(id)
       if (!it) continue
       await tx.objectStore('photos').delete(it.photoId)
       await tx.objectStore('items').delete(id)
     }
-  } catch (e) {
-    await fail(tx, pending, e)
-  }
-  await tx.done
+  })
 }
 
 /** @returns {Promise<Blob|undefined>} */
@@ -129,41 +133,23 @@ export const setMeta = async (db, key, value) => {
   await db.put('meta', value, key)
 }
 
-/** @param {ImportPlan} plan  One tx over everything: all-or-nothing. */
+/** @param {ImportPlan} plan  One tx over everything (incl. meta): all-or-nothing. */
 export async function applyPlan(db, plan) {
-  const pending = []
-  const tx = db.transaction(['tabs', 'items', 'photos', 'meta'], 'readwrite')
-  try {
-    for (const t of plan.tabsPut) pending.push(tx.objectStore('tabs').put(t))
-    for (const it of plan.itemsPut) pending.push(tx.objectStore('items').put(it))
+  await withTx(db, ['tabs', 'items', 'photos', 'meta'], (tx, track) => {
+    for (const t of plan.tabsPut) track(tx.objectStore('tabs').put(t))
+    for (const it of plan.itemsPut) track(tx.objectStore('items').put(it))
     // Dimensions are unknown for imported blobs; 0 means "not measured".
-    for (const [id, blob] of plan.photosPut) pending.push(tx.objectStore('photos').put({ id, blob, width: 0, height: 0 }))
-    for (const id of plan.photosDelete) pending.push(tx.objectStore('photos').delete(id))
-  } catch (e) {
-    await fail(tx, pending, e)
-  }
-  await tx.done
+    for (const [id, blob] of plan.photosPut) track(tx.objectStore('photos').put({ id, blob, width: 0, height: 0 }))
+    for (const id of plan.photosDelete) track(tx.objectStore('photos').delete(id))
+    for (const [k, v] of plan.metaPut ?? []) track(tx.objectStore('meta').put(v, k))
+  })
 }
 
 async function patchItems(db, ids, fn) {
-  const pending = []
-  const tx = db.transaction('items', 'readwrite')
-  try {
+  await withTx(db, ['items'], async (tx) => {
     for (const id of ids) {
       const it = await tx.store.get(id)
       if (it) await tx.store.put(fn(it))
     }
-  } catch (e) {
-    await fail(tx, pending, e)
-  }
-  await tx.done
-}
-
-// Abort the tx and swallow the AbortError of requests still in flight, so only the
-// original error reaches the caller (and nothing is left as an unhandled rejection).
-async function fail(tx, pending, err) {
-  try { tx.abort() } catch { /* already finished */ }
-  pending.forEach((p) => p.catch(() => {}))
-  await tx.done.catch(() => {})
-  throw err
+  })
 }
