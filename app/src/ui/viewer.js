@@ -82,9 +82,9 @@ async function show(i) {
     if (!url) {
       const blob = await getPhoto(store.db, it.photoId)
       if (!blob) return
-      url = URL.createObjectURL(blob)
-      if (!isOpen) { URL.revokeObjectURL(url); return }
-      urls.set(it.photoId, url)
+      if (!isOpen) return
+      url = urls.get(it.photoId) // a faster duplicate load (a->b->a swipe) may have won meanwhile
+      if (!url) { url = URL.createObjectURL(blob); urls.set(it.photoId, url) }
     }
     if (my === token) d.img.src = url
   } catch (e) { reportError(e) }

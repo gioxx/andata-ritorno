@@ -152,11 +152,15 @@ export function addPhotos(photos, { location, label }) {
 const EDITABLE = ['label', 'tabId', 'category']
 
 /**
- * Edit label / tab / category (anything else is ignored). Changes updatedAt, never movedAt.
+ * Edit label / tab / category (anything else is ignored) and optionally replace the photo,
+ * as ONE change. Changes updatedAt, never movedAt. Nothing changed = nothing written.
+ * The replaced blob is deleted in replacePhoto's transaction; the old object URL is dropped
+ * by the next render (it revokes URLs of photos no longer in use).
  * @param {string} id
  * @param {{label?:string, tabId?:string, category?:string}} patch
+ * @param {import('./types.js').Photo|null} [photo] already compressed, see prepareReplacement
  */
-export function editItem(id, patch) {
+export function editItem(id, patch, photo = null) {
   return queue(async () => {
     const it = store.items.find((i) => i.id === id)
     if (!it) throw new Error('not-found')
@@ -164,9 +168,15 @@ export function editItem(id, patch) {
     for (const k of EDITABLE) if (patch[k] !== undefined) clean[k] = patch[k]
     if (clean.label !== undefined) clean.label = String(clean.label).trim()
     if (clean.tabId !== undefined && !store.tabs.some((t) => t.id === clean.tabId)) throw new Error('not-found')
+    for (const k of Object.keys(clean)) if (clean[k] === (it[k] ?? (k === 'label' ? '' : undefined))) delete clean[k]
+    if (!Object.keys(clean).length && !photo) return
     const now = new Date().toISOString()
-    await updateItem(store.db, id, clean, now)
-    const leaves = clean.tabId !== undefined && clean.tabId !== it.tabId
+    if (photo) {
+      await replacePhoto(store.db, id, photo, now)
+      it.photoId = photo.id
+    }
+    if (Object.keys(clean).length) await updateItem(store.db, id, clean, now)
+    const leaves = clean.tabId !== undefined
     Object.assign(it, clean, { updatedAt: now })
     if (leaves) store.selected.clear() // it is no longer in the visible tab
     await bump(1)
@@ -174,24 +184,10 @@ export function editItem(id, patch) {
   })
 }
 
-/**
- * Replace the item's photo. The old blob is deleted in the same transaction; the old
- * object URL is dropped by the next render (it revokes URLs of photos no longer in use).
- * @param {string} id @param {File|Blob} file
- */
-export async function changePhoto(id, file, compressFn = compress) {
+/** Compress a picked file for editItem(..., photo). Slow, so it runs outside the queue. */
+export async function prepareReplacement(file, compressFn = compress) {
   if (!file?.type?.startsWith('image/')) throw new Error('not-an-image')
-  const photo = await compressFn(file) // slow: done outside the queue
-  return queue(async () => {
-    const it = store.items.find((i) => i.id === id)
-    if (!it) throw new Error('not-found')
-    const now = new Date().toISOString()
-    await replacePhoto(store.db, id, photo, now)
-    it.photoId = photo.id
-    it.updatedAt = now
-    await bump(1)
-    notify()
-  })
+  return compressFn(file)
 }
 
 /** Create a tab at the end and make it current. @param {string} name */

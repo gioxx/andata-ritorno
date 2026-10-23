@@ -1,6 +1,6 @@
 // Add-flow dialogs. Built once on first use and appended to <body>, so the whole-screen
 // innerHTML re-render of the main screen never touches them.
-import { store, editItem, changePhoto } from '../store.js'
+import { store, editItem, prepareReplacement } from '../store.js'
 
 let filesHandler = () => {}
 /** One-shot handler for the next picked files (change photo); null = the add flow. */
@@ -35,6 +35,7 @@ function ensureDom() {
       <h3>Modifica capo</h3>
       <input type="text" id="editLabel" placeholder="Descrizione" aria-label="Descrizione" autocomplete="off">
       <select id="editTab" aria-label="Scheda"></select>
+      <img id="editPreview" class="edit-preview" alt="" hidden>
       <button type="button" id="editPhoto">Cambia foto</button>
       <div class="row">
         <button value="" class="cancel-inline">Annulla</button>
@@ -47,7 +48,7 @@ function ensureDom() {
   const $ = (id) => document.getElementById(id)
   dom = { source: $('source'), newItem: $('newItem'), title: $('newTitle'), preview: $('newPreview'), label: $('newLabel'),
     sourceTitle: $('sourceTitle'), gallery: $('gallery'),
-    edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editSave: $('editSave') }
+    edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editPreview: $('editPreview'), editSave: $('editSave') }
   // Click the input inside the same tap, so the browser lets the picker open.
   dom.source.addEventListener('click', (e) => {
     const b = e.target.closest('[data-source]')
@@ -110,12 +111,21 @@ export function openEditItem(id) {
   const d = ensureDom()
   d.editLabel.value = it.label || ''
   d.editTab.replaceChildren(...store.tabs.map((t) => Object.assign(new Option(t.name, t.id), { selected: t.id === it.tabId })))
+  // The picked photo is only held here; Salva commits it with the fields, Annulla drops it.
+  let pending = null
+  let previewUrl = ''
+  const clearPreview = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = ''; d.editPreview.hidden = true; d.editPreview.removeAttribute('src') }
+  clearPreview()
   d.editPhoto.textContent = 'Cambia foto'
   d.editPhoto.onclick = () => openSourcePicker(async (files) => {
     if (!files[0]) return
     try {
-      await changePhoto(id, files[0])
-      d.editPhoto.textContent = 'Foto cambiata ✓'
+      pending = await prepareReplacement(files[0])
+      clearPreview()
+      previewUrl = URL.createObjectURL(pending.blob)
+      d.editPreview.src = previewUrl
+      d.editPreview.hidden = false
+      d.editPhoto.textContent = 'Cambia di nuovo'
     } catch (e) {
       if (e?.message === 'not-an-image') alert("1 file non è un'immagine leggibile ed è stato saltato")
       else reportError(e)
@@ -123,8 +133,9 @@ export function openEditItem(id) {
   })
   d.edit.returnValue = ''
   d.edit.addEventListener('close', () => {
+    clearPreview()
     if (d.edit.returnValue !== 'ok') return
-    editItem(id, { label: d.editLabel.value, tabId: d.editTab.value }).catch(reportError)
+    editItem(id, { label: d.editLabel.value, tabId: d.editTab.value }, pending).catch(reportError)
   }, { once: true })
   d.edit.showModal()
 }

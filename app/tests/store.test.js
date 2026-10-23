@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, changePhoto } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, prepareReplacement } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -195,19 +195,36 @@ describe('edit item', () => {
     await expect(editItem('a1', { tabId: 'nope' })).rejects.toThrow('not-found')
   })
 
-  it('changePhoto leaves exactly one photo blob for the item and counts one change', async () => {
+  it('saving with a new photo replaces the blob exactly once and counts ONE change with the fields', async () => {
     const fake = async () => photo('new')
-    await changePhoto('a1', new File(['x'], 'x.jpg', { type: 'image/jpeg' }), fake)
-    expect(store.items.find((i) => i.id === 'a1').photoId).toBe('new')
+    const p = await prepareReplacement(new File(['x'], 'x.jpg', { type: 'image/jpeg' }), fake)
+    await editItem('a1', { label: 'nuova' }, p)
+    const it = store.items.find((i) => i.id === 'a1')
+    expect(it.photoId).toBe('new')
+    expect(it.label).toBe('nuova')
     expect(await getPhoto(db, 'p-a1')).toBeUndefined()
     expect(await getPhoto(db, 'new')).toBeDefined()
+    expect(it.movedAt).toBe(T0)
     expect(store.unsaved).toBe(1)
-    expect(store.items.find((i) => i.id === 'a1').movedAt).toBe(T0)
+    expect((await loadAll(db)).items.find((i) => i.id === 'a1').photoId).toBe('new')
   })
 
-  it('changePhoto rejects a non-image and changes nothing', async () => {
-    await expect(changePhoto('a1', new File(['x'], 'x.txt', { type: 'text/plain' }))).rejects.toThrow('not-an-image')
+  it('preparing a replacement and cancelling (never calling editItem) leaves the original blob intact', async () => {
+    const before = await (await getPhoto(db, 'p-a1')).text()
+    await prepareReplacement(new File(['x'], 'x.jpg', { type: 'image/jpeg' }), async () => photo('new'))
+    expect(await (await getPhoto(db, 'p-a1')).text()).toBe(before)
+    expect(await getPhoto(db, 'new')).toBeUndefined()
     expect(store.items.find((i) => i.id === 'a1').photoId).toBe('p-a1')
     expect(store.unsaved).toBe(0)
+  })
+
+  it('saving with nothing changed writes and counts nothing', async () => {
+    await editItem('a1', { label: ' a1 ', tabId: 'A' })
+    expect(store.items.find((i) => i.id === 'a1').updatedAt).toBe(T0)
+    expect(store.unsaved).toBe(0)
+  })
+
+  it('prepareReplacement rejects a non-image', async () => {
+    await expect(prepareReplacement(new File(['x'], 'x.txt', { type: 'text/plain' }))).rejects.toThrow('not-an-image')
   })
 })
