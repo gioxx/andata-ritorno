@@ -73,14 +73,17 @@ export async function commitImport(db, { incoming, plan }, { partial }) {
 
   const { tabs, items } = await loadAll(db)
   const byId = new Map(items.map((i) => [i.id, i]))
-  for (const planned of plan.itemsPut) {
-    const stored = byId.get(planned.id)
+  // Every valid item of the file (incl. ones skipped as unchanged) must be there with its photo.
+  const fileIds = new Set(incoming.items.map((i) => i.id))
+  const toCheck = new Set([...fileIds, ...plan.itemsPut.map((i) => i.id)])
+  for (const id of toCheck) {
+    const stored = byId.get(id)
     const blob = stored && (await getPhoto(db, stored.photoId))
     if (!(blob?.size > 0)) throw new Error('verify-failed')
   }
+  if (items.filter((i) => fileIds.has(i.id)).length !== fileIds.size) throw new Error('verify-failed')
 
   // Counts as stored, for the file's items: what the user compares with the mockup.
-  const fileIds = new Set(incoming.items.map((i) => i.id))
   const perTab = []
   for (const tab of tabs) {
     const mine = items.filter((i) => i.tabId === tab.id && fileIds.has(i.id))
@@ -93,9 +96,9 @@ export async function commitImport(db, { incoming, plan }, { partial }) {
 
 /** @param {Summary} s */
 export function formatSummary(s) {
-  const parts = [`Importati ${s.added} ${s.added === 1 ? 'capo' : 'capi'}`]
+  const parts = [s.added === 1 ? 'Importato 1 capo' : `Importati ${s.added} capi`]
   for (const t of s.perTab) parts.push(`${t.tabName} ${t.school + t.home} (${t.school} a scuola, ${t.home} a casa)`)
-  if (s.updated > 0) parts.push(`${s.updated} aggiornati`)
+  if (s.updated > 0) parts.push(`${s.updated} ${s.updated === 1 ? 'aggiornato' : 'aggiornati'}`)
   if (s.failed > 0) parts.push(`${s.failed} da rifare`)
   return parts.join(' · ')
 }

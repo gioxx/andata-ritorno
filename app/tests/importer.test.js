@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest'
 import { openDb, loadAll, putTab, getPhoto, getMeta } from '../src/db.js'
-import { dataUrlToBlob } from '../src/photos.js'
 import { prepareImport, commitImport, formatSummary, ImportBlocked } from '../src/backup/importer.js'
 import sample from './fixtures/v1-sample.json'
 
@@ -56,9 +55,10 @@ describe('importer', () => {
     for (const src of sample.items) {
       const it = items.find((i) => i.id === src.id)
       const stored = await getPhoto(db, it.photoId)
-      const expected = dataUrlToBlob(src.photo)
+      // Decoded independently of dataUrlToBlob so a bug there cannot cancel out.
+      const expected = new Uint8Array(Buffer.from(src.photo.split(',')[1], 'base64'))
       expect(stored.type).toBe('image/webp')
-      expect(await bytesOf(stored)).toEqual(await bytesOf(expected))
+      expect(await bytesOf(stored)).toEqual(expected)
     }
   })
 
@@ -172,7 +172,7 @@ describe('importer', () => {
     data.items[0].location = 'home'
     const summary = await run(db, data)
     expect(summary).toMatchObject({ added: 0, updated: 1 })
-    expect(formatSummary(summary)).toBe('Importati 0 capi · Nido 2 (0 a scuola, 2 a casa) · Materna 1 (1 a scuola, 0 a casa) · 1 aggiornati')
+    expect(formatSummary(summary)).toBe('Importati 0 capi · Nido 2 (0 a scuola, 2 a casa) · Materna 1 (1 a scuola, 0 a casa) · 1 aggiornato')
     const it = (await loadAll(db)).items.find((i) => i.id === id)
     expect(it).toMatchObject({ label: 'Rinominato in v2', location: 'home', photoId: cur.photoId })
   })
@@ -193,6 +193,16 @@ describe('importer', () => {
 
   it('formatSummary uses the singular for one item', () => {
     expect(formatSummary({ added: 1, updated: 2, failed: 0, perTab: [{ tabName: 'Nido', school: 1, home: 0 }] }))
-      .toBe('Importati 1 capo · Nido 1 (1 a scuola, 0 a casa) · 2 aggiornati')
+      .toBe('Importato 1 capo · Nido 1 (1 a scuola, 0 a casa) · 2 aggiornati')
+  })
+
+  it('verify fails when an unchanged local item of the file has lost its photo', async () => {
+    const db = await fresh()
+    await run(db, sample)
+    const cur = (await loadAll(db)).items.find((i) => i.id === sample.items[0].id)
+    await db.delete('photos', cur.photoId)
+    const prepared = await prepareImport(db, fileOf(sample))
+    expect(prepared.plan.itemsPut).toHaveLength(0) // skipped by buildPlan as unchanged
+    await expect(commitImport(db, prepared, { partial: false })).rejects.toThrow('verify-failed')
   })
 })
