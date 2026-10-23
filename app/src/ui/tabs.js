@@ -37,6 +37,17 @@ function ensureDom() {
     left: $('mgrLeft'), right: $('mgrRight'), del: $('mgrDel'), note: $('mgrNote'),
   }
   dom.newName.addEventListener('input', () => { dom.newOk.disabled = !dom.newName.value.trim() })
+  // Enter would hit the first submit button (the cancel one); make it the primary action.
+  dom.newName.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    if (!dom.newOk.disabled) dom.newTab.querySelector('form').requestSubmit(dom.newOk)
+  })
+  dom.name.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    manage('mgrSave')
+  })
   dom.newTab.addEventListener('close', () => {
     if (dom.newTab.returnValue === 'ok' && dom.newName.value.trim()) addTab(dom.newName.value).catch(reportError)
   })

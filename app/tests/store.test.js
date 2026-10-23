@@ -122,6 +122,13 @@ describe('tab management', () => {
     expect((await loadAll(db)).tabs).toHaveLength(3)
   })
 
+  it('addTab and renameTab reject empty names', async () => {
+    await expect(addTab('   ')).rejects.toThrow('empty-name')
+    await expect(renameTab('A', ' ')).rejects.toThrow('empty-name')
+    expect(store.tabs).toHaveLength(2)
+    expect(store.tabs[0].name).toBe('A')
+  })
+
   it('renameTab keeps items tabId and bumps updatedAt', async () => {
     await renameTab('A', 'Nuovo')
     expect(store.tabs.find((t) => t.id === 'A').name).toBe('Nuovo')

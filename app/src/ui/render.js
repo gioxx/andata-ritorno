@@ -127,7 +127,13 @@ function wireLongPress(root) {
     timer = setTimeout(() => { fired = true; act(() => hooks.onTabLongPress(chip.dataset.tab)) }, LONG_PRESS_MS)
   })
   root.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - x, e.clientY - y) > 10) cancel() })
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(ev, cancel)
+  // On document: after a long-press a modal opens and the release lands outside root.
+  // The click (if any) follows pointerup right away, so `fired` is cleared a tick later.
+  for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, () => {
+    cancel()
+    setTimeout(() => { fired = false }, 0)
+  })
+  root.addEventListener('pointerleave', cancel)
   // Capture phase: runs before the delegated click handler below.
   root.addEventListener('click', (e) => {
     if (!fired) return

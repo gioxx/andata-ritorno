@@ -151,6 +151,7 @@ export function addPhotos(photos, { location, label }) {
 /** Create a tab at the end and make it current. @param {string} name */
 export function addTab(name) {
   return queue(async () => {
+    if (!name.trim()) throw new Error('empty-name')
     const now = new Date().toISOString()
     const order = store.tabs.reduce((m, t) => Math.max(m, t.order), -1) + 1
     const tab = { id: crypto.randomUUID(), name: name.trim(), order, createdAt: now, updatedAt: now }
@@ -165,6 +166,7 @@ export function addTab(name) {
 
 export function renameTab(id, name) {
   return queue(async () => {
+    if (!name.trim()) throw new Error('empty-name')
     const tab = store.tabs.find((t) => t.id === id)
     if (!tab) throw new Error('not-found')
     const next = { ...tab, name: name.trim(), updatedAt: new Date().toISOString() }
