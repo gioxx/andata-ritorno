@@ -4,4 +4,4 @@ name = "andata-ritorno-mockup"
 compatibility_date = "2026-10-01"
 
 [assets]
-directory = "../public"
+directory = "../legacy"

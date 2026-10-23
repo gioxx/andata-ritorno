@@ -38,6 +38,9 @@
   .empty { color:var(--muted); font-size:13px; }
   .unsaved { display:flex; align-items:center; gap:8px; margin:12px 16px 0; padding:10px 12px; border-radius:12px; background:var(--warn-bg); color:var(--warn-fg); font-size:14px; }
   .unsaved span { flex:1; }
+  /* Persistent notice: the mockup is frozen, the real app lives elsewhere */
+  .moved { flex-wrap:wrap; }
+  .moved a { padding:8px 12px; border-radius:8px; background:#b07800; color:#fff; font-weight:600; font-size:14px; text-decoration:none; }
   .unsaved button { padding:8px 12px; border:0; border-radius:8px; background:#b07800; color:#fff; font-weight:600; }
   .bar { position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:var(--card); box-shadow:0 -2px 8px rgba(0,0,0,.1); }
   .bar button { flex:1; padding:12px; border:0; border-radius:10px; font-weight:600; font-size:15px; background:var(--accent); color:#fff; }
@@ -176,7 +179,8 @@ function render() {
       : '<div class="empty">Nessun capo</div>'}</div></section>`;
   };
   const n = unsavedCount();
-  const banner = n ? `<div class="unsaved"><span>⚠ ${n === 1 ? '1 modifica non salvata' : `${n} modifiche non salvate`}</span><button id="exportNow">Esporta</button></div>` : '';
+  const moved = `<div class="unsaved moved"><span>A/R si è trasferita su ar.gioxx.org</span><button id="exportMoved">Esporta backup</button><a href="https://ar.gioxx.org" target="_blank" rel="noopener">Apri la nuova app</a></div>`;
+  const banner = moved + (n ? `<div class="unsaved"><span>⚠ ${n === 1 ? '1 modifica non salvata' : `${n} modifiche non salvate`}</span><button id="exportNow">Esporta</button></div>` : '');
   document.getElementById('main').innerHTML = banner +
     section('school', '🏫 A scuola', 'school') + section('home', '🏠 A casa', 'home');
 
@@ -316,7 +320,7 @@ document.addEventListener('click', e => {
   else if (t.dataset.id) { selected.has(t.dataset.id) ? selected.delete(t.dataset.id) : selected.add(t.dataset.id); }
   else if (t.id === 'add') return document.getElementById('source').showModal();
   else if (t.id === 'paste') return pasteFromClipboard();
-  else if (t.id === 'export' || t.id === 'exportNow') return exportBackup();
+  else if (t.id === 'export' || t.id === 'exportNow' || t.id === 'exportMoved') return exportBackup();
   else if (t.id === 'import') return document.getElementById('importFile').click();
   else if (t.id === 'clear') selected.clear();
   else if (t.id === 'toSchool') return move('school');

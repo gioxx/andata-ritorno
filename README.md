@@ -6,14 +6,15 @@ Each item has one state — **at school** or **at home** — and moves with a ta
 ## Structure
 
 ```
-public/          PWA frontend (currently a localStorage mockup)
+legacy/          Frozen localStorage mockup (shows a "moved to ar.gioxx.org" banner)
+app/             A/R v2 (in progress)
 worker/          Cloudflare Worker API + D1 schema + R2 photos
 ```
 
 ## Try the mockup
 
 ```bash
-npx serve public     # or: python3 -m http.server -d public
+npx serve legacy     # or: python3 -m http.server -d legacy
 ```
 
 Open on a phone (same LAN) to test the camera flow. Data stays in the browser.
@@ -41,7 +42,7 @@ Then protect the Worker hostname with **Cloudflare Access** (Zero Trust → Appl
 
 ## Roadmap
 
-- [ ] Replace localStorage in `public/index.html` with calls to `/api/*`
+- [ ] Replace localStorage in `legacy/index.html` with calls to `/api/*`
 - [ ] Multi-select move (done in mockup) wired to `POST /api/move`
 - [x] PWA icons
 - [ ] Per-item movement history view

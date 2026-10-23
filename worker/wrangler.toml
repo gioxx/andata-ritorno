@@ -2,9 +2,9 @@ name = "andata-ritorno"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
 
-# Serve the PWA from /public as static assets
+# Serve the PWA from /legacy as static assets
 [assets]
-directory = "../public"
+directory = "../legacy"
 
 [[d1_databases]]
 binding = "DB"
