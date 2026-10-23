@@ -13,13 +13,15 @@ export function persistLine(persisted) {
   return persisted ? 'Memoria protetta ✓' : 'Memoria non protetta: fai backup spesso'
 }
 
-const CHILD_LABEL = (c) => c.charAt(0).toUpperCase() + c.slice(1)
+export const childLabel = (c) => c.charAt(0).toUpperCase() + c.slice(1)
+const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
 
 /** One mapping row per v1 child: default "new tab", then every existing tab. */
 export function mappingRows(children, tabs) {
   return children.map((child) => ({
     child,
-    options: [{ value: 'new', label: `Nuova scheda "${CHILD_LABEL(child)}"` }, ...tabs.map((t) => ({ value: t.id, label: t.name }))],
+    label: childLabel(child),
+    options: [{ value: 'new', label: `Nuova scheda "${childLabel(child)}"` }, ...tabs.map((t) => ({ value: t.id, label: t.name }))],
   }))
 }
 
@@ -35,9 +37,34 @@ export function importErrorMessage(e) {
   return null
 }
 
-/** Drop one "Da rifare" entry (identified by itemId + reason). */
-export function removeTodo(list, entry) {
-  return list.filter((f) => !(f.itemId === entry.itemId && f.reason === entry.reason))
+/** Drop the tapped "Da rifare" entry by position (id-less entries can look identical). */
+export function removeTodo(list, index) {
+  return list.filter((_, i) => i !== index)
+}
+
+const PLACE = { school: 'a scuola', home: 'a casa' }
+
+/** Readable parts of a failure; empty parts are skipped. */
+export function failureParts(f) {
+  return {
+    title: f.label || 'senza nome',
+    detail: [f.tabName, PLACE[f.location] ?? f.location, f.reason].filter(Boolean).join(' · '),
+  }
+}
+
+/** <li> for a failure list; `extra` is trusted markup appended inside (e.g. a button). */
+export function failureRow(f, extra = '') {
+  const { title, detail } = failureParts(f)
+  return `<li><div><strong>${esc(title)}</strong><br><span>${esc(detail)}</span></div>${extra}</li>`
+}
+
+/**
+ * A tapped button value is only final once confirmed. 'secondary' (partial import) needs the
+ * user's yes; returns undefined when declined so the dialog stays open and nothing is chosen.
+ */
+export function confirmedChoice(choice, confirmFn) {
+  if (choice === 'secondary' && !confirmFn()) return undefined
+  return choice
 }
 
 /** "N capi non si possono importare" */

@@ -2,12 +2,12 @@
 import { store, load } from '../store.js'
 import { getMeta, setMeta } from '../db.js'
 import { exportBackup, backupFileName } from '../backup/exporter.js'
-import { hooks, esc } from './render.js'
+import { hooks } from './render.js'
 import { openTabManager } from './tabs.js'
 import { reportError } from './dialogs.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
-import { backupInfoLine, persistLine, removeTodo } from './model.js'
+import { backupInfoLine, persistLine, removeTodo, failureRow } from './model.js'
 
 let dlg = null
 let db = null
@@ -35,6 +35,7 @@ async function openMenu() {
   todoBtn.hidden = !todo.length
   todoBtn.textContent = `Da rifare (${todo.length})`
   renderThemeSeg()
+  if (dlg.open) return // double tap on the menu button
   dlg.showModal()
   persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p) })
 }
@@ -101,8 +102,8 @@ async function openTodo() {
       if (!b) return
       try {
         const list = (await getMeta(db, 'todo')) ?? []
-        const entry = list[Number(b.dataset.done)]
-        if (entry) await setMeta(db, 'todo', removeTodo(list, entry))
+        const i = Number(b.dataset.done)
+        if (i < list.length) await setMeta(db, 'todo', removeTodo(list, i))
         await renderTodo()
       } catch (err) { reportError(err) }
     })
@@ -115,8 +116,7 @@ async function renderTodo() {
   const list = (await getMeta(db, 'todo')) ?? []
   if (!list.length) { todoDlg.close(); return }
   todoDlg.innerHTML = `<form method="dialog"><h3>Da rifare (${list.length})</h3>
-    <ul class="failures">${list.map((f, i) => `<li><div><strong>${esc(f.label || 'senza nome')}</strong><br><span>${esc(f.tabName)} · ${esc(f.location)} · ${esc(f.reason)}</span></div>
-      <button type="button" data-done="${i}">Fatto</button></li>`).join('')}</ul>
+    <ul class="failures">${list.map((f, i) => failureRow(f, `<button type="button" data-done="${i}">Fatto</button>`)).join('')}</ul>
     <button value="" class="cancel">Chiudi</button></form>`
 }
 

@@ -4,7 +4,7 @@ import { store, load } from '../store.js'
 import { prepareImport, commitImport, formatSummary, ImportBlocked } from '../backup/importer.js'
 import { esc } from './render.js'
 import { reportError } from './dialogs.js'
-import { mappingRows, importErrorMessage, blockedTitle } from './model.js'
+import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice } from './model.js'
 
 let busyDlg = null
 
@@ -32,9 +32,9 @@ function ask(html, { collect } = {}) {
     d.addEventListener('click', (e) => {
       const b = e.target.closest('[data-result]')
       if (!b) return
-      result = b.dataset.result
-      if (result === 'secondary' && !confirm('I capi elencati non verranno importati e finiranno nella lista "Da rifare". Continuare?')) return
-      if (collect && result) result = { result, value: collect(d) }
+      const choice = confirmedChoice(b.dataset.result, () => confirm('I capi elencati non verranno importati e finiranno nella lista "Da rifare". Continuare?'))
+      if (choice === undefined) return // declined: later dismissal must resolve null, not this button
+      result = collect && choice ? { result: choice, value: collect(d) } : choice
       d.close()
     })
     d.addEventListener('close', () => { d.remove(); resolve(result) })
@@ -44,18 +44,16 @@ function ask(html, { collect } = {}) {
 
 const askMapping = (children) => ask(`
   <h3>Dove metto i capi del backup?</h3>
-  ${mappingRows(children, store.tabs).map((r, i) => `<label class="maprow">${esc(r.child.charAt(0).toUpperCase() + r.child.slice(1))}
+  ${mappingRows(children, store.tabs).map((r, i) => `<label class="maprow">${esc(r.label)}
     <select data-child="${esc(r.child)}" aria-label="${esc(r.child)}">${r.options.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select></label>`).join('')}
   <div class="row"><button type="button" class="primary" data-result="ok">Continua</button></div>
   <button type="button" class="cancel" data-result="">Annulla</button>`, {
   collect: (d) => Object.fromEntries([...d.querySelectorAll('select[data-child]')].map((s) => [s.dataset.child, s.value])),
 })
 
-const failureRow = (f) => `<li><strong>${esc(f.label || 'senza nome')}</strong><br><span>${esc(f.tabName)} · ${esc(f.location)} · ${esc(f.reason)}</span></li>`
-
 const askBlocked = (failures, others) => ask(`
   <h3>${blockedTitle(failures.length)}</h3>
-  <ul class="failures">${failures.map(failureRow).join('')}</ul>
+  <ul class="failures">${failures.map((f) => failureRow(f)).join('')}</ul>
   <p class="note">Consiglio: rifai la foto di questi capi nella vecchia app, esporta di nuovo e riprova.</p>
   <div class="row"><button type="button" class="primary" data-result="">Annulla</button>
   ${others ? `<button type="button" data-result="secondary">Importa gli altri ${others}</button>` : ''}</div>`)
@@ -64,8 +62,9 @@ const showMessage = (text) => ask(`<h3>Importazione</h3><p>${esc(text)}</p><div 
 
 /** Whole import, from a picked file to the summary. Never throws: errors are reported. */
 export async function importFile(db, file) {
+  let summary
   try {
-    const summary = await withBusy(async () => {
+    summary = await withBusy(async () => {
       let prepared = await prepareImport(db, file)
       if (prepared.needsMapping.length) {
         const answer = await hideBusyWhile(() => askMapping(prepared.needsMapping))
@@ -81,14 +80,20 @@ export async function importFile(db, file) {
         return commitImport(db, prepared, { partial: true })
       }
     })
-    if (!summary) return
-    await load(db) // also covers importing from the welcome screen: tabs now exist
-    await showMessage(formatSummary(summary))
   } catch (e) {
+    // The failure may be past the write (verify-failed): make the UI match the DB anyway.
+    await load(db).catch(() => {})
     const msg = importErrorMessage(e)
     if (msg) alert(msg)
     else reportError(e)
+    return
   }
+  if (!summary) return
+  // The import is committed: a reload problem must not be reported as a failed import.
+  let reloadError = null
+  try { await load(db) } catch (e) { reloadError = e }
+  await showMessage(formatSummary(summary))
+  if (reloadError) alert("Import completato, ma l'elenco non si è aggiornato: riapri l'app. " + (reloadError?.message ?? reloadError))
 }
 
 // Questions need the user's hands, so drop the overlay for them and bring it back after.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { backupInfoLine, persistLine, mappingRows, importErrorMessage, removeTodo, blockedTitle } from '../src/ui/model.js'
+import { backupInfoLine, persistLine, mappingRows, importErrorMessage, removeTodo, blockedTitle, failureParts, failureRow, confirmedChoice } from '../src/ui/model.js'
 
 describe('ui model', () => {
   it('backup info singular/plural and mai', () => {
@@ -15,6 +15,7 @@ describe('ui model', () => {
   })
   it('mapping rows: new tab first, then existing', () => {
     const rows = mappingRows(['nido', 'materna'], [{ id: 't1', name: 'Sofia' }])
+    expect(rows[0].label).toBe('Nido')
     expect(rows[0].options).toEqual([{ value: 'new', label: 'Nuova scheda "Nido"' }, { value: 't1', label: 'Sofia' }])
     expect(rows[1].options[0].label).toBe('Nuova scheda "Materna"')
   })
@@ -25,9 +26,22 @@ describe('ui model', () => {
     expect(importErrorMessage(new SyntaxError('x'))).toBe('File non valido')
     expect(importErrorMessage(new Error('boom'))).toBeNull()
   })
-  it('removeTodo removes by itemId+reason only', () => {
-    const a = { itemId: 'a', reason: 'r1' }, b = { itemId: 'a', reason: 'r2' }
-    expect(removeTodo([a, b], a)).toEqual([b])
+  it('removeTodo removes exactly the tapped index (id-less duplicates)', () => {
+    const a = { label: 'x', reason: 'r' }, b = { label: 'x', reason: 'r' }
+    const out = removeTodo([a, b], 1)
+    expect(out).toHaveLength(1)
+    expect(out[0]).toBe(a)
+  })
+  it('failure text maps places and skips empty parts', () => {
+    expect(failureParts({ label: '', tabName: '', location: 'school', reason: 'foto' })).toEqual({ title: 'senza nome', detail: 'a scuola · foto' })
+    expect(failureParts({ label: 'Giacca', tabName: 'Nido', location: 'nonna', reason: 'r' }).detail).toBe('Nido · nonna · r')
+    expect(failureParts({ label: 'G', tabName: 'N', location: 'home', reason: 'r' }).detail).toBe('N · a casa · r')
+    expect(failureRow({ label: '<b>', tabName: '', location: 'home', reason: 'r' }, '<i>x</i>')).toBe('<li><div><strong>&lt;b&gt;</strong><br><span>a casa · r</span></div><i>x</i></li>')
+  })
+  it('partial import choice needs a confirmed yes', () => {
+    expect(confirmedChoice('secondary', () => false)).toBeUndefined()
+    expect(confirmedChoice('secondary', () => true)).toBe('secondary')
+    expect(confirmedChoice('ok', () => { throw new Error('no confirm') })).toBe('ok')
   })
   it('blocked title', () => {
     expect(blockedTitle(1)).toBe('1 capo non si può importare')
