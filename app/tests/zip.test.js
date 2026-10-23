@@ -92,4 +92,65 @@ describe('v2 zip', () => {
     const prepared = await prepareImport(dst, asFile(new Blob([zipSync(entries)])))
     expect(prepared.incoming.failures).toEqual([])
   })
+
+  const edit = async (mutate) => {
+    const entries = unzipSync(await bytesOf(await zipOf(await seeded())))
+    mutate(entries)
+    return asFile(new Blob([zipSync(entries)]))
+  }
+  const editJson = (fn) => (entries) => {
+    const json = JSON.parse(new TextDecoder().decode(entries['backup.json']))
+    fn(json)
+    entries['backup.json'] = new TextEncoder().encode(JSON.stringify(json))
+  }
+
+  it.each([
+    ['wrong app', editJson((j) => { j.app = 'other' })],
+    ['wrong version', editJson((j) => { j.version = 3 })],
+    ['missing backup.json', (e) => { delete e['backup.json'] }],
+  ])('%s → bad-file', async (_n, mutate) => {
+    const dst = await fresh()
+    await expect(prepareImport(dst, await edit(mutate))).rejects.toThrow('bad-file')
+  })
+
+  it('photo that fails decode → Foto non leggibile', async () => {
+    const orig = globalThis.createImageBitmap
+    globalThis.createImageBitmap = async () => { throw new Error('nope') }
+    try {
+      const dst = await fresh()
+      const prepared = await prepareImport(dst, asFile(await zipOf(await seeded())))
+      expect(prepared.incoming.failures.map((f) => f.reason)).toEqual(Array(3).fill('Foto non leggibile'))
+    } finally { globalThis.createImageBitmap = orig }
+  })
+
+  it('flipped byte in a photo → Foto non leggibile (integrity check)', async () => {
+    const file = await edit((e) => { e['photos/p1.webp'] = e['photos/p1.webp'].map((b, i) => (i === 2 ? b ^ 1 : b)) })
+    const dst = await fresh()
+    const prepared = await prepareImport(dst, file)
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'Foto non leggibile']])
+  })
+
+  it('v2 file without the photos map still imports', async () => {
+    const file = await edit(editJson((j) => { delete j.photos }))
+    const dst = await fresh()
+    expect((await prepareImport(dst, file)).incoming.failures).toEqual([])
+  })
+
+  it('png photo round-trips with its type', async () => {
+    const src = await seeded()
+    await addItems(src, [{ id: 'i9', tabId: 'tab-a', location: 'home', label: 'png', photoId: 'p9', createdAt: T, movedAt: T, updatedAt: T }],
+      [{ id: 'p9', blob: new Blob([new Uint8Array([9, 9, 9])], { type: 'image/png' }), width: 1, height: 1 }])
+    const entries = unzipSync(await bytesOf(await zipOf(src)))
+    expect(entries['photos/p9.png']).toBeDefined()
+    const dst = await fresh()
+    await commitImport(dst, await prepareImport(dst, asFile(await zipOf(src))), { partial: false })
+    expect((await getPhoto(dst, 'p9')).type).toBe('image/png')
+  })
+
+  it("missing photo on export throws 'missing-photo:<itemId>'", async () => {
+    const src = await seeded()
+    const { tabs, items } = await loadAll(src)
+    await expect(buildZip({ tabs, items, getPhoto: async (id) => (id === 'p2' ? undefined : getPhoto(src, id)) }))
+      .rejects.toThrow('missing-photo:i2')
+  })
 })

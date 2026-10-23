@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { unzipSync } from 'fflate'
 import { openDb, getMeta, setMeta, putTab, addItems } from '../src/db.js'
 import { exportBackup } from '../src/backup/exporter.js'
 
@@ -51,5 +52,23 @@ describe('exportBackup', () => {
     const share = async () => { throw Object.assign(new Error('x'), { name: 'NotAllowedError' }) }
     expect(await exportBackup(db, { share, download, now })).toBe('downloaded')
     expect(download).toHaveBeenCalledOnce()
+  })
+
+  it('missing photo → throws with item id, meta untouched', async () => {
+    const db = await seeded()
+    await db.delete('photos', 'p')
+    const download = vi.fn()
+    await expect(exportBackup(db, { share: async () => false, download, now })).rejects.toThrow('missing-photo:i')
+    expect(download).not.toHaveBeenCalled()
+    expect(await getMeta(db, 'lastBackupAt')).toBeUndefined()
+    expect(await getMeta(db, 'unsavedCount')).toBe(5)
+  })
+
+  it('exportedAt uses the injected now', async () => {
+    const db = await seeded()
+    const download = vi.fn()
+    await exportBackup(db, { share: async () => false, download, now })
+    const entries = unzipSync(new Uint8Array(await download.mock.calls[0][0].arrayBuffer()))
+    expect(JSON.parse(new TextDecoder().decode(entries['backup.json'])).exportedAt).toBe(now.toISOString())
   })
 })

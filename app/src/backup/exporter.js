@@ -23,7 +23,7 @@ function defaultDownload(file) {
  */
 export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date() } = {}) {
   const { tabs, items } = await loadAll(db)
-  const blob = await buildZip({ tabs, items, getPhoto: (id) => getPhoto(db, id) })
+  const blob = await buildZip({ tabs, items, getPhoto: (id) => getPhoto(db, id), now })
   const name = `andata-ritorno-${now.toISOString().slice(0, 10)}.zip`
   const file = new File([blob], name, { type: 'application/zip' })
 
