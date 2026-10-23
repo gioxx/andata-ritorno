@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, subscribe } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -75,5 +75,38 @@ describe('store', () => {
     selectToggle('a1')
     clearSelection()
     expect(store.selected.size).toBe(0)
+  })
+
+  it('two concurrent move() calls count the selection once', async () => {
+    selectSection('school')
+    await Promise.all([move('home'), move('home')])
+    expect(store.unsaved).toBe(2)
+    expect(await getMeta(db, 'unsavedCount')).toBe(2)
+  })
+
+  it('concurrent markChanged calls do not lose increments', async () => {
+    await Promise.all([markChanged(1), markChanged(1), markChanged(1)])
+    expect(store.unsaved).toBe(3)
+    expect(await getMeta(db, 'unsavedCount')).toBe(3)
+  })
+
+  it('addPhotos adds items to the current tab, persists them and counts changes', async () => {
+    const photos = [photo('n1'), photo('n2')]
+    await addPhotos(photos, { location: 'school', label: 'felpa' })
+    const added = store.items.filter((i) => i.photoId === 'n1' || i.photoId === 'n2')
+    expect(added.length).toBe(2)
+    expect(added.every((i) => i.tabId === 'A' && i.location === 'school' && i.label === 'felpa' && i.createdAt === i.movedAt)).toBe(true)
+    expect(store.unsaved).toBe(2)
+    expect((await loadAll(db)).items.length).toBe(6)
+  })
+
+  it('addPhotos adds nothing when the write fails', async () => {
+    const bad = { id: 'bad', blob: new Blob(['x']), width: 1, height: 1 }
+    const real = db.transaction.bind(db)
+    db.transaction = () => { throw new DOMException('full', 'QuotaExceededError') }
+    await expect(addPhotos([bad], { location: 'home', label: '' })).rejects.toMatchObject({ name: 'QuotaExceededError' })
+    db.transaction = real
+    expect(store.items.length).toBe(4)
+    expect(store.unsaved).toBe(0)
   })
 })

@@ -18,8 +18,15 @@ async function check(onChange) {
   if (hasImage !== before) onChange()
 }
 
+let changed = () => {}
+/** Re-check now (e.g. after a paste that found no image). */
+export function recheckClipboard() {
+  return check(changed)
+}
+
 /** Re-check when the app returns to the foreground. */
 export function watchClipboard(onChange) {
+  changed = onChange
   const run = () => check(onChange)
   window.addEventListener('focus', run)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run() })

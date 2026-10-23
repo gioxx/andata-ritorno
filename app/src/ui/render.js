@@ -4,6 +4,7 @@ import { getPhoto } from '../db.js'
 import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected } from '../store.js'
 import { menuIcon, trashIcon, checkIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
+import { reportError } from './dialogs.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
@@ -98,15 +99,20 @@ function wire(root) {
     if (t.dataset.section) return selectSection(t.dataset.section)
     if (t.dataset.id) return selectToggle(t.dataset.id)
     switch (t.dataset.act) {
-      case 'addTab': return hooks.onAddTab()
-      case 'add': return hooks.onAdd()
-      case 'paste': return hooks.onPaste()
-      case 'menu': return hooks.onMenu()
-      case 'export': return hooks.onExport()
+      case 'addTab': return act(hooks.onAddTab)
+      case 'add': return act(hooks.onAdd)
+      case 'paste': return act(hooks.onPaste)
+      case 'menu': return act(hooks.onMenu)
+      case 'export': return act(hooks.onExport)
       case 'clear': return clearSelection()
-      case 'toSchool': return move('school')
-      case 'toHome': return move('home')
-      case 'del': if (confirm('Eliminare i capi selezionati?')) return deleteSelected()
+      case 'toSchool': return act(() => move('school'))
+      case 'toHome': return act(() => move('home'))
+      case 'del': if (confirm('Eliminare i capi selezionati?')) return act(deleteSelected)
     }
   })
+}
+
+/** Run an action; any failure (sync or async) goes to one user-facing handler. */
+function act(fn) {
+  try { Promise.resolve(fn()).catch(reportError) } catch (e) { reportError(e) }
 }

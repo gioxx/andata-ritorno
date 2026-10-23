@@ -1,6 +1,6 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { loadAll, moveItems, deleteItems, getMeta, setMeta } from './db.js'
+import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta } from './db.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -62,6 +62,15 @@ export function clearSelection() {
   notify()
 }
 
+// Serialize every mutation: read-await-write sequences (counter bumps, moves) would
+// otherwise interleave on a double tap and lose updates.
+let chain = Promise.resolve()
+function queue(fn) {
+  const run = chain.then(fn)
+  chain = run.catch(() => {}) // a failed action must not block the next one
+  return run
+}
+
 async function bump(n) {
   const next = store.unsaved + n
   await setMeta(store.db, 'unsavedCount', next)
@@ -69,28 +78,72 @@ async function bump(n) {
 }
 
 /** @param {number} n changes since the last export */
-export async function markChanged(n) {
-  await bump(n)
+export function markChanged(n) {
+  return queue(async () => {
+    await bump(n)
+    notify()
+  })
+}
+
+/** Take the current selection and clear it right away, so a fast second tap finds nothing. */
+function takeSelection() {
+  const ids = [...store.selected]
+  store.selected.clear()
+  return ids
+}
+
+/** Put back what a failed action took, so the user can retry. */
+function restoreSelection(ids) {
+  for (const id of ids) store.selected.add(id)
   notify()
 }
 
-export async function move(location) {
-  const ids = [...store.selected]
-  if (!ids.length) return
-  const now = new Date().toISOString()
-  await moveItems(store.db, ids, location, now)
-  for (const it of store.items) if (store.selected.has(it.id)) { it.location = location; it.movedAt = now }
-  await bump(ids.length)
-  store.selected.clear()
-  notify()
+export function move(location) {
+  const ids = takeSelection()
+  if (!ids.length) return Promise.resolve()
+  return queue(async () => {
+    try {
+      const now = new Date().toISOString()
+      await moveItems(store.db, ids, location, now)
+      const set = new Set(ids)
+      for (const it of store.items) if (set.has(it.id)) { it.location = location; it.movedAt = now }
+      await bump(ids.length)
+      notify()
+    } catch (e) { restoreSelection(ids); throw e }
+  })
 }
 
-export async function deleteSelected() {
-  const ids = [...store.selected]
-  if (!ids.length) return
-  await deleteItems(store.db, ids)
-  store.items = store.items.filter((i) => !store.selected.has(i.id))
-  await bump(ids.length)
-  store.selected.clear()
-  notify()
+export function deleteSelected() {
+  const ids = takeSelection()
+  if (!ids.length) return Promise.resolve()
+  return queue(async () => {
+    try {
+      await deleteItems(store.db, ids)
+      const set = new Set(ids)
+      store.items = store.items.filter((i) => !set.has(i.id))
+      await bump(ids.length)
+      notify()
+    } catch (e) { restoreSelection(ids); throw e }
+  })
+}
+
+/**
+ * Add one item per photo to the current tab. Rejects (e.g. QuotaExceededError) with
+ * nothing added: addItems writes photos and items in one transaction.
+ * @param {import('./types.js').Photo[]} photos
+ * @param {{location: 'school'|'home', label: string}} opts
+ */
+export function addPhotos(photos, { location, label }) {
+  const tabId = store.currentTabId
+  return queue(async () => {
+    const now = new Date().toISOString()
+    const items = photos.map((photo) => ({
+      id: crypto.randomUUID(), tabId, location, label, photoId: photo.id,
+      createdAt: now, movedAt: now, updatedAt: now,
+    }))
+    await addItems(store.db, items, photos)
+    store.items.push(...items)
+    await bump(items.length)
+    notify()
+  })
 }

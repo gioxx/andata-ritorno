@@ -6,6 +6,7 @@ import { openDb } from './db.js';
 import { store, load, subscribe } from './store.js';
 import { renderApp } from './ui/render.js';
 import { watchClipboard } from './ui/clipboard.js';
+import { initAddFlow } from './ui/add.js';
 
 const root = document.getElementById('app');
 
@@ -18,3 +19,4 @@ const db = await openDb();
 subscribe(draw);
 await load(db);
 watchClipboard(draw);
+initAddFlow();
