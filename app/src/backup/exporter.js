@@ -17,6 +17,9 @@ function defaultDownload(file) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000)
 }
 
+/** Deterministic, so the UI can tell the user where the download landed. */
+export const backupFileName = (now) => `andata-ritorno-${now.toISOString().slice(0, 10)}.zip`
+
 /**
  * Side effects are injectable for tests. Meta is only touched on success.
  * @returns {Promise<'shared'|'downloaded'|'cancelled'>}
@@ -24,7 +27,7 @@ function defaultDownload(file) {
 export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date() } = {}) {
   const { tabs, items } = await loadAll(db)
   const blob = await buildZip({ tabs, items, getPhoto: (id) => getPhoto(db, id), now })
-  const name = `andata-ritorno-${now.toISOString().slice(0, 10)}.zip`
+  const name = backupFileName(now)
   const file = new File([blob], name, { type: 'application/zip' })
 
   let result

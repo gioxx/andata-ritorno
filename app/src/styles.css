@@ -109,3 +109,32 @@ dialog #editPhoto { display: block; width: 100%; margin-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) { #viewer img.snap { transition: none; } }
 dialog .edit-preview { display: block; height: 96px; width: 96px; margin: 0 auto 12px; object-fit: cover; border-radius: var(--r-tile); background: var(--tile); }
 dialog .edit-preview[hidden] { display: none; }
+
+/* ---- Menu drawer, import flow ---- */
+#menu { margin: 0; inset: 0 0 0 auto; width: min(82vw, 320px); height: 100dvh; max-height: 100dvh; max-width: none;
+  border-radius: 16px 0 0 16px; padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
+  transform: translateX(100%); transition: transform .25s ease, display .25s allow-discrete, overlay .25s allow-discrete; }
+#menu[open] { transform: none; }
+@starting-style { #menu[open] { transform: translateX(100%); } }
+#menu::backdrop { background: rgba(0,0,0,0); transition: background .25s, display .25s allow-discrete, overlay .25s allow-discrete; }
+#menu[open]::backdrop { background: rgba(0,0,0,.45); }
+@starting-style { #menu[open]::backdrop { background: rgba(0,0,0,0); } }
+@media (prefers-reduced-motion: reduce) { #menu, #menu::backdrop { transition: none; } }
+#menu h3 { display: flex; justify-content: space-between; align-items: center; }
+#menu h3 .close { flex: none; padding: 0 4px; background: none; color: var(--muted); font-size: 20px; }
+#menu .info { font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+#menu h4 { margin: 14px 0 8px; font-size: 14px; }
+#menu h3 + h4 { margin-top: 4px; }
+#menu .menuItem { display: block; width: 100%; text-align: left; padding: 12px; margin-bottom: 6px; border-radius: 12px; background: var(--chip); font-size: 15px; font-weight: 600; }
+#menu .menuItem[hidden] { display: none; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); }
+#menu .seg button { flex: 1; padding: 8px 4px; border-radius: 9px; background: none; font-size: 14px; font-weight: 600; }
+#menu .seg button.active { background: var(--accent); color: var(--bg); }
+dialog.busy { text-align: center; font-weight: 700; width: auto; padding: 18px 28px; }
+dialog .maprow { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 700; }
+dialog .maprow select { margin-top: 4px; }
+dialog ul.failures { list-style: none; margin: 0 0 12px; padding: 0; max-height: 40vh; overflow-y: auto; font-size: 14px; }
+dialog ul.failures li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--chip); }
+dialog ul.failures li span { font-size: 12px; color: var(--muted); }
+dialog ul.failures li button { flex: none; padding: 8px 14px; }
+dialog .row + .cancel { margin-top: 8px; }

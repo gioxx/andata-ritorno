@@ -11,6 +11,7 @@ import { reportError } from './ui/dialogs.js';
 import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
+import { initMenu } from './ui/menu.js';
 
 const root = document.getElementById('app');
 
@@ -36,3 +37,4 @@ watchClipboard(draw);
 initAddFlow();
 initTabs();
 initViewer();
+initMenu(db);

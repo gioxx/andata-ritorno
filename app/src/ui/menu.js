@@ -1,0 +1,128 @@
+// Side drawer (slides from the right): backup info, export/import, tabs, "Da rifare", theme.
+import { store, load } from '../store.js'
+import { getMeta, setMeta } from '../db.js'
+import { exportBackup, backupFileName } from '../backup/exporter.js'
+import { hooks, esc } from './render.js'
+import { openTabManager } from './tabs.js'
+import { reportError } from './dialogs.js'
+import { withBusy, importFile, pickImportFile } from './importFlow.js'
+import { getTheme, setTheme } from '../theme.js'
+import { backupInfoLine, persistLine, removeTodo } from './model.js'
+
+let dlg = null
+let db = null
+
+const THEMES = [['auto', 'Auto'], ['light', '☀ Chiaro'], ['dark', '☾ Scuro']]
+
+/** Ask the browser not to evict our data; null when unsupported. */
+async function persistence() {
+  if (!navigator.storage?.persist) return null
+  try { return (await navigator.storage.persisted()) || (await navigator.storage.persist()) } catch { return null }
+}
+
+function renderThemeSeg() {
+  const cur = getTheme()
+  dlg.querySelector('#themeSeg').innerHTML = THEMES.map(([v, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}">${l}</button>`).join('')
+}
+
+async function openMenu() {
+  if (!dlg) build()
+  const todo = (await getMeta(db, 'todo')) ?? []
+  const last = await getMeta(db, 'lastBackupAt')
+  dlg.querySelector('#backupInfo').textContent = backupInfoLine(store.items.length, last)
+  dlg.querySelector('#persistInfo').textContent = ''
+  const todoBtn = dlg.querySelector('#todoBtn')
+  todoBtn.hidden = !todo.length
+  todoBtn.textContent = `Da rifare (${todo.length})`
+  renderThemeSeg()
+  dlg.showModal()
+  persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p) })
+}
+
+function build() {
+  dlg = document.createElement('dialog')
+  dlg.id = 'menu'
+  dlg.innerHTML = `<h3>Menu <button type="button" class="close" data-menu="close" aria-label="Chiudi">✕</button></h3>
+    <h4>Backup</h4>
+    <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
+    <button type="button" class="menuItem" data-menu="export">⬇ Esporta backup</button>
+    <button type="button" class="menuItem" data-menu="import">⬆ Importa backup</button>
+    <h4>Schede</h4>
+    <button type="button" class="menuItem" data-menu="tabs">Gestisci schede</button>
+    <button type="button" class="menuItem" id="todoBtn" data-menu="todo" hidden></button>
+    <h4>Tema</h4>
+    <div class="seg" id="themeSeg"></div>`
+  document.body.append(dlg)
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg) { // the dialog itself is the target for both its padding and the backdrop
+      const r = dlg.getBoundingClientRect()
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close()
+      return
+    }
+    const theme = e.target.closest('[data-theme-choice]')
+    if (theme) { setTheme(theme.dataset.themeChoice); renderThemeSeg(); return } // stay open to see the result
+    const item = e.target.closest('[data-menu]')
+    if (!item) return
+    dlg.close()
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), todo: openTodo }[item.dataset.menu]
+    run()
+  })
+  // Swipe right on the drawer to close it.
+  let x0 = null
+  dlg.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX }, { passive: true })
+  dlg.addEventListener('touchend', (e) => {
+    if (x0 !== null && e.changedTouches[0].clientX - x0 > 60) dlg.close()
+    x0 = null
+  })
+}
+
+/** Export with share sheet / download; tells the user only what they need to know. */
+export async function runExport() {
+  const now = new Date()
+  let result
+  try {
+    result = await withBusy(() => exportBackup(db, { now }))
+  } catch (e) {
+    alert('Esportazione non riuscita: ' + (e?.message ?? e))
+    return
+  }
+  if (result === 'cancelled') return
+  if (result === 'downloaded') alert('File salvato in Download: ' + backupFileName(now))
+  await load(db) // refreshes the unsaved-changes banner
+}
+
+let todoDlg = null
+async function openTodo() {
+  if (!todoDlg) {
+    todoDlg = document.createElement('dialog')
+    document.body.append(todoDlg)
+    todoDlg.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-done]')
+      if (!b) return
+      try {
+        const list = (await getMeta(db, 'todo')) ?? []
+        const entry = list[Number(b.dataset.done)]
+        if (entry) await setMeta(db, 'todo', removeTodo(list, entry))
+        await renderTodo()
+      } catch (err) { reportError(err) }
+    })
+  }
+  await renderTodo()
+  if (!todoDlg.open) todoDlg.showModal()
+}
+
+async function renderTodo() {
+  const list = (await getMeta(db, 'todo')) ?? []
+  if (!list.length) { todoDlg.close(); return }
+  todoDlg.innerHTML = `<form method="dialog"><h3>Da rifare (${list.length})</h3>
+    <ul class="failures">${list.map((f, i) => `<li><div><strong>${esc(f.label || 'senza nome')}</strong><br><span>${esc(f.tabName)} · ${esc(f.location)} · ${esc(f.reason)}</span></div>
+      <button type="button" data-done="${i}">Fatto</button></li>`).join('')}</ul>
+    <button value="" class="cancel">Chiudi</button></form>`
+}
+
+export function initMenu(database) {
+  db = database
+  hooks.onMenu = openMenu
+  hooks.onExport = runExport
+  hooks.onImportFile = (file) => importFile(db, file)
+}
