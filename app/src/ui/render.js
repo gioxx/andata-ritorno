@@ -2,7 +2,7 @@
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
 import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected } from '../store.js'
-import { menuIcon, trashIcon, checkIcon, pencilIcon, expandIcon } from './icons.js'
+import { menuIcon, trashIcon, checkIcon, pencilIcon, expandIcon, cameraIcon, pasteIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
 
@@ -42,7 +42,7 @@ function revokeGone() {
 
 function tile(i, moved) {
   const sel = store.selected.has(i.id)
-  return `<div class="item${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
+  return `<div class="item${i.label ? ' labeled' : ''}${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
     <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(i.label || '')}</span>${sel ? `<i class="check">${checkIcon}</i><button class="expand" data-view="${esc(i.id)}" aria-label="Apri a schermo intero">${expandIcon}</button>` : ''}</div>`
 }
 
@@ -55,7 +55,7 @@ function section(loc, title, cls, list) {
 
 function bar(sel) {
   if (!sel.length) {
-    return `<button class="primary" data-act="add">📷 Aggiungi capi</button>${canShowPaste() ? '<button class="ghost" data-act="paste">📋 Incolla</button>' : ''}`
+    return `<button class="primary" data-act="add">${cameraIcon}Aggiungi capi</button>${canShowPaste() ? `<button class="ghost" data-act="paste">${pasteIcon}Incolla</button>` : ''}`
   }
   const allSchool = sel.every((i) => i.location === 'school')
   const allHome = sel.every((i) => i.location === 'home')
