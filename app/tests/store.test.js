@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { openDb, putTab, addItems, getMeta, loadAll } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab } from '../src/store.js'
+import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, changePhoto } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -163,5 +163,51 @@ describe('tab management', () => {
     await expect(removeTab('A')).rejects.toThrow('last-tab')
     expect(store.tabs).toHaveLength(1)
     expect(store.items).toHaveLength(3)
+  })
+})
+
+describe('edit item', () => {
+  it('editItem changes updatedAt not movedAt, trims, persists, counts one change', async () => {
+    await editItem('a1', { label: '  felpa blu ' })
+    const it = store.items.find((i) => i.id === 'a1')
+    expect(it.label).toBe('felpa blu')
+    expect(it.updatedAt).not.toBe(T0)
+    expect(it.movedAt).toBe(T0)
+    expect(store.unsaved).toBe(1)
+    const saved = (await loadAll(db)).items.find((i) => i.id === 'a1')
+    expect(saved.label).toBe('felpa blu')
+    expect(saved.movedAt).toBe(T0)
+  })
+
+  it('editItem ignores fields outside the whitelist', async () => {
+    await editItem('a1', { label: 'x', location: 'home', photoId: 'zzz', id: 'evil' })
+    const it = store.items.find((i) => i.id === 'a1')
+    expect(it.location).toBe('school')
+    expect(it.photoId).toBe('p-a1')
+    expect((await loadAll(db)).items.find((i) => i.id === 'a1').location).toBe('school')
+  })
+
+  it('moving to another tab removes it from the view and clears the selection', async () => {
+    selectToggle('a1')
+    await editItem('a1', { tabId: 'B' })
+    expect(store.items.find((i) => i.id === 'a1').tabId).toBe('B')
+    expect(store.selected.size).toBe(0)
+    await expect(editItem('a1', { tabId: 'nope' })).rejects.toThrow('not-found')
+  })
+
+  it('changePhoto leaves exactly one photo blob for the item and counts one change', async () => {
+    const fake = async () => photo('new')
+    await changePhoto('a1', new File(['x'], 'x.jpg', { type: 'image/jpeg' }), fake)
+    expect(store.items.find((i) => i.id === 'a1').photoId).toBe('new')
+    expect(await getPhoto(db, 'p-a1')).toBeUndefined()
+    expect(await getPhoto(db, 'new')).toBeDefined()
+    expect(store.unsaved).toBe(1)
+    expect(store.items.find((i) => i.id === 'a1').movedAt).toBe(T0)
+  })
+
+  it('changePhoto rejects a non-image and changes nothing', async () => {
+    await expect(changePhoto('a1', new File(['x'], 'x.txt', { type: 'text/plain' }))).rejects.toThrow('not-an-image')
+    expect(store.items.find((i) => i.id === 'a1').photoId).toBe('p-a1')
+    expect(store.unsaved).toBe(0)
   })
 })

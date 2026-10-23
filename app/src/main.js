@@ -10,6 +10,7 @@ import { initTabs } from './ui/tabs.js';
 import { reportError } from './ui/dialogs.js';
 import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
+import { initViewer } from './ui/viewer.js';
 
 const root = document.getElementById('app');
 
@@ -34,3 +35,4 @@ await load(db);
 watchClipboard(draw);
 initAddFlow();
 initTabs();
+initViewer();

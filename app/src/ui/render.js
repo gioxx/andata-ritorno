@@ -2,13 +2,14 @@
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
 import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected } from '../store.js'
-import { menuIcon, trashIcon, checkIcon } from './icons.js'
+import { menuIcon, trashIcon, checkIcon, pencilIcon, expandIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
   onAddTab() {}, onTabLongPress(_id) {}, onImportFile(_file) {}, onAdd() {}, onPaste() {}, onMenu() {}, onExport() {},
+  onEdit(_id) {}, onOpenViewer(_ids, _startId) {},
 }
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
@@ -42,7 +43,7 @@ function revokeGone() {
 function tile(i, moved) {
   const sel = store.selected.has(i.id)
   return `<div class="item${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
-    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(i.label || '')}</span>${sel ? `<i class="check">${checkIcon}</i>` : ''}</div>`
+    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(i.label || '')}</span>${sel ? `<i class="check">${checkIcon}</i><button class="expand" data-view="${esc(i.id)}" aria-label="Apri a schermo intero">${expandIcon}</button>` : ''}</div>`
 }
 
 function section(loc, title, cls, list) {
@@ -61,6 +62,7 @@ function bar(sel) {
   return `<button class="ghost" data-act="clear">Annulla (${sel.length})</button>
     ${allSchool ? '' : '<button class="primary" data-act="toSchool">→ Scuola</button>'}
     ${allHome ? '' : '<button class="primary" data-act="toHome">→ Casa</button>'}
+    ${sel.length === 1 ? `<button class="ghost icon" data-act="edit" aria-label="Modifica">${pencilIcon}</button>` : ''}
     <button class="ghost icon" data-act="del" aria-label="Elimina">${trashIcon}</button>`
 }
 
@@ -94,9 +96,10 @@ function wire(root) {
   wired.add(root)
   wireLongPress(root)
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-tab],[data-id],[data-section],[data-act]')
+    const t = e.target.closest('[data-tab],[data-view],[data-id],[data-section],[data-act]')
     if (!t) return
     if (t.dataset.tab) return setCurrentTab(t.dataset.tab)
+    if (t.dataset.view) return act(() => hooks.onOpenViewer(sectionIds(t), t.dataset.view))
     if (t.dataset.section) return selectSection(t.dataset.section)
     if (t.dataset.id) return selectToggle(t.dataset.id)
     switch (t.dataset.act) {
@@ -105,6 +108,7 @@ function wire(root) {
       case 'paste': return act(hooks.onPaste)
       case 'menu': return act(hooks.onMenu)
       case 'export': return act(hooks.onExport)
+      case 'edit': return act(() => hooks.onEdit([...store.selected][0]))
       case 'clear': return clearSelection()
       case 'toSchool': return act(() => move('school'))
       case 'toHome': return act(() => move('home'))
@@ -115,16 +119,29 @@ function wire(root) {
 
 const LONG_PRESS_MS = 450
 
-/** Long-press on a tab chip opens its manager; the click that follows the release is swallowed. */
+/** Ids of the tiles in the same section as `el`, in display order. */
+const sectionIds = (el) => [...el.closest('.grid').querySelectorAll('.item[data-id]')].map((n) => n.dataset.id)
+
+// What a long-press does, per pressable element.
+const LONG_PRESS = [
+  { sel: '.chip[data-tab]', run: (el) => hooks.onTabLongPress(el.dataset.tab) }, // tab manager
+  { sel: '.item[data-id]', run: (el) => hooks.onOpenViewer(sectionIds(el), el.dataset.id) }, // full-screen viewer
+]
+const pressable = (target) => {
+  for (const p of LONG_PRESS) { const el = target.closest(p.sel); if (el) return { el, run: p.run } }
+  return null
+}
+
+/** Long-press on a tab chip or a tile; the click that follows the release is swallowed. */
 function wireLongPress(root) {
   let timer = 0, fired = false, x = 0, y = 0
   const cancel = () => { clearTimeout(timer); timer = 0 }
   root.addEventListener('pointerdown', (e) => {
-    const chip = e.target.closest('.chip[data-tab]')
-    if (!chip) return
+    const hit = pressable(e.target)
+    if (!hit) return
     fired = false; x = e.clientX; y = e.clientY
     cancel()
-    timer = setTimeout(() => { fired = true; act(() => hooks.onTabLongPress(chip.dataset.tab)) }, LONG_PRESS_MS)
+    timer = setTimeout(() => { fired = true; act(() => hit.run(hit.el)) }, LONG_PRESS_MS)
   })
   root.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - x, e.clientY - y) > 10) cancel() })
   // On document: after a long-press a modal opens and the release lands outside root.
@@ -140,8 +157,8 @@ function wireLongPress(root) {
     fired = false
     e.stopImmediatePropagation(); e.preventDefault()
   }, true)
-  // Android Chrome shows a context menu on long-press; the manager replaces it.
-  root.addEventListener('contextmenu', (e) => { if (e.target.closest('.chip[data-tab]')) e.preventDefault() })
+  // Android Chrome shows a context menu on long-press; the manager / viewer replaces it.
+  root.addEventListener('contextmenu', (e) => { if (pressable(e.target)) e.preventDefault() })
 }
 
 /** Run an action; any failure (sync or async) goes to one user-facing handler. */

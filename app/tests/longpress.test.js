@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderApp, hooks } from '../src/ui/render.js'
+import { store } from '../src/store.js'
 
 const tab = (id) => ({ id, name: id, order: 0, createdAt: '', updatedAt: '' })
 const fire = (el, type) => el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 5, clientY: 5 }))
@@ -51,5 +52,25 @@ describe('chip long-press', () => {
     fire(chip, 'pointerup')
     vi.advanceTimersByTime(1000)
     expect(lp).not.toHaveBeenCalled()
+  })
+})
+
+describe('tile long-press', () => {
+  it('opens the viewer with the section ids after 450 ms and swallows the click (no select)', () => {
+    const items = ['a', 'b', 'c'].map((id, n) => ({ id, tabId: 'A', location: n < 2 ? 'school' : 'home', label: id, photoId: 'p' + id }))
+    const s = { tabs: [tab('A')], items, currentTabId: 'A', selected: new Set(), unsaved: 0 }
+    renderApp(root, s)
+    const open = vi.fn()
+    hooks.onOpenViewer = open
+    const tileB = root.querySelector('.item[data-id="b"]')
+    fire(tileB, 'pointerdown')
+    vi.advanceTimersByTime(450)
+    expect(open).toHaveBeenCalledWith(['a', 'b'], 'b')
+    fire(tileB, 'pointerup')
+    tileB.click()
+    expect(store.selected.size).toBe(0) // click delegation toggles the global store
+    tileB.click() // a later plain tap still selects
+    expect(store.selected.has('b')).toBe(true)
+    store.selected.clear()
   })
 })

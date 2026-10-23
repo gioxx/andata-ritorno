@@ -1,6 +1,7 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, deleteTab } from './db.js'
+import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, deleteTab, updateItem, replacePhoto } from './db.js'
+import { compress } from './photos.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -144,6 +145,51 @@ export function addPhotos(photos, { location, label }) {
     await addItems(store.db, items, photos)
     store.items.push(...items)
     await bump(items.length)
+    notify()
+  })
+}
+
+const EDITABLE = ['label', 'tabId', 'category']
+
+/**
+ * Edit label / tab / category (anything else is ignored). Changes updatedAt, never movedAt.
+ * @param {string} id
+ * @param {{label?:string, tabId?:string, category?:string}} patch
+ */
+export function editItem(id, patch) {
+  return queue(async () => {
+    const it = store.items.find((i) => i.id === id)
+    if (!it) throw new Error('not-found')
+    const clean = {}
+    for (const k of EDITABLE) if (patch[k] !== undefined) clean[k] = patch[k]
+    if (clean.label !== undefined) clean.label = String(clean.label).trim()
+    if (clean.tabId !== undefined && !store.tabs.some((t) => t.id === clean.tabId)) throw new Error('not-found')
+    const now = new Date().toISOString()
+    await updateItem(store.db, id, clean, now)
+    const leaves = clean.tabId !== undefined && clean.tabId !== it.tabId
+    Object.assign(it, clean, { updatedAt: now })
+    if (leaves) store.selected.clear() // it is no longer in the visible tab
+    await bump(1)
+    notify()
+  })
+}
+
+/**
+ * Replace the item's photo. The old blob is deleted in the same transaction; the old
+ * object URL is dropped by the next render (it revokes URLs of photos no longer in use).
+ * @param {string} id @param {File|Blob} file
+ */
+export async function changePhoto(id, file, compressFn = compress) {
+  if (!file?.type?.startsWith('image/')) throw new Error('not-an-image')
+  const photo = await compressFn(file) // slow: done outside the queue
+  return queue(async () => {
+    const it = store.items.find((i) => i.id === id)
+    if (!it) throw new Error('not-found')
+    const now = new Date().toISOString()
+    await replacePhoto(store.db, id, photo, now)
+    it.photoId = photo.id
+    it.updatedAt = now
+    await bump(1)
     notify()
   })
 }
