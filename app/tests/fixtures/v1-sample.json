@@ -1,0 +1,31 @@
+{
+  "app": "andata-ritorno",
+  "version": 1,
+  "exportedAt": "2025-09-12T20:00:00.000Z",
+  "items": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "child": "nido",
+      "location": "school",
+      "label": "Body bianco",
+      "photo": "data:image/webp;base64,UklGRjoAAABXRUJQVlA4IC4AAADwAQCdASoCAAIAAUAmJaACdLoB+AAGXYAA/si//8guWF1yNf+k2eJs8TZ8cwAA",
+      "movedAt": "2025-09-10T07:30:00.000Z"
+    },
+    {
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "child": "nido",
+      "location": "home",
+      "label": "Calzini righe",
+      "photo": "data:image/webp;base64,UklGRjYAAABXRUJQVlA4ICoAAABwAQCdASoCAAIAAUAmJaACdAFAAAD+pNdcXNkRR/9NI//ppH/9NI+U0AA=",
+      "movedAt": "2025-09-11T16:45:00.000Z"
+    },
+    {
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "child": "materna",
+      "location": "school",
+      "label": "Felpa blu",
+      "photo": "data:image/webp;base64,UklGRjoAAABXRUJQVlA4IC4AAADwAQCdASoCAAIAAUAmJaACdLoB+AAETAAA/vFNr/2Vj6Vj6Vj94L/vvQG8DAAA",
+      "movedAt": "2025-09-12T08:00:00.000Z"
+    }
+  ]
+}
