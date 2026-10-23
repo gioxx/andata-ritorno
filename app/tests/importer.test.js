@@ -184,10 +184,10 @@ describe('importer', () => {
     await expect(commitImport(db, prepared, { partial: false })).rejects.toThrow('verify-failed')
   })
 
-  it('ZIP files are not supported yet, unknown files are rejected', async () => {
+  it('corrupt ZIPs and unknown files are rejected', async () => {
     const db = await fresh()
     const zip = new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'b.zip')
-    await expect(prepareImport(db, zip)).rejects.toThrow('unsupported')
+    await expect(prepareImport(db, zip)).rejects.toThrow('bad-file')
     await expect(prepareImport(db, new File(['{}'], 'x.json'))).rejects.toThrow('bad-file')
   })
 

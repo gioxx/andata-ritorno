@@ -2,6 +2,7 @@
 import { loadAll, applyPlan, getMeta, getPhoto } from '../db.js'
 import { buildPlan } from './merge.js'
 import { parseV1, detectFormat } from './v1.js'
+import { parseZip } from './zip.js'
 
 /** @typedef {import('../types.js').Failure} Failure */
 /** @typedef {import('../types.js').Incoming} Incoming */
@@ -26,7 +27,12 @@ export class ImportBlocked extends Error {
  */
 export async function prepareImport(db, file, { childMap = {} } = {}) {
   const format = await detectFormat(file)
-  if (format === 'v2') throw new Error('unsupported') // ZIP reader comes with the v2 format
+  if (format === 'v2') {
+    const local = await loadAll(db)
+    // Tab ids missing from both the file and the local DB become failures inside parseZip.
+    const incoming = await parseZip(file, { localTabIds: local.tabs.map((t) => t.id) })
+    return { incoming, plan: buildPlan(local, incoming), needsMapping: [] }
+  }
   if (format !== 'v1') throw new Error('bad-file')
   const json = JSON.parse(await file.text())
 
