@@ -2,6 +2,7 @@
 import { loadAll, getPhoto, setMeta } from '../db.js'
 import { buildZip } from './zip.js'
 
+// iOS Safari 15+ shares ZIP files through the same API; if the gesture expired it throws and we download.
 /** @returns {Promise<boolean>} false when sharing files is not supported */
 async function defaultShare(file) {
   if (!navigator.canShare?.({ files: [file] })) return false

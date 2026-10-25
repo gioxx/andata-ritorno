@@ -31,7 +31,7 @@ body { margin: 0; font-family: var(--font); font-weight: 500; background: var(--
 /* ---- Main screen (visual option Y) ---- */
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 #app { max-width: 640px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
-header { padding: calc(18px + env(safe-area-inset-top)) 16px 10px; background: var(--surface); }
+header { padding: calc(18px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background: var(--surface); }
 .row1 { display: flex; justify-content: space-between; align-items: center; }
 h1 { margin: 0; font-size: 1.375rem; font-weight: 700; letter-spacing: -.01em; }
 .menu { min-width: 44px; min-height: 44px; padding: 6px; display: flex; align-items: center; justify-content: center; }
@@ -65,7 +65,7 @@ section h2 { display: flex; justify-content: space-between; align-items: center;
 .unsaved { display: flex; align-items: center; gap: 8px; margin: 4px 4px 10px; padding: 10px 12px; border-radius: 12px; background: var(--chip); font-size: 0.8125rem; font-weight: 600; }
 .unsaved span { flex: 1; }
 .unsaved button { min-height: 44px; padding: 7px 12px; border-radius: var(--r-pill); background: var(--accent-strong); color: var(--bg); font-weight: 700; }
-.bar { flex-wrap: wrap; position: fixed; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto; display: flex; gap: 8px; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); background: var(--surface); }
+.bar { flex-wrap: wrap; position: fixed; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto; display: flex; gap: 8px; padding: 12px max(14px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); background: var(--surface); }
 .bar button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 16px; border-radius: var(--r-pill); font-weight: 700; font-size: 0.875rem; text-align: center; }
 .bar .primary { flex: 1; background: var(--accent-strong); color: var(--bg); }
 .bar .ghost { background: var(--chip); }
@@ -73,7 +73,7 @@ section h2 { display: flex; justify-content: space-between; align-items: center;
 @media (max-width: 380px) { .bar { gap: 6px; padding-left: 10px; padding-right: 10px; } .bar button { padding: 13px 10px; font-size: 0.8125rem; } .bar .icon { width: 42px; padding: 13px 0; } }
 
 /* ---- Dialogs (add flow) ---- */
-dialog { max-height: 90dvh; overflow-y: auto; border: 0; border-radius: var(--r-section); padding: 18px; background: var(--surface); color: var(--fg); width: min(92vw, 360px); font-family: var(--font); }
+dialog { max-height: calc(90dvh - env(safe-area-inset-bottom)); overflow-y: auto; border: 0; border-radius: var(--r-section); padding: 18px; background: var(--surface); color: var(--fg); width: min(92vw, 360px); font-family: var(--font); }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 dialog h3 { margin: 0 0 12px; font-size: 1.0625rem; font-weight: 700; }
 dialog .row { display: flex; gap: 8px; }
@@ -112,11 +112,11 @@ dialog select { width: 100%; margin-bottom: 12px; padding: 12px 14px; border: 1.
 dialog #editRotate, dialog #editPhoto { display: block; width: 100%; margin-bottom: 12px; }
 #viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; flex-direction: column; }
 #viewer[hidden] { display: none; }
-#viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 14px 12px; }
+#viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); }
 #viewer .vlabel { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #viewer .vx { flex: none; width: 44px; height: 44px; border-radius: 50%; background: #fff; color: #111; display: flex; align-items: center; justify-content: center; }
 #viewer .vhint { margin: 0; padding: 10px 14px 4px; text-align: center; font-size: 0.75rem; color: #ddd; }
-#viewer .vbot { display: flex; gap: 8px; padding: 6px 14px calc(18px + env(safe-area-inset-bottom)); }
+#viewer .vbot { display: flex; gap: 8px; padding: 6px max(14px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 #viewer .vbot button { flex: 1; min-height: 44px; padding: 13px; border-radius: var(--r-pill); background: rgba(255,255,255,.15); color: #fff; font-weight: 700; font-size: 0.875rem; }
 #viewer .vbot .vclose { background: #fff; color: #111; }
 #viewer .stage { flex: 1; min-height: 0; margin: 0 10px; border-radius: 16px; touch-action: none; overflow: hidden; user-select: none; -webkit-user-select: none; }
@@ -128,7 +128,7 @@ dialog .edit-preview[hidden] { display: none; }
 
 /* ---- Menu drawer, import flow ---- */
 #menu { margin: 0; inset: 0 0 0 auto; width: min(82vw, 320px); height: 100dvh; max-height: 100dvh; max-width: none;
-  border-radius: 16px 0 0 16px; padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
+  border-radius: 16px 0 0 16px; padding: calc(16px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) 16px;
   transform: translateX(100%); transition: transform .25s ease, display .25s allow-discrete, overlay .25s allow-discrete; }
 #menu[open] { transform: none; display: flex; flex-direction: column; }
 @starting-style { #menu[open] { transform: translateX(100%); } }
@@ -202,3 +202,16 @@ dialog #catDefaults[hidden] { display: none; }
 #viewer .vnav.next { right: 14px; }
 #viewer .vnav[hidden] { display: none; }
 #viewer .vnav:disabled { opacity: .35; }
+
+/* ---- iOS / platform ---- */
+/* 16px minimum stops iOS Safari zooming the page on focus */
+input, textarea, select { font-size: max(1rem, 16px); }
+.desktop-gate h2 { margin: 4px 0 0; font-size: 1rem; text-align: left; }
+.welcome .install { text-align: left; font-size: 0.8125rem; color: var(--muted); }
+.welcome .install p { margin: 0 0 4px; }
+.welcome .install ol { margin: 0; padding-left: 20px; line-height: 1.6; }
+.ios-banner { position: sticky; top: 0; z-index: 20; background: var(--accent-strong); color: var(--bg); padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left)); font-size: 0.8125rem; line-height: 1.5; }
+.ios-banner p { margin: 0 0 4px; }
+.ios-banner ol { margin: 0 0 8px; padding-left: 20px; }
+.ios-banner .ios-ok { min-height: 44px; padding: 8px 18px; border-radius: var(--r-pill); background: var(--bg); color: var(--fg); font-weight: 700; }
+.ios-banner :focus-visible { outline: 2px solid var(--bg); outline-offset: 2px; }

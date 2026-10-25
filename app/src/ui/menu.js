@@ -10,6 +10,7 @@ import { keepFocus } from './focus.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
 import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
+import { currentPlatform } from '../platform.js'
 import { menuFooter } from './about.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessage } from './model.js'
@@ -121,7 +122,7 @@ export async function runExport() {
     return
   }
   if (result === 'cancelled') return
-  if (result === 'downloaded') alert(t('menu.fileSaved', { name: backupFileName(now) }))
+  if (result === 'downloaded') alert(t(currentPlatform() === 'ios' ? 'menu.fileSavedIos' : 'menu.fileSaved', { name: backupFileName(now) }))
   await load(db) // refreshes the unsaved-changes banner
 }
 

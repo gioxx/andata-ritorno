@@ -14,10 +14,12 @@ import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
 import { initMenu } from './ui/menu.js';
 import { desktopGate } from './ui/desktop.js';
+import { initIosBanner } from './ui/iosBanner.js';
 import { t, onLangChange } from './i18n.js';
 
 const root = document.getElementById('app');
 await desktopGate(root);
+initIosBanner();
 
 // Ask the browser not to evict our data; never throws, the answer is not needed.
 function persist() {

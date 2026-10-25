@@ -3,6 +3,7 @@
 
 import { inviteFooter } from './about.js'
 import { t, onLangChange } from '../i18n.js'
+import { installSteps } from '../platform.js'
 
 const KEY = 'ar-desktop-ok'
 
@@ -44,11 +45,9 @@ export function desktopGate(root) {
     <h1>${t('desktop.title')}</h1>
     <p>${t('desktop.lead')}</p>
     <img class="qr" src="/qr-ar.svg" width="200" height="200" alt="${t('desktop.qrAlt')}">
-    <ol>
-      <li>${t('desktop.step1')}</li>
-      <li>${t('desktop.step2')}</li>
-      <li>${t('desktop.step3')}</li>
-    </ol>
+    <p>${t('desktop.step1')}</p>
+    ${['android', 'ios'].map((p) => `<h2>${t('install.' + p + 'Title')}</h2>
+    <ol>${installSteps(p).map((k) => `<li>${t(k)}</li>`).join('')}</ol>`).join('')}
     <button class="ghost" id="desktopContinue">${t('desktop.continue')}</button>
     ${inviteFooter()}
   </div>`
