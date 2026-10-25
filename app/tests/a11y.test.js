@@ -27,7 +27,7 @@ beforeAll(() => {
 
 const tab = { id: 'A', name: 'Casa', order: 0 }
 const cats = [{ id: 'c1', name: 'Maglie', order: 0 }]
-const mk = (id, extra = {}) => ({ id, tabId: 'A', location: 'school', label: 'Maglia ' + id, photoId: 'p' + id, ...extra })
+const mk = (id, extra = {}) => ({ id, tabId: 'A', location: 'school', label: 'Maglia ' + id, photoId: 'p' + id, movedAt: '2026-01-12T09:00:00.000Z', ...extra })
 const setStore = (items) => {
   Object.assign(store, { tabs: [tab], items, categories: cats, currentTabId: 'A', unsaved: 0 })
   store.selected.clear(); store.filter.clear()
@@ -81,6 +81,7 @@ describe('dialogs', () => {
     expect(dlg.open).toBe(true)
     expect(dlg.contains(document.activeElement)).toBe(true)
     expect(dlg.getAttribute('aria-labelledby')).toBeTruthy()
+    expect(document.getElementById('editSince').textContent).toMatch(/^🏫 A scuola dal 12 gennaio/)
     key(dlg, 'Escape')
     expect(dlg.open).toBe(false)
     await tick()
@@ -178,6 +179,7 @@ describe('viewer', () => {
     next.click()
     expect(label()).toBe('Maglia b')
     expect(v.querySelector('[data-live="pos"]').textContent).toBe('Maglia b, 2 di 3')
+    expect(v.querySelector('.vsince').textContent).toMatch(/^(🏫 A scuola|🏠 A casa) (da|dal|dall')/)
     key(document, 'ArrowRight')
     expect(label()).toBe('Maglia c')
     expect(next.disabled).toBe(true)

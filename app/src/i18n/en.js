@@ -140,6 +140,13 @@ export default {
     other: 'Delete the category "{name}"? Its {n} items stay, uncategorised.',
   },
 
+  'since.school': '🏫 At school {when}',
+  'since.home': '🏠 At home {when}',
+  'since.today': 'since today',
+  'since.yesterday': 'since yesterday',
+  'since.days': 'for {n} days',
+  'since.date': 'since {date}',
+  'since.dateElided': 'since {date}',
   'viewer.hintOne': 'Pinch to zoom',
   'viewer.hintMany': 'Pinch to zoom · swipe for the other items',
   'viewer.title': 'Photo',

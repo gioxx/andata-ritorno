@@ -123,7 +123,12 @@ dialog #editRotate, dialog #editPhoto { display: block; width: 100%; margin-bott
 #viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; flex-direction: column; }
 #viewer[hidden] { display: none; }
 #viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); }
-#viewer .vlabel { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#viewer .vhead { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#viewer .vlabel { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#viewer .vlabel:empty { display: none; }
+#viewer .vsince { font-size: 0.8125rem; opacity: .85; }
+dialog .since { margin: -6px 0 12px; font-size: 0.8125rem; color: var(--muted); }
+dialog .since:empty { display: none; }
 #viewer .vx { flex: none; width: 44px; height: 44px; border-radius: 50%; background: #fff; color: #111; display: flex; align-items: center; justify-content: center; }
 #viewer .vhint { margin: 0; padding: 10px max(14px, env(safe-area-inset-right)) 4px max(14px, env(safe-area-inset-left)); text-align: center; font-size: 0.75rem; color: #ddd; }
 #viewer .vbot { display: flex; gap: 8px; padding: 6px max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }

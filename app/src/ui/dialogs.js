@@ -7,6 +7,7 @@ import { cameraIcon, imageIcon, rotateIcon } from './icons.js'
 import { getPhoto } from '../db.js'
 import { normTurns } from '../rotate.js'
 import { esc } from './esc.js'
+import { sinceText } from './since.js'
 import { t, onLangChange } from '../i18n.js'
 import { resolve, lastActivator, locator, keepFocus } from './focus.js'
 
@@ -154,6 +155,7 @@ function ensureDom() {
     </form></dialog>
     <dialog id="editItem"><form method="dialog">
       <h3>${t('dialogs.editTitle')}</h3>
+      <p class="since" id="editSince"></p>
       <input type="text" id="editLabel" placeholder="${t('dialogs.label')}" aria-label="${t('dialogs.label')}" autocomplete="off">
       <select id="editTab" aria-label="${t('dialogs.tab')}"></select>
       <div class="catpick" id="editCat" role="group" aria-label="${t('dialogs.category')}"></div>
@@ -178,7 +180,7 @@ function ensureDom() {
   dom = { source: $('source'), newItem: $('newItem'), title: $('newTitle'), preview: $('newPreview'), label: $('newLabel'),
     sourceTitle: $('sourceTitle'), gallery: $('gallery'), newCat: $('newCat'), editCat: $('editCat'),
     catItems: $('catItems'), catItemsTitle: $('catItemsTitle'), catItemsPick: $('catItemsPick'),
-    edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editRotate: $('editRotate'), editPreview: $('editPreview'), editSave: $('editSave') }
+    edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editRotate: $('editRotate'), editPreview: $('editPreview'), editSave: $('editSave'), editSince: $('editSince') }
   // Click the input inside the same tap, so the browser lets the picker open.
   dom.source.addEventListener('click', (e) => {
     const b = e.target.closest('[data-source]')
@@ -264,6 +266,7 @@ export function openEditItem(id) {
   if (!it) return
   const d = ensureDom()
   d.editLabel.value = it.label || ''
+  d.editSince.textContent = sinceText(it)
   d.editTab.replaceChildren(...store.tabs.map((t) => Object.assign(new Option(t.name, t.id), { selected: t.id === it.tabId })))
   // The picked photo and the rotation are only held here; Salva commits them with the fields, Annulla drops them.
   let pending = null

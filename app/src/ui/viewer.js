@@ -7,7 +7,8 @@ import { openEditItem, reportError, openModal } from './dialogs.js'
 import { closeIcon, rotateIcon, chevronLeftIcon, chevronRightIcon } from './icons.js'
 import { viewerAction, idleRotation } from './rotation.js'
 import { pinch, swipeIntent, stepIndex, containSize, clampPan, refit, DOUBLE_TAP_SCALE } from './gesture.js'
-import { t as tr, onLangChange } from '../i18n.js'  // `t` is the pan/zoom state here
+import { t as tr, onLangChange } from '../i18n.js'
+import { sinceText } from './since.js'  // `t` is the pan/zoom state here
 
 const DOUBLE_TAP_MS = 300
 const TAP_SLOP = 10
@@ -38,7 +39,7 @@ function ensureDom() {
   el.setAttribute('role', 'dialog')
   el.setAttribute('aria-modal', 'true')
   el.setAttribute('aria-label', tr('viewer.title'))
-  el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="${tr('common.close')}">${closeIcon}</button></div>
+  el.innerHTML = `<div class="vbar"><div class="vhead"><span class="vlabel"></span><span class="vsince"></span></div><button type="button" class="vx" data-v="close" aria-label="${tr('common.close')}">${closeIcon}</button></div>
     <div class="stage"><img alt="" draggable="false"></div>
     <button type="button" class="vnav prev" data-v="prev" aria-label="${tr('viewer.prev')}">${chevronLeftIcon}</button>
     <button type="button" class="vnav next" data-v="next" aria-label="${tr('viewer.next')}">${chevronRightIcon}</button>
@@ -46,7 +47,7 @@ function ensureDom() {
     <p class="sr" data-live="pos" aria-live="polite"></p><p class="sr" data-live="state" aria-live="polite"></p>
     <div class="vbot"><button type="button" data-v="rotate">${rotateIcon}<span>${tr('common.rotate')}</span></button><button type="button" class="n" data-v="edit">${tr('common.edit')}</button><button type="button" class="n vclose" data-v="close">${tr('common.close')}</button><button type="button" class="p" data-v="cancel">${tr('common.cancel')}</button><button type="button" class="p vclose" data-v="save">${tr('common.save')}</button></div>`
   document.body.append(el)
-  dom = { el, prev: el.querySelector('.prev'), next: el.querySelector('.next'), pos: el.querySelector('[data-live="pos"]'), state: el.querySelector('[data-live="state"]'), label: el.querySelector('.vlabel'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
+  dom = { el, prev: el.querySelector('.prev'), next: el.querySelector('.next'), pos: el.querySelector('[data-live="pos"]'), state: el.querySelector('[data-live="state"]'), label: el.querySelector('.vlabel'), since: el.querySelector('.vsince'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-v]')
     if (!b) return
@@ -97,6 +98,8 @@ function ensureDom() {
     el.querySelector('[data-v="cancel"]').textContent = tr('common.cancel')
     el.querySelector('[data-v="save"]').textContent = tr('common.save')
     if (isOpen) dom.hint.textContent = hintText()
+    const cur = isOpen && store.items.find((x) => x.id === ids[index])
+    if (cur) dom.since.textContent = sinceText(cur)
   })
   return dom
 }
@@ -187,6 +190,7 @@ async function show(i) {
   const my = ++token
   const it = store.items.find((x) => x.id === ids[i])
   d.label.textContent = it?.label || ''
+  d.since.textContent = it ? sinceText(it) : ''
   d.el.setAttribute('aria-label', it?.label || tr('viewer.title'))
   d.pos.textContent = tr('viewer.position', { label: it?.label || tr('common.unnamed'), n: i + 1, total: ids.length })
   refreshNav()

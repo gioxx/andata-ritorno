@@ -141,6 +141,13 @@ export default {
     other: 'Eliminare la categoria "{name}"? I suoi {n} capi restano, senza categoria.',
   },
 
+  'since.school': '🏫 A scuola {when}',
+  'since.home': '🏠 A casa {when}',
+  'since.today': 'da oggi',
+  'since.yesterday': 'da ieri',
+  'since.days': 'da {n} giorni',
+  'since.date': 'dal {date}',
+  'since.dateElided': "dall'{date}",
   'viewer.hintOne': 'Due dita per ingrandire',
   'viewer.hintMany': 'Due dita per ingrandire · scorri per gli altri capi',
   'viewer.title': 'Foto',
