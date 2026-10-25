@@ -7,7 +7,7 @@ import { openTabManager } from './tabs.js'
 import { reportError } from './dialogs.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
-import { backupInfoLine, persistLine, removeTodo, failureRow } from './model.js'
+import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessage } from './model.js'
 
 let dlg = null
 let db = null
@@ -84,7 +84,7 @@ export async function runExport() {
   try {
     result = await withBusy(() => exportBackup(db, { now }))
   } catch (e) {
-    alert('Esportazione non riuscita: ' + (e?.message ?? e))
+    alert(missingPhotoMessage(e, store) ?? 'Esportazione non riuscita: ' + (e?.message ?? e))
     return
   }
   if (result === 'cancelled') return

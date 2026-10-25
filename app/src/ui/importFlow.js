@@ -4,7 +4,8 @@ import { store, load } from '../store.js'
 import { prepareImport, commitImport, formatSummary, ImportBlocked } from '../backup/importer.js'
 import { esc } from './render.js'
 import { reportError } from './dialogs.js'
-import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice } from './model.js'
+import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice, importDoneText } from './model.js'
+import { getMeta } from '../db.js'
 
 let busyDlg = null
 
@@ -92,7 +93,9 @@ export async function importFile(db, file) {
   // The import is committed: a reload problem must not be reported as a failed import.
   let reloadError = null
   try { await load(db) } catch (e) { reloadError = e }
-  await showMessage(formatSummary(summary))
+  // A failed read only costs an extra reminder.
+  const lastBackupAt = await getMeta(db, 'lastBackupAt').catch(() => null)
+  await showMessage(importDoneText(formatSummary(summary), lastBackupAt))
   if (reloadError) alert("Import completato, ma l'elenco non si è aggiornato: riapri l'app. " + (reloadError?.message ?? reloadError))
 }
 

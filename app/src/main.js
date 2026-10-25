@@ -30,11 +30,22 @@ function draw() {
   }
 }
 
-const db = await openDb();
-subscribe(draw);
-await load(db);
-watchClipboard(draw);
-initAddFlow();
-initTabs();
-initViewer();
-initMenu(db);
+// IndexedDB can be blocked (private mode, site data disabled): say so instead of a blank page.
+let db = null;
+try {
+  db = await openDb();
+} catch {
+  root.innerHTML = `<div class="welcome">
+    <h1>Impossibile accedere alla memoria del browser</h1>
+    <p>Controlla di non essere in navigazione anonima e che il sito possa salvare dati, poi ricarica la pagina.</p>
+  </div>`;
+}
+if (db) {
+  subscribe(draw);
+  await load(db);
+  watchClipboard(draw);
+  initAddFlow();
+  initTabs();
+  initViewer();
+  initMenu(db);
+}

@@ -37,12 +37,45 @@ export function importErrorMessage(e) {
   return null
 }
 
+const PLACE = { school: 'a scuola', home: 'a casa' }
+
+/**
+ * Export stops at the first item without a readable photo ('missing-photo:<itemId>'):
+ * name that item so the user can find and fix it. null = not that error.
+ * @param {{ items?:any[], tabs?:any[] }} [ctx]  current store data
+ */
+export function missingPhotoMessage(e, { items = [], tabs = [] } = {}) {
+  const id = /^missing-photo:(.*)$/.exec(e?.message ?? '')?.[1]
+  if (id === undefined) return null
+  const it = items.find((i) => i.id === id)
+  const name = String(it?.label ?? '').trim() || 'senza nome'
+  const where = [tabs.find((t) => t.id === it?.tabId)?.name, PLACE[it?.location]].filter(Boolean).join(', ')
+  return `La foto di «${name}»${where ? ` (${where})` : ''} non si trova: cambiala o elimina il capo, poi riprova.`
+}
+
+// Error codes thrown by db.js / store.js / photos.js, as the user should read them.
+const ERROR_TEXT = {
+  'not-found': 'Elemento non trovato: ricarica la pagina',
+  'last-tab': 'Serve almeno una scheda',
+  'empty-name': 'Il nome non può essere vuoto',
+  'bad-data-url': 'Immagine non valida',
+}
+
+/** User-facing text for any failed action (see reportError). */
+export function errorMessage(e, ctx) {
+  return missingPhotoMessage(e, ctx) ?? ERROR_TEXT[e?.message] ?? 'Operazione non riuscita: ' + (e?.message ?? e)
+}
+
+/** Import summary; before the first v2 backup, remind the user to make one. */
+export function importDoneText(summary, lastBackupAt) {
+  return lastBackupAt ? summary : summary + ' · Ora fai un backup della nuova app dal menu.'
+}
+
 /** Drop the tapped "Da rifare" entry by position (id-less entries can look identical). */
 export function removeTodo(list, index) {
   return list.filter((_, i) => i !== index)
 }
 
-const PLACE = { school: 'a scuola', home: 'a casa' }
 
 /** Readable parts of a failure; empty parts are skipped. */
 export function failureParts(f) {

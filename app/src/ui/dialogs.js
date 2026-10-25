@@ -1,6 +1,8 @@
 // Add-flow dialogs. Built once on first use and appended to <body>, so the whole-screen
 // innerHTML re-render of the main screen never touches them.
 import { store, editItem, prepareReplacement } from '../store.js'
+import { errorMessage } from './model.js'
+import { cameraIcon, imageIcon } from './icons.js'
 
 let filesHandler = () => {}
 /** One-shot handler for the next picked files (change photo); null = the add flow. */
@@ -16,8 +18,8 @@ function ensureDom() {
     <dialog id="source"><form method="dialog">
       <h3 id="sourceTitle">Aggiungi capi</h3>
       <div class="row">
-        <button type="button" data-source="camera" class="primary">📷 Scatta</button>
-        <button type="button" data-source="gallery">🖼️ Galleria</button>
+        <button type="button" data-source="camera" class="primary">${cameraIcon}Scatta</button>
+        <button type="button" data-source="gallery">${imageIcon}Galleria</button>
       </div>
       <button value="" class="cancel">Annulla</button>
     </form></dialog>
@@ -143,5 +145,5 @@ export function openEditItem(id) {
 /** Single place where a failed action reaches the user. */
 export function reportError(e) {
   if (e?.name === 'QuotaExceededError') alert('Memoria del telefono piena: esporta un backup ed elimina qualche capo.')
-  else alert('Operazione non riuscita: ' + (e?.message ?? e))
+  else alert(errorMessage(e, store))
 }
