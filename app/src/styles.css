@@ -145,6 +145,8 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .menuItem .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--holder); color: var(--accent); }
 #menu .menuItem .badge { margin-left: auto; padding: 2px 9px; border-radius: var(--r-pill); background: var(--accent-strong); color: var(--bg); font-size: 0.75rem; font-weight: 700; }
 #menu .menuItem[hidden] { display: none; }
+#menu .menuItem.danger { color: var(--danger); }
+#menu .menuItem.danger .ic { color: var(--danger); }
 .seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); }
 #menu .seg button { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 4px; border-radius: 9px; background: none; font-size: 0.875rem; font-weight: 600; }
 #menu .seg button.active { background: var(--accent-strong); color: var(--bg); }
@@ -215,3 +217,15 @@ input, textarea, select { font-size: max(1rem, 16px); }
 .ios-banner ol { margin: 0 0 8px; padding-left: 20px; }
 .ios-banner .ios-ok { min-height: 44px; padding: 8px 18px; border-radius: var(--r-pill); background: var(--bg); color: var(--fg); font-weight: 700; }
 .ios-banner :focus-visible { outline: 2px solid var(--bg); outline-offset: 2px; }
+
+/* ---- Install strip, app dialogs ---- */
+.install-strip { display: flex; align-items: center; gap: 8px; padding: calc(6px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left)); background: var(--chip); font-size: 0.8125rem; line-height: 1.4; }
+.install-strip p { margin: 0; flex: 1; }
+.install-strip button { flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: var(--r-pill); font-weight: 700; }
+.install-strip .strip-go { background: var(--accent-strong); color: var(--bg); }
+.install-strip .strip-x { background: none; color: var(--muted); font-size: 1.125rem; }
+dialog .steps-title { margin: 12px 0 4px; font-size: 0.875rem; font-weight: 700; }
+dialog ol.steps { margin: 0 0 8px; padding-left: 20px; font-size: 0.875rem; line-height: 1.5; }
+dialog p.warn { color: var(--danger); font-weight: 600; }
+dialog p.plain { margin: 0 0 12px; font-size: 0.875rem; line-height: 1.5; }
+dialog .wipe-actions { display: flex; flex-direction: column; gap: 8px; }

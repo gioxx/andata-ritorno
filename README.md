@@ -19,6 +19,7 @@ Take a photo of each item once; from then on every item is either *a scuola* or 
 - **Backup / restore** as a single `.zip` file (photos included, with integrity checks). Every backup is read back and verified before it is saved. Importing merges by item, so restoring the same backup twice creates no duplicates.
 - **Works offline** and installs like an app (PWA).
 - Light, dark or automatic theme.
+- **App menu**: an *Install app* button (native prompt where the browser offers it, steps otherwise), *How to uninstall* instructions, and *Delete all data* (two steps, with an optional backup first and a typed confirmation).
 - Security headers on the served app.
 
 ## Installing on iPhone
@@ -95,6 +96,7 @@ npm run deploy
 
 - **Android**: apri il sito in Chrome e scegli "Installa app" / "Aggiungi a schermata Home".
 - **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
+- **Menu App**: *Installa app*, *Come disinstallare* ed *Elimina tutti i dati* (con backup facoltativo e conferma scritta).
 - **Privacy**: tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server.
 - **Backup**: esporta un file `.zip` con le foto; ogni backup viene riletto e controllato prima del salvataggio. I backup sono una tua responsabilità.
 

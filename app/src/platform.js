@@ -16,6 +16,23 @@ export function installSteps(platform) {
   return []
 }
 
+/** Dictionary keys of the "how to uninstall" steps for a platform. */
+export function uninstallSteps(platform) {
+  if (platform === 'ios') return ['uninstall.ios.1', 'uninstall.ios.2']
+  if (platform === 'android') return ['uninstall.android.1', 'uninstall.android.2']
+  return []
+}
+
+/**
+ * Step lists to show for a platform: its own, or both when we cannot tell (desktop/other).
+ * @param {string} platform @param {(p: string) => string[]} stepsOf installSteps or uninstallSteps
+ * @returns {{platform: 'android'|'ios', keys: string[]}[]}
+ */
+export function stepGroups(platform, stepsOf) {
+  const list = platform === 'ios' || platform === 'android' ? [platform] : ['android', 'ios']
+  return list.map((p) => ({ platform: p, keys: stepsOf(p) }))
+}
+
 export const currentPlatform = () => platformOf({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints || 0 })
 
 export const isStandalone = () =>

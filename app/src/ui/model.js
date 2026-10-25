@@ -64,6 +64,7 @@ const ERROR_KEY = {
   'not-an-image': 'rotate.unreadable',
   'backup-verify-failed': 'error.backupFailed',
   'backup-too-large': 'error.backupTooLarge',
+  'wipe-failed': 'wipe.failed',
 }
 
 /** User-facing text for any failed action (see reportError). */

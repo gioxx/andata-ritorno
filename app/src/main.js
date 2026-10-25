@@ -15,8 +15,11 @@ import { initViewer } from './ui/viewer.js';
 import { initMenu } from './ui/menu.js';
 import { desktopGate } from './ui/desktop.js';
 import { initIosBanner } from './ui/iosBanner.js';
+import { initInstall } from './install.js';
+import { initInstallStrip } from './ui/installStrip.js';
 import { t, onLangChange } from './i18n.js';
 
+initInstall(); // the browser may fire beforeinstallprompt before the UI is ready
 const root = document.getElementById('app');
 await desktopGate(root);
 
@@ -61,6 +64,7 @@ if (db) {
   await load(db);
   // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
   initIosBanner({ onDismiss: () => draw(true) });
+  initInstallStrip();
   watchClipboard(draw);
   initAddFlow();
   initTabs();

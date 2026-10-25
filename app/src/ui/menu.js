@@ -10,9 +10,12 @@ import { keepFocus } from './focus.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
 import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
-import { currentPlatform } from '../platform.js'
+import { currentPlatform, isStandalone } from '../platform.js'
+import { canPromptInstall, promptInstall } from '../install.js'
+import { openInstallSteps, openUninstallSteps } from './appDialogs.js'
+import { openWipeFlow } from './wipeFlow.js'
 import { menuFooter } from './about.js'
-import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
+import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, logOutIcon, eraseIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
 let dlg = null
@@ -23,7 +26,7 @@ const themes = () => [['auto', monitorIcon, t('menu.themeAuto')], ['light', sunI
 const langs = () => [['auto', t('menu.langAuto')], ['it', 'Italiano'], ['en', 'English']]
 
 /** Menu row: icon holder + label (+ optional right-hand pill). */
-const menuItem = (act, icon, label, extra = '') => `<button type="button" class="menuItem" data-menu="${act}"${act === 'todo' ? ' id="todoBtn" hidden' : ''}><span class="ic">${icon}</span>${label}${extra}</button>`
+const menuItem = (act, icon, label, extra = '', cls = '') => `<button type="button" class="menuItem${cls}" data-menu="${act}"${act === 'todo' ? ' id="todoBtn" hidden' : ''}><span class="ic">${icon}</span>${label}${extra}</button>`
 
 /** Ask the browser not to evict our data; null when unsupported. */
 async function persistence() {
@@ -77,6 +80,10 @@ const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="clos
     <div class="seg" id="themeSeg"></div>
     <h4>${t('menu.language')}</h4>
     <div class="seg" id="langSeg"></div>
+    <h4>${t('menu.app')}</h4>
+    ${isStandalone() ? '' : menuItem('install', smartphoneIcon, t('menu.installApp'))}
+    ${menuItem('uninstall', logOutIcon, t('menu.uninstallHow'))}
+    ${menuItem('wipe', eraseIcon, t('menu.wipe'), '', ' danger')}
     ${menuFooter()}`
 
 function build() {
@@ -99,7 +106,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo }[item.dataset.menu]
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), wipe: () => openWipeFlow({ db, onExport: runExport }) }[item.dataset.menu]
     run()
   })
   // Swipe right on the drawer to close it.
@@ -125,6 +132,12 @@ export async function runExport() {
   if (result === 'cancelled') return
   if (result === 'downloaded') alert(t(currentPlatform() === 'ios' ? 'menu.fileSavedIos' : 'menu.fileSaved', { name: backupFileName(now) }))
   await load(db) // refreshes the unsaved-changes banner
+}
+
+/** Native prompt when the browser offered one, else the manual steps for this platform. */
+async function runInstall() {
+  if (canPromptInstall()) await promptInstall()
+  else openInstallSteps()
 }
 
 let todoDlg = null
