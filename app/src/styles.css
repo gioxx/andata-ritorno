@@ -145,7 +145,9 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .seg button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 4px; border-radius: 9px; background: none; font-size: 14px; font-weight: 600; }
 #menu .seg button.active { background: var(--accent); color: var(--bg); }
 #menu .about { margin-top: auto; padding-top: 16px; font-size: 12px; line-height: 1.6; color: var(--muted); }
-.about a { color: inherit; display: inline-flex; align-items: center; gap: 4px; }
+.about a { color: inherit; }
+/* Keep the icon on the text baseline: an inline-flex link would sit on the icon's bottom edge and lift the text. */
+.about a svg { vertical-align: -0.2em; margin-right: 4px; }
 dialog.busy { text-align: center; font-weight: 700; width: auto; padding: 18px 28px; }
 dialog .maprow { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 700; }
 dialog .maprow select { margin-top: 4px; }
