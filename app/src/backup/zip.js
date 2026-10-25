@@ -62,6 +62,7 @@ function normItem(raw) {
     photoId: raw.photoId, createdAt: isIso(raw.createdAt) ? raw.createdAt : movedAt, movedAt, updatedAt: iso(raw.updatedAt),
   }
   if (typeof raw.category === 'string') item.category = raw.category
+  if (isIso(raw.photoAt)) item.photoAt = raw.photoAt
   return item
 }
 

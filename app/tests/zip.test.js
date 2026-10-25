@@ -184,6 +184,16 @@ describe('v2 zip', () => {
     expect('category' in b).toBe(false)
   })
 
+  it('normItem keeps a valid photoAt and drops an invalid one', async () => {
+    const { prepared } = await incomingOf((j) => {
+      j.items[0].photoAt = '2026-05-01T00:00:00.000Z'
+      j.items[1].photoAt = 'nope'
+    })
+    const [a, b] = ['i1', 'i2'].map((id) => prepared.incoming.items.find((i) => i.id === id))
+    expect(a.photoAt).toBe('2026-05-01T00:00:00.000Z')
+    expect('photoAt' in b).toBe(false)
+  })
+
   it('missing movedAt → epoch; bad createdAt → movedAt; bad updatedAt → epoch', async () => {
     const { prepared } = await incomingOf((j) => {
       delete j.items[0].movedAt

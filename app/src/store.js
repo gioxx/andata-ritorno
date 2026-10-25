@@ -235,7 +235,7 @@ export function addPhotos(photos, { location, label, category }) {
     const items = photos.map((photo) => ({
       id: crypto.randomUUID(), tabId, location, label, photoId: photo.id,
       ...(category ? { category } : {}),
-      createdAt: now, movedAt: now, updatedAt: now,
+      createdAt: now, movedAt: now, updatedAt: now, photoAt: now,
     }))
     await addItems(store.db, items, photos)
     store.items.push(...items)
@@ -302,6 +302,7 @@ async function applyEdit(id, patch, photo) {
     if (photo) {
       await replacePhoto(store.db, id, photo, now)
       it.photoId = photo.id
+      it.photoAt = now
     }
     if (Object.keys(clean).length) await updateItem(store.db, id, clean, now)
     const leaves = clean.tabId !== undefined

@@ -174,7 +174,7 @@ export async function replacePhoto(db, itemId, photo, now) {
     if (!it) throw new Error('not-found')
     await tx.objectStore('photos').put(photo)
     if (it.photoId !== photo.id) await tx.objectStore('photos').delete(it.photoId)
-    await tx.objectStore('items').put({ ...it, photoId: photo.id, updatedAt: now })
+    await tx.objectStore('items').put({ ...it, photoId: photo.id, photoAt: now, updatedAt: now })
   })
 }
 

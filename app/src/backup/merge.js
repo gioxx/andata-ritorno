@@ -1,24 +1,28 @@
 // Per-field last-writer-wins merge. Pure: no I/O. ISO strings compare lexicographically.
 
 /** Merge two versions of one item; ties keep `a` (the local / first-seen side). */
-function mergeItem(a, b) {
+export function mergeItem(a, b) {
   const move = b.movedAt > a.movedAt ? b : a // location travels with movedAt
   const edit = b.updatedAt > a.updatedAt ? b : a // everything else with updatedAt
+  // The photo has its own clock: a label edit must not drag an older photo along (or lose a newer one).
+  const photo = (b.photoAt ?? b.updatedAt) > (a.photoAt ?? a.updatedAt) ? b : a
   const out = {
     ...a,
     location: move.location,
     movedAt: move.movedAt,
     label: edit.label,
     tabId: edit.tabId,
-    photoId: edit.photoId,
+    photoId: photo.photoId,
     updatedAt: edit.updatedAt,
   }
+  if (photo.photoAt === undefined) delete out.photoAt
+  else out.photoAt = photo.photoAt
   if (edit.category === undefined) delete out.category
   else out.category = edit.category
   return out
 }
 
-const FIELDS = ['tabId', 'location', 'label', 'category', 'photoId', 'movedAt', 'updatedAt']
+const FIELDS = ['tabId', 'location', 'label', 'category', 'photoId', 'photoAt', 'movedAt', 'updatedAt']
 const same = (a, b) => FIELDS.every((f) => a[f] === b[f])
 
 /**

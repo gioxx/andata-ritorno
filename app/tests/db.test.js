@@ -89,6 +89,13 @@ describe('db', () => {
     expect(it.updatedAt).toBe(T1)
   })
 
+  it('replacePhoto sets photoAt = now', async () => {
+    const db = await fresh()
+    await seed(db)
+    await replacePhoto(db, 'i1', photo('p-new'), T1)
+    expect((await db.get('items', 'i1')).photoAt).toBe(T1)
+  })
+
   it('deleteItems removes items and photos', async () => {
     const db = await fresh()
     await seed(db)

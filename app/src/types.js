@@ -1,6 +1,6 @@
 /** @typedef {{ id:string, name:string, order:number, createdAt:string, updatedAt:string }} Tab */
 /** @typedef {{ id:string, tabId:string, location:'school'|'home', label:string, category?:string,
- *   photoId:string, createdAt:string, movedAt:string, updatedAt:string }} Item */
+ *   photoId:string, photoAt?:string, createdAt:string, movedAt:string, updatedAt:string }} Item */
 /** nameKey = dictionary key of a default category (shown translated until renamed).
  * @typedef {{ id:string, name:string, nameKey?:string, order:number, createdAt:string, updatedAt:string }} Category */
 /** @typedef {{ id:string, blob:Blob, width:number, height:number }} Photo */
