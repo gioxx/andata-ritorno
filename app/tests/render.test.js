@@ -111,6 +111,17 @@ describe('tag row', () => {
     root.querySelector('[data-tagclear]').click()
     expect(st.filter.size).toBe(0)
   })
+
+  it('an item whose category was deleted elsewhere renders as uncategorised', () => {
+    const root = document.createElement('div')
+    renderApp(root, state([mk('x', 'gone')], new Set(), false))
+    expect(root.querySelector('[data-act="toggleTags"]')).toBeNull()
+    expect(root.querySelector('.item[data-id="x"] .pick').getAttribute('aria-label')).toContain('senza categoria')
+    const items = [mk('x', 'c1'), mk('y', 'gone')]
+    renderApp(root, state(items, new Set([''])))
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti ✕', 'Maglie', 'Senza categoria'])
+    expect([...root.querySelectorAll('.item')].map((n) => n.dataset.id)).toEqual(['y'])
+  })
 })
 
 describe('categorize button', () => {

@@ -4,7 +4,7 @@ import {
   openDb, loadAll, putTab, deleteTab, addItems, moveItems, updateItem,
   replacePhoto, deleteItems, getPhoto, getMeta, setMeta, applyPlan, setVersionChangeHandler,
   putCategory, deleteCategory, putCategories, putTabs, setItemsCategory,
-  setSyncTracking, readOutbox, clearOutbox, getTombstones, putTombstones, clearSyncStores, clearWardrobe,
+  setSyncTracking, readOutbox, clearOutbox, getTombstones, putTombstones, clearSyncStores, clearWardrobe, applySyncPlan,
 } from '../src/db.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
@@ -510,5 +510,68 @@ describe('db', () => {
       expect(await readOutbox(db)).toEqual([])
       expect((await db.get('tabs', 'T')).updatedAt).toBe(T0)
     })
+  })
+})
+
+describe('applySyncPlan', () => {
+  const syncPlan = (p) => ({
+    tabsPut: [], tabsDelete: [], categoriesPut: [], categoriesDelete: [], itemsPut: [], itemsDelete: [],
+    photosDelete: [], tombstonesPut: [], tombstonesDelete: [], pushBack: [], photosNeeded: [], movedOrphans: 0,
+    changesBy: new Map(), ...p,
+  })
+  const outboxKeys = async (db) => (await readOutbox(db)).map((e) => `${e.kind}:${e.id}`).sort()
+
+  async function seeded() {
+    const db = await fresh()
+    await seed(db)
+    await putCategory(db, cat('c1'))
+    await putTombstones(db, [{ kind: 'item', id: 'i9', deletedAt: T0 }])
+    return db
+  }
+  const full = () => syncPlan({
+    tabsPut: [tab('C', 2)], tabsDelete: ['B'],
+    categoriesPut: [cat('c2', 1)], categoriesDelete: ['c1'],
+    itemsPut: [{ ...item('i1', 'A'), label: 'nuovo', updatedAt: T1 }, item('i9', 'C')], itemsDelete: ['i3'],
+    photosDelete: ['p-i3'],
+    tombstonesPut: [{ kind: 'tab', id: 'B', deletedAt: T1 }, { kind: 'item', id: 'i3', deletedAt: T1 }],
+    tombstonesDelete: ['i9'],
+    pushBack: [{ kind: 'item', id: 'i1' }],
+  })
+
+  it('writes every put, delete and tombstone; only pushBack reaches the outbox, even while tracking', async () => {
+    const db = await seeded()
+    setSyncTracking(true)
+    try {
+      await applySyncPlan(db, full())
+    } finally { setSyncTracking(false) }
+    const { tabs, categories, items } = await loadAll(db)
+    expect(tabs.map((t) => t.id)).toEqual(['A', 'C'])
+    expect(categories.map((c) => c.id)).toEqual(['c2'])
+    expect(items.map((i) => i.id).sort()).toEqual(['i1', 'i2', 'i9'])
+    expect(items.find((i) => i.id === 'i1').label).toBe('nuovo')
+    expect(await getPhoto(db, 'p-i3')).toBeUndefined()
+    await expectBlob(await getPhoto(db, 'p-i1'), 'p-i1')
+    expect([...(await getTombstones(db)).keys()].sort()).toEqual(['B', 'i3'])
+    expect(await outboxKeys(db)).toEqual(['item:i1'])
+  })
+
+  it('keeps outbox entries already waiting', async () => {
+    const db = await seeded()
+    setSyncTracking(true)
+    try { await moveItems(db, ['i2'], 'home', T1) } finally { setSyncTracking(false) }
+    await applySyncPlan(db, syncPlan({ pushBack: [{ kind: 'tab', id: 'A' }] }))
+    expect(await outboxKeys(db)).toEqual(['item:i2', 'tab:A'])
+  })
+
+  it('is atomic: one failing write leaves everything unchanged', async () => {
+    const db = await seeded()
+    const before = { ...(await loadAll(db)), tombs: await db.getAll('tombstones'), photos: await db.getAllKeys('photos') }
+    const plan = full()
+    plan.itemsPut.push({ ...item('bad', 'A'), oops: () => {} }) // not cloneable: the put throws
+    await expect(applySyncPlan(db, plan)).rejects.toBeTruthy()
+    expect(await loadAll(db)).toEqual({ tabs: before.tabs, categories: before.categories, items: before.items })
+    expect(await db.getAll('tombstones')).toEqual(before.tombs)
+    expect(await db.getAllKeys('photos')).toEqual(before.photos)
+    expect(await readOutbox(db)).toEqual([])
   })
 })

@@ -5,7 +5,7 @@ import { compress } from './photos.js'
 import { rotatePhoto } from './rotate.js'
 import { missingDefaults, categoryName } from './categories.js'
 import { t } from './i18n.js'
-import { visibleItems, usableFilters } from './ui/filter.js'
+import { visibleItems, usableFilters, effectiveCategory } from './ui/filter.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -65,16 +65,20 @@ export async function load(db) {
   notify()
 }
 
+/** Ids of existing categories: an item pointing elsewhere (deleted on another device) is uncategorised. */
+export const knownCategoryIds = (s = store) => new Set((s.categories ?? []).map((c) => c.id))
+
 /**
  * Keep filter and selection coherent after any change: the filter only holds categories
  * still used in the current tab (else the screen could be empty with no pill to clear),
  * and the selection only holds visible items.
  */
 function settle() {
-  const used = usableFilters(store.items.filter((i) => i.tabId === store.currentTabId))
+  const known = knownCategoryIds()
+  const used = usableFilters(store.items.filter((i) => i.tabId === store.currentTabId), known)
   for (const id of [...store.filter]) if (!used.has(id)) store.filter.delete(id)
   if (!store.filter.size) return
-  const shown = new Set(visibleItems(store.items, store.filter).map((i) => i.id))
+  const shown = new Set(visibleItems(store.items, store.filter, known).map((i) => i.id))
   for (const id of [...store.selected]) if (!shown.has(id)) store.selected.delete(id)
 }
 
@@ -104,7 +108,7 @@ export function selectToggle(id) {
 
 /** Select every visible (filter-respecting) item of the current tab in `location`; if all are already selected, deselect them. */
 export function selectSection(location) {
-  const ids = visibleItems(store.items.filter((i) => i.tabId === store.currentTabId), store.filter)
+  const ids = visibleItems(store.items.filter((i) => i.tabId === store.currentTabId), store.filter, knownCategoryIds())
     .filter((i) => i.location === location)
     .map((i) => i.id)
   const allSelected = ids.length > 0 && ids.every((id) => store.selected.has(id))
@@ -189,7 +193,8 @@ export function categorizeSelected(category) {
     try {
       if (category && !store.categories.some((c) => c.id === category)) throw new Error('not-found')
       const set = new Set(ids)
-      const changed = store.items.filter((i) => set.has(i.id) && (i.category ?? '') !== (category || ''))
+      const known = knownCategoryIds()
+      const changed = store.items.filter((i) => set.has(i.id) && (effectiveCategory(i, known) ?? '') !== (category || ''))
       if (changed.length) {
         const now = new Date().toISOString()
         await setItemsCategory(store.db, changed.map((i) => i.id), category, now)
@@ -297,6 +302,8 @@ async function applyEdit(id, patch, photo) {
     if (clean.tabId !== undefined && !store.tabs.some((t) => t.id === clean.tabId)) throw new Error('not-found')
     if (clean.category && !store.categories.some((c) => c.id === clean.category)) throw new Error('not-found')
     for (const k of Object.keys(clean)) if ((clean[k] ?? undefined) === (it[k] ?? (k === 'label' ? '' : undefined))) delete clean[k]
+    // A stale (deleted) category already shows as none: clearing it alone is no edit, but it rides along with a real one.
+    if ('category' in clean && !clean.category && !effectiveCategory(it, knownCategoryIds()) && Object.keys(clean).length === 1 && !photo) delete clean.category
     if (!Object.keys(clean).length && !photo) return
     const now = new Date().toISOString()
     if (photo) {
@@ -435,16 +442,16 @@ export function reorderCategories(ids) {
   })
 }
 
-/** Delete a category; its items stay, uncategorised (db.js bumps their updatedAt). */
+/**
+ * Delete a category; its items stay, uncategorised. Items are re-read: untracked, db.js clears
+ * their category (bumping updatedAt); while syncing it leaves them alone (stale id = uncategorised).
+ */
 export function removeCategory(id) {
   return queue(async () => {
     if (!store.categories.some((c) => c.id === id)) throw new Error('not-found')
-    const now = new Date().toISOString()
-    await deleteCategory(store.db, id, now)
+    await deleteCategory(store.db, id, new Date().toISOString())
     store.categories = store.categories.filter((c) => c.id !== id)
-    for (const it of store.items) {
-      if (it.category === id) { delete it.category; it.updatedAt = now }
-    }
+    store.items = (await loadAll(store.db)).items
     settle()
     await bump(1)
     notify()

@@ -1,8 +1,8 @@
 // Main screen. Whole-screen innerHTML re-render on every store change (small data set),
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
-import { store, setShowTags, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, categorizeSelected, toggleFilter, clearFilter } from '../store.js'
-import { visibleItems, usableFilters, UNCATEGORISED } from './filter.js'
+import { store, knownCategoryIds, setShowTags, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, categorizeSelected, toggleFilter, clearFilter } from '../store.js'
+import { visibleItems, usableFilters, effectiveCategory, UNCATEGORISED } from './filter.js'
 import { categoryName } from '../categories.js'
 import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon, tagIcon, filterIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
@@ -43,7 +43,7 @@ function revokeGone() {
   for (const [id, url] of urls) if (!alive.has(id)) { URL.revokeObjectURL(url); urls.delete(id) }
 }
 
-/** Spoken name of a tile: description, place and category. */
+/** Spoken name of a tile: description, place and category (a deleted one is not found: none). */
 function tileLabel(i, label, categories) {
   const cat = categories.find((c) => c.id === i.category)
   return t('item.aria', { label: label.trim() || t('common.unnamed'), place: t(i.location === 'home' ? 'loc.home' : 'loc.school'), category: cat ? categoryName(cat) : t('item.noCategory') })
@@ -67,7 +67,7 @@ function section(loc, title, cls, list, categories) {
 
 /** Pills for the categories used in this tab (category order), then "Senza categoria"; none when nothing is categorised. */
 function tagRow(tabItems, s) {
-  const used = usableFilters(tabItems)
+  const used = usableFilters(tabItems, knownCategoryIds(s))
   const cats = (s.categories ?? []).filter((c) => used.has(c.id))
   if (!cats.length) return ''
   if (!s.showTags) return ''
@@ -79,7 +79,8 @@ function tagRow(tabItems, s) {
 
 /** Show/hide button for the category row, only when the tab has something to filter by. */
 function tagToggle(tabItems, s) {
-  if (!tabItems.some((i) => i.category)) return ''
+  const known = knownCategoryIds(s)
+  if (!tabItems.some((i) => effectiveCategory(i, known))) return ''
   return `<button class="menu tagtoggle${s.showTags ? ' on' : ''}" data-act="toggleTags" aria-pressed="${!!s.showTags}" aria-label="${t('render.tagsToggle')}">${filterIcon}</button>`
 }
 
@@ -104,7 +105,7 @@ export function renderApp(root, s = store) {
   const tagsOld = root.querySelector('.tags')
   const tagsScroll = tagsOld ? tagsOld.scrollLeft : 0
   const tabItems = s.items.filter((i) => i.tabId === s.currentTabId)
-  const items = visibleItems(tabItems, s.filter)
+  const items = visibleItems(tabItems, s.filter, knownCategoryIds(s))
   const sel = [...s.selected].map((id) => s.items.find((i) => i.id === id)).filter(Boolean)
   const n = s.unsaved
   const cats = s.categories ?? []
@@ -162,7 +163,8 @@ function wire(root) {
 /** Category for the whole selection; the pill they all share starts chosen. */
 async function categorize() {
   const sel = store.items.filter((i) => store.selected.has(i.id))
-  const shared = new Set(sel.map((i) => i.category ?? ''))
+  const known = knownCategoryIds()
+  const shared = new Set(sel.map((i) => effectiveCategory(i, known) ?? ''))
   const category = await askCategory(sel.length, shared.size === 1 ? [...shared][0] : undefined)
   if (category !== null) await categorizeSelected(category)
 }

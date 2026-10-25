@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
+import { openDb, putTab, addItems, getMeta, loadAll, getPhoto, setSyncTracking } from '../src/db.js'
 import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected, setShowTags } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
@@ -338,6 +338,44 @@ describe('edit item', () => {
     await renameCategory(c.id, 'Tutine')
     expect('nameKey' in c).toBe(false)
     expect(store.unsaved).toBe(before.unsaved + 1)
+  })
+
+  describe('category deleted while syncing (stale id stays on items)', () => {
+    let cid
+    beforeEach(async () => {
+      await addCategory('Costumi')
+      cid = store.categories[0].id
+      await editItem('a1', { category: cid })
+      await addCategory('Maglie')
+      await editItem('a2', { category: store.categories[1].id })
+      setSyncTracking(true)
+      try { await removeCategory(cid) } finally { setSyncTracking(false) }
+    })
+
+    it('memory matches the database: the item keeps the id and its updatedAt', async () => {
+      const mem = store.items.find((i) => i.id === 'a1')
+      const stored = (await loadAll(db)).items.find((i) => i.id === 'a1')
+      expect(mem.category).toBe(cid)
+      expect(mem).toEqual(stored)
+    })
+
+    it('filters and selection treat it as uncategorised', () => {
+      toggleFilter('')
+      expect([...store.filter]).toEqual([''])
+      selectSection('school')
+      expect([...store.selected]).toEqual(['a1'])
+    })
+
+    it('choosing "none" or saving an untouched edit writes nothing; a real edit clears the id', async () => {
+      const before = store.unsaved
+      selectToggle('a1')
+      await categorizeSelected(null)
+      await editItem('a1', { label: 'a1', tabId: 'A', category: null })
+      expect(store.unsaved).toBe(before)
+      expect(store.items.find((i) => i.id === 'a1').category).toBe(cid)
+      await editItem('a1', { label: 'nuovo', tabId: 'A', category: null })
+      expect('category' in store.items.find((i) => i.id === 'a1')).toBe(false)
+    })
   })
 
   it('removeCategory on an unknown id throws not-found and counts nothing', async () => {

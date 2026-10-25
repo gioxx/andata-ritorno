@@ -322,6 +322,28 @@ export async function applyPlan(db, plan, now = new Date().toISOString()) {
   })
 }
 
+/**
+ * @param {import('./types.js').SyncPlan} plan  from sync/merge.js, all-or-nothing. Records taken
+ * from the server are not queued for upload again (writes here bypass markDirty); only
+ * `pushBack` joins the outbox, next to entries already waiting.
+ */
+export async function applySyncPlan(db, plan) {
+  const stores = ['tabs', 'categories', 'items', 'photos', 'tombstones', 'outbox']
+  await withTx(db, stores, (tx, track) => {
+    const st = (n) => tx.objectStore(n)
+    for (const id of plan.tabsDelete) track(st('tabs').delete(id))
+    for (const id of plan.categoriesDelete) track(st('categories').delete(id))
+    for (const id of plan.itemsDelete) track(st('items').delete(id))
+    for (const id of plan.photosDelete) track(st('photos').delete(id))
+    for (const id of plan.tombstonesDelete) track(st('tombstones').delete(id))
+    for (const t of plan.tabsPut) track(st('tabs').put(t))
+    for (const c of plan.categoriesPut) track(st('categories').put(c))
+    for (const it of plan.itemsPut) track(st('items').put(it))
+    for (const t of plan.tombstonesPut) track(st('tombstones').put(t))
+    for (const { kind, id } of plan.pushBack) track(st('outbox').put({ kind, id }, `${kind}:${id}`))
+  })
+}
+
 async function patchItems(db, ids, fn) {
   await withTx(db, withOutbox(['items']), async (tx, track) => {
     for (const id of ids) {

@@ -13,3 +13,9 @@
  *   added:number, updated:number, metaPut?:Array<[string, any]> }} ImportPlan */
 /** Deletion marker kept while syncing so a delete wins over an older edit on other devices.
  * @typedef {{ kind:'item'|'tab'|'category', id:string, deletedAt:string }} Tombstone */
+/** What merging pulled sync records changes locally (db.applySyncPlan writes it in one tx).
+ * photosDelete: local blobs no longer referenced; photosNeeded: referenced but not on this device;
+ * pushBack: records to (re)upload because the server holds something else; changesBy: deviceId → applied records.
+ * @typedef {{ tabsPut:Tab[], tabsDelete:string[], categoriesPut:Category[], categoriesDelete:string[],
+ *   itemsPut:Item[], itemsDelete:string[], photosDelete:string[], tombstonesPut:Tombstone[], tombstonesDelete:string[],
+ *   pushBack:{kind:string, id:string}[], photosNeeded:string[], movedOrphans:number, changesBy:Map<string,number> }} SyncPlan */
