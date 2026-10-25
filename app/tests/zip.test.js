@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { zipSync, unzipSync } from 'fflate'
+import { zipSync, unzipSync, Zip, ZipPassThrough, strToU8 } from 'fflate'
 import { openDb, loadAll, putTab, putCategory, updateItem, addItems, getPhoto } from '../src/db.js'
 import { buildZip } from '../src/backup/zip.js'
 import { prepareImport, commitImport, ImportBlocked } from '../src/backup/importer.js'
@@ -53,6 +53,18 @@ describe('v2 zip', () => {
   it('names photos by type and stores them uncompressed', async () => {
     const entries = unzipSync(await bytesOf(await zipOf(await seeded())))
     expect(Object.keys(entries).sort()).toEqual(['backup.json', 'photos/p1.webp', 'photos/p2.jpg', 'photos/p3.webp'])
+  })
+
+  it('photos are stored with CRC and sizes in their local headers (no data descriptors)', async () => {
+    const bytes = await bytesOf(await zipOf(await seeded()))
+    const v = new DataView(bytes.buffer)
+    const json = JSON.parse(new TextDecoder().decode(unzipSync(bytes)['backup.json']))
+    expect(v.getUint32(0, true)).toBe(0x04034b50)
+    expect(v.getUint16(6, true) & 8).toBe(0) // no data descriptor
+    expect(v.getUint16(8, true)).toBe(0) // stored
+    expect(v.getUint32(14, true)).toBe(json.photos.p1.crc32)
+    expect(v.getUint32(18, true)).toBe(json.photos.p1.size)
+    expect(v.getUint32(22, true)).toBe(json.photos.p1.size)
   })
 
   it('photo missing in zip → failure, not orphan', async () => {
@@ -267,5 +279,49 @@ describe('v2 zip', () => {
       { id: 'c3', name: 'Z', order: 5, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z' },
       { id: 'default-body', name: 'W', order: 6, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z' },
     ])
+  })
+
+  // ZIP record signatures inside photo bytes must not confuse the reader (a signature-scanning
+  // stream parser would cut the photo short there).
+  const SIGS = [0x50, 0x4b, 7, 8, 0x50, 0x4b, 1, 2, 0x50, 0x4b, 3, 4, 0x50, 0x4b, 5, 6]
+  it('photo bytes containing ZIP signatures round-trip intact', async () => {
+    const src = await seeded()
+    const bytes = new Uint8Array([1, ...SIGS, 9, ...SIGS, 2])
+    await addItems(src, [{ id: 'i8', tabId: 'tab-a', location: 'home', label: 'sig', photoId: 'p8', createdAt: T, movedAt: T, updatedAt: T }],
+      [{ id: 'p8', blob: new Blob([bytes], { type: 'image/webp' }), width: 1, height: 1 }])
+    const dst = await fresh()
+    const prepared = await prepareImport(dst, asFile(await zipOf(src)))
+    expect(prepared.incoming.failures).toEqual([])
+    await commitImport(dst, prepared, { partial: false })
+    expect(await bytesOf(await getPhoto(dst, 'p8'))).toEqual(bytes)
+  })
+
+  it('reads archives written with data descriptors (streaming writers)', async () => {
+    const entries = unzipSync(await bytesOf(await zipOf(await seeded())))
+    entries['photos/p1.webp'] = new Uint8Array([...entries['photos/p1.webp'], ...SIGS])
+    const json = JSON.parse(new TextDecoder().decode(entries['backup.json']))
+    delete json.photos // the integrity map no longer matches p1: drop it, as an older file would
+    entries['backup.json'] = strToU8(JSON.stringify(json))
+    const chunks = []
+    const z = new Zip((err, chunk) => { if (err) throw err; chunks.push(chunk) })
+    for (const [name, data] of Object.entries(entries)) {
+      const f = new ZipPassThrough(name)
+      z.add(f)
+      f.push(data, true)
+    }
+    z.end()
+    const dst = await fresh()
+    const prepared = await prepareImport(dst, asFile(new Blob(chunks)))
+    expect(prepared.incoming.failures).toEqual([])
+    expect(await bytesOf(prepared.incoming.photos.get('p1'))).toEqual(entries['photos/p1.webp'])
+  })
+
+  it.each([
+    ['truncated archive', (b) => b.slice(0, b.length - 30)],
+    ['not a zip past the header', (b) => new Uint8Array([0x50, 0x4b, 3, 4, 0, 0, 0, 0])],
+  ])('%s → bad-file', async (_n, cut) => {
+    const bytes = cut(await bytesOf(await zipOf(await seeded())))
+    const dst = await fresh()
+    await expect(prepareImport(dst, asFile(new Blob([bytes])))).rejects.toThrow('bad-file')
   })
 })

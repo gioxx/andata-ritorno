@@ -1,5 +1,7 @@
 // v2 backup container: a ZIP with backup.json + photos/<photoId>.<ext> (no base64, no giant string).
-import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
+// Built and read entry by entry (zipio.js): peak memory stays near one photo, not the archive.
+import { strToU8 } from 'fflate'
+import { writeZip, readIndex, readEntry, measure, crc32 } from './zipio.js'
 import { decodeImage } from '../photos.js'
 import { DEFAULT_CATEGORIES } from '../categories.js'
 
@@ -16,17 +18,6 @@ const extOf = (type) => {
   return sub === 'jpeg' ? 'jpg' : sub ?? null
 }
 
-const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, n) => {
-  let c = n
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-  return c >>> 0
-})
-// fflate's unzipSync does not verify CRCs, so the backup carries its own.
-const crc32 = (bytes) => {
-  let c = 0xffffffff
-  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
-  return (c ^ 0xffffffff) >>> 0
-}
 const PLACES = ['school', 'home']
 const EPOCH = '1970-01-01T00:00:00.000Z'
 const str = (v) => (typeof v === 'string' ? v : '')
@@ -79,7 +70,7 @@ function normItem(raw) {
  * @returns {Promise<Blob>}
  */
 export async function buildZip({ tabs, items, categories = [], getPhoto, now = new Date() }) {
-  const files = {}
+  const entries = []
   const integrity = {}
   const done = new Set()
   for (const it of items) {
@@ -88,14 +79,16 @@ export async function buildZip({ tabs, items, categories = [], getPhoto, now = n
     const blob = await getPhoto(it.photoId)
     const ext = blob && extOf(blob.type)
     if (!ext) throw new Error(`missing-photo:${it.id}`)
-    const bytes = new Uint8Array(await blob.arrayBuffer())
-    integrity[it.photoId] = { size: bytes.length, crc32: crc32(bytes) }
-    // Photos are already compressed: store them, level 0.
-    files[`photos/${it.photoId}.${ext}`] = [bytes, { level: 0 }]
+    // Streamed once for the checksum; the Blob itself goes into the archive by reference.
+    const m = await measure(blob)
+    integrity[it.photoId] = m
+    // Photos are already compressed: stored as they are.
+    entries.push({ name: `photos/${it.photoId}.${ext}`, data: blob, ...m })
   }
   const meta = { app: 'andata-ritorno', version: 2, exportedAt: now.toISOString(), tabs, categories, items, photos: integrity }
-  files['backup.json'] = strToU8(JSON.stringify(meta))
-  return new Blob([zipSync(files)], { type: 'application/zip' })
+  const json = strToU8(JSON.stringify(meta))
+  entries.push({ name: 'backup.json', data: json, size: json.length, crc32: crc32(json) })
+  return writeZip(entries, now)
 }
 
 /**
@@ -105,15 +98,13 @@ export async function buildZip({ tabs, items, categories = [], getPhoto, now = n
  * @returns {Promise<Incoming>}
  */
 export async function parseZip(blob, { localTabIds = [] } = {}) {
-  let entries
-  try {
-    entries = unzipSync(new Uint8Array(await blob.arrayBuffer()))
-  } catch {
-    throw new Error('bad-file')
-  }
+  let index
   let json
   try {
-    json = JSON.parse(strFromU8(entries['backup.json']))
+    index = await readIndex(blob)
+    const meta = index.get('backup.json')
+    if (!meta) throw new Error('bad-file')
+    json = JSON.parse(await new Blob(await readEntry(blob, meta)).text())
   } catch {
     throw new Error('bad-file')
   }
@@ -121,10 +112,10 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     throw new Error('bad-file')
   }
 
-  const photoFiles = new Map() // photoId -> { bytes, type }
-  for (const [path, bytes] of Object.entries(entries)) {
+  const photoFiles = new Map() // photoId -> { entry, type }
+  for (const [path, entry] of index) {
     const m = /^photos\/(.+)\.([a-z0-9]+)$/.exec(path)
-    if (m) photoFiles.set(m[1], { bytes, type: TYPE[m[2]] ?? 'application/octet-stream' })
+    if (m) photoFiles.set(m[1], { entry, type: TYPE[m[2]] ?? 'application/octet-stream' })
   }
   // The `photos` integrity map is additive: a v2 file without it still imports, just unchecked.
   const integrity = json.photos && typeof json.photos === 'object' ? json.photos : {}
@@ -133,6 +124,27 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
   const categories = Array.isArray(json.categories) ? json.categories.map(normCategory).filter(Boolean) : []
   const tabNames = new Map(tabs.map((t) => [t.id, t.name]))
   const known = new Set([...tabNames.keys(), ...localTabIds])
+
+  // One read per photo, however many items share it; a failed read is remembered too.
+  const read = new Map() // photoId -> Promise<Blob>
+  const readPhoto = (photoId, file) => {
+    if (!read.has(photoId)) {
+      read.set(photoId, (async () => {
+        const chunks = await readEntry(blob, file.entry)
+        const want = integrity[photoId]
+        if (want) {
+          let size = 0
+          let crc = 0
+          for (const c of chunks) { size += c.length; crc = crc32(c, crc) }
+          if (want.size !== size || want.crc32 !== crc) throw new Error('corrupt')
+        }
+        const photo = new Blob(chunks, { type: file.type })
+        await decodeImage(photo)
+        return photo
+      })())
+    }
+    return read.get(photoId)
+  }
 
   const items = []
   const photos = new Map()
@@ -147,11 +159,9 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     if (!known.has(item.tabId)) { fail('missing-tab'); continue }
     const file = photoFiles.get(item.photoId)
     if (!file) { fail('missing-photo'); continue }
-    const photo = new Blob([file.bytes], { type: file.type })
-    const want = integrity[item.photoId]
+    let photo
     try {
-      if (want && (want.size !== file.bytes.length || want.crc32 !== crc32(file.bytes))) throw new Error('corrupt')
-      await decodeImage(photo)
+      photo = await readPhoto(item.photoId, file)
     } catch {
       fail('unreadable-photo'); continue
     }
