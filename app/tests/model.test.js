@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { backupInfoLine, persistLine, mappingRows, importErrorMessage, removeTodo, blockedTitle, failureParts, failureRow, confirmedChoice, missingPhotoMessage, errorMessage, importDoneText } from '../src/ui/model.js'
+import { backupInfoLine, persistLine, mappingRows, importErrorMessage, removeTodo, blockedTitle, failureParts, failureRow, confirmedChoice, missingPhotoMessage, errorMessage, exportErrorMessage, importDoneText } from '../src/ui/model.js'
 
 describe('ui model', () => {
   it('backup info singular/plural and mai', () => {
@@ -66,10 +66,21 @@ describe('ui model', () => {
     expect(errorMessage(new Error('missing-photo:i1'), { items: [{ id: 'i1', tabId: 't', location: 'home', label: 'G' }], tabs: [] }))
       .toBe('La foto di «G» (a casa) non si trova: cambiala o elimina il capo, poi riprova.')
     expect(errorMessage(new Error('boom'))).toBe('Operazione non riuscita: boom')
+    expect(errorMessage(new Error('backup-verify-failed'))).toBe('Il backup non è riuscito: riprova.')
+    expect(errorMessage(new Error('backup-too-large'))).toMatch(/troppo grande/)
     expect(errorMessage('raw')).toBe('Operazione non riuscita: raw')
   })
   it('import summary nudges a first backup only when none was ever made', () => {
     expect(importDoneText('Importati 3 capi', null)).toBe('Importati 3 capi · Ora fai un backup della nuova app dal menu.')
     expect(importDoneText('Importati 3 capi', '2026-10-23T10:00:00.000Z')).toBe('Importati 3 capi')
+  })
+})
+
+describe('exportErrorMessage', () => {
+  it('maps backup codes and missing photos, else the generic export text', () => {
+    expect(exportErrorMessage(new Error('backup-verify-failed'))).toBe('Il backup non è riuscito: riprova.')
+    expect(exportErrorMessage(new Error('backup-too-large'))).toMatch(/troppo grande/)
+    expect(exportErrorMessage(new Error('missing-photo:x'), { items: [], tabs: [] })).toMatch(/non si trova/)
+    expect(exportErrorMessage(new Error('boom'))).toBe('Esportazione non riuscita: boom')
   })
 })

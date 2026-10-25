@@ -184,6 +184,8 @@ export default {
   'error.badDataUrl': 'Immagine non valida',
   'error.generic': 'Operazione non riuscita: {message}',
   'error.missingPhoto': 'La foto di «{name}»{where} non si trova: cambiala o elimina il capo, poi riprova.',
+  'error.backupFailed': 'Il backup non è riuscito: riprova.',
+  'error.backupTooLarge': 'Il backup è troppo grande per un solo file (oltre 4 GB o 65.535 foto).',
   'category.default.body': 'Body',
   'category.default.tops': 'Maglie',
   'category.default.trousers': 'Pantaloni',

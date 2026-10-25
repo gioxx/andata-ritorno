@@ -60,11 +60,18 @@ const ERROR_KEY = {
   'empty-name': 'error.emptyName',
   'bad-data-url': 'error.badDataUrl',
   'rotate-missing': 'rotate.missingPhoto',
+  'backup-verify-failed': 'error.backupFailed',
+  'backup-too-large': 'error.backupTooLarge',
 }
 
 /** User-facing text for any failed action (see reportError). */
 export function errorMessage(e, ctx) {
   return missingPhotoMessage(e, ctx) ?? (ERROR_KEY[e?.message] ? t(ERROR_KEY[e.message]) : t('error.generic', { message: e?.message ?? e }))
+}
+
+/** User-facing text for a failed export: known codes, else "Esportazione non riuscita: …". */
+export function exportErrorMessage(e, ctx) {
+  return missingPhotoMessage(e, ctx) ?? (ERROR_KEY[e?.message] ? t(ERROR_KEY[e.message]) : t('menu.exportFailed', { message: e?.message ?? e }))
 }
 
 /** Import summary; before the first v2 backup, remind the user to make one. */

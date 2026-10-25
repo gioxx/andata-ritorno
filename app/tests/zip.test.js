@@ -324,4 +324,94 @@ describe('v2 zip', () => {
     const dst = await fresh()
     await expect(prepareImport(dst, asFile(new Blob([bytes])))).rejects.toThrow('bad-file')
   })
+
+  // Byte-for-byte the v2.1 writer (a529f64): zipSync, photos stored, backup.json deflated.
+  const OLD_CRC = Uint32Array.from({ length: 256 }, (_, n) => {
+    let c = n
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    return c >>> 0
+  })
+  const oldCrc32 = (bytes) => {
+    let c = 0xffffffff
+    for (let i = 0; i < bytes.length; i++) c = OLD_CRC[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
+    return (c ^ 0xffffffff) >>> 0
+  }
+  const oldExt = (type) => { const sub = /^image\/([a-z0-9]+)/.exec(type ?? '')?.[1]; return sub === 'jpeg' ? 'jpg' : sub ?? null }
+  async function v21BuildZip({ tabs, items, getPhoto, now = new Date() }) {
+    const files = {}
+    const integrity = {}
+    const done = new Set()
+    for (const it of items) {
+      if (done.has(it.photoId)) continue
+      done.add(it.photoId)
+      const blob = await getPhoto(it.photoId)
+      const ext = blob && oldExt(blob.type)
+      if (!ext) throw new Error(`missing-photo:${it.id}`)
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      integrity[it.photoId] = { size: bytes.length, crc32: oldCrc32(bytes) }
+      files[`photos/${it.photoId}.${ext}`] = [bytes, { level: 0 }]
+    }
+    const meta = { app: 'andata-ritorno', version: 2, exportedAt: now.toISOString(), tabs, items, photos: integrity }
+    files['backup.json'] = strToU8(JSON.stringify(meta))
+    return new Blob([zipSync(files)], { type: 'application/zip' })
+  }
+
+  it('a v2.1 backup imports byte-identical, signatures inside photos included', async () => {
+    const src = await seeded()
+    const extra = {
+      p7: new Uint8Array([9, ...SIGS, 9]), // all four PK signatures
+      p6: new Uint8Array([0x50, 0x4b, 3, 4]), // a whole photo that is just a signature
+      p5: new Uint8Array([]), // empty: carried byte-identical, rejected only by the decoder
+    }
+    const ids = Object.keys(extra)
+    await addItems(src,
+      ids.map((p) => ({ id: 'i-' + p, tabId: 'tab-b', location: 'home', label: p, photoId: p, createdAt: T, movedAt: T, updatedAt: T })),
+      ids.map((p) => ({ id: p, blob: new Blob([extra[p]], { type: 'image/webp' }), width: 1, height: 1 })))
+    const { tabs, items } = await loadAll(src)
+    const file = asFile(await v21BuildZip({ tabs, items, getPhoto: (id) => getPhoto(src, id) }))
+    const dst = await fresh()
+    const prepared = await prepareImport(dst, file)
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i-p5', 'unreadable-photo']])
+    await commitImport(dst, prepared, { partial: true })
+    const got = await loadAll(dst)
+    expect(got.items).toHaveLength(items.length - 1)
+    for (const it of got.items) {
+      expect(await bytesOf(await getPhoto(dst, it.photoId))).toEqual(await bytesOf(await getPhoto(src, it.photoId)))
+    }
+    expect(got.tabs).toEqual(tabs)
+  })
+
+  // Without an integrity-map entry the ZIP's own CRC (central directory) still guards the data.
+  const rawStored = async (mutateJson) => {
+    const entries = unzipSync(await bytesOf(await zipOf(await seeded())))
+    const json = JSON.parse(new TextDecoder().decode(entries['backup.json']))
+    mutateJson(json)
+    entries['backup.json'] = new TextEncoder().encode(JSON.stringify(json))
+    return zipSync(Object.fromEntries(Object.entries(entries).map(([k, v]) => [k, [v, { level: 0 }]])))
+  }
+  const indexOf = (hay, needle) => {
+    outer: for (let i = 0; i <= hay.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer
+      return i
+    }
+    return -1
+  }
+
+  it('photo without a map entry but with a wrong ZIP CRC → unreadable-photo', async () => {
+    const zip = await rawStored((j) => { delete j.photos })
+    const name = new TextEncoder().encode('photos/p1.webp')
+    const at = indexOf(zip, name) + name.length // first hit: the local header, data follows
+    zip[at + 2] ^= 1
+    const dst = await fresh()
+    const prepared = await prepareImport(dst, asFile(new Blob([zip])))
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'unreadable-photo']])
+  })
+
+  it('backup.json with a wrong ZIP CRC → bad-file, even when it still parses', async () => {
+    const zip = await rawStored(() => {})
+    const at = indexOf(zip, new TextEncoder().encode('capo 1'))
+    zip[at + 5] = '9'.charCodeAt(0)
+    const dst = await fresh()
+    await expect(prepareImport(dst, asFile(new Blob([zip])))).rejects.toThrow('bad-file')
+  })
 })

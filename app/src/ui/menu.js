@@ -13,7 +13,7 @@ import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
 import { currentPlatform } from '../platform.js'
 import { menuFooter } from './about.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
-import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessage } from './model.js'
+import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
 let dlg = null
 let db = null
@@ -119,7 +119,7 @@ export async function runExport() {
     // Exclusive: a move during the export would be counted, then zeroed with the counter.
     result = await withBusy(() => runExclusive(() => exportBackup(db, { now })))
   } catch (e) {
-    alert(missingPhotoMessage(e, store) ?? t('menu.exportFailed', { message: e?.message ?? e }))
+    alert(exportErrorMessage(e, store))
     return
   }
   if (result === 'cancelled') return

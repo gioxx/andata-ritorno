@@ -67,6 +67,8 @@ export function writeZip(entries, now) {
   const central = []
   let offset = 0
   for (const e of entries) {
+    // Header sizes must match the bytes that follow, or the archive is unreadable.
+    if ((e.data.size ?? e.data.length) !== e.size) throw new Error('backup-verify-failed')
     const name = strToU8(e.name)
     // Common local/central fields: version, flags, method 0, time, date, crc, sizes, name length.
     const common = (v, at) => {
@@ -102,7 +104,7 @@ const bytesOf = async (blob) => new Uint8Array(await blob.arrayBuffer())
 /**
  * Index a ZIP from its central directory. Throws 'bad-file' when the structure is unusable.
  * @param {Blob} blob
- * @returns {Promise<Map<string, { method:number, csize:number, usize:number, offset:number, flags:number }>>}
+ * @returns {Promise<Map<string, { method:number, crc32:number, csize:number, usize:number, offset:number, flags:number }>>}
  */
 export async function readIndex(blob) {
   const tailStart = Math.max(0, blob.size - 22 - 0xffff)
@@ -131,6 +133,7 @@ export async function readIndex(blob) {
     index.set(name, {
       flags,
       method: v.getUint16(p + 10, true),
+      crc32: v.getUint32(p + 16, true),
       csize: v.getUint32(p + 20, true),
       usize: v.getUint32(p + 24, true),
       offset: v.getUint32(p + 42, true),
@@ -141,12 +144,10 @@ export async function readIndex(blob) {
 }
 
 /**
- * The uncompressed content of one entry, as fresh chunks (never a view on the source file,
- * which the browser may stop reading once the user's picked file changes).
+ * Feed the uncompressed content of one entry to `fn`, chunk by chunk.
  * Throws 'bad-entry' when this entry alone is unreadable.
- * @returns {Promise<Uint8Array[]>}
  */
-export async function readEntry(blob, e) {
+async function streamEntry(blob, e, fn) {
   if (e.flags & 1) throw new Error('bad-entry') // encrypted
   const lh = await bytesOf(blob.slice(e.offset, e.offset + 30))
   const lv = new DataView(lh.buffer)
@@ -154,17 +155,55 @@ export async function readEntry(blob, e) {
   const start = e.offset + 30 + lv.getUint16(26, true) + lv.getUint16(28, true)
   if (start + e.csize > blob.size) throw new Error('bad-entry')
   const data = blob.slice(start, start + e.csize)
-  if (e.method === 0) {
-    const chunks = []
-    await eachChunk(data, (c) => chunks.push(c))
-    return chunks
+  if (e.method === 0) return eachChunk(data, fn)
+  if (e.method !== 8) throw new Error('bad-entry')
+  let bytes
+  try {
+    bytes = inflateSync(await bytesOf(data))
+  } catch {
+    throw new Error('bad-entry')
   }
-  if (e.method === 8) {
-    try {
-      return [inflateSync(await bytesOf(data))]
-    } catch {
-      throw new Error('bad-entry')
+  fn(bytes)
+}
+
+/**
+ * The uncompressed content of one entry, as fresh chunks (never a view on the source file,
+ * which the browser may stop reading once the user's picked file changes).
+ * @returns {Promise<Uint8Array[]>}
+ */
+export async function readEntry(blob, e) {
+  const chunks = []
+  await streamEntry(blob, e, (c) => chunks.push(c))
+  return chunks
+}
+
+/** Size and CRC of a list of chunks. */
+export function measureChunks(chunks) {
+  let size = 0
+  let crc = 0
+  for (const c of chunks) { size += c.length; crc = crc32(c, crc) }
+  return { size, crc32: crc }
+}
+
+/**
+ * Read a finished archive back through the reader, one chunk at a time, and check every
+ * expected entry. Any failure (unreadable source Blob, short data, wrong CRC) throws
+ * 'backup-verify-failed': a backup is only handed out once it has been read back whole.
+ * @param {Blob} blob
+ * @param {Map<string, { size:number, crc32:number }>} expected  entry name -> content
+ */
+export async function verifyZip(blob, expected) {
+  try {
+    const index = await readIndex(blob)
+    for (const [name, want] of expected) {
+      const e = index.get(name)
+      if (!e || e.crc32 !== want.crc32 || e.usize !== want.size) throw new Error('mismatch')
+      let size = 0
+      let crc = 0
+      await streamEntry(blob, e, (c) => { size += c.length; crc = crc32(c, crc) })
+      if (size !== want.size || crc !== want.crc32) throw new Error('mismatch')
     }
+  } catch {
+    throw new Error('backup-verify-failed')
   }
-  throw new Error('bad-entry')
 }

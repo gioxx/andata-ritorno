@@ -1,7 +1,7 @@
 // v2 backup container: a ZIP with backup.json + photos/<photoId>.<ext> (no base64, no giant string).
 // Built and read entry by entry (zipio.js): peak memory stays near one photo, not the archive.
 import { strToU8 } from 'fflate'
-import { writeZip, readIndex, readEntry, measure, crc32 } from './zipio.js'
+import { writeZip, verifyZip, readIndex, readEntry, measure, measureChunks, crc32 } from './zipio.js'
 import { decodeImage } from '../photos.js'
 import { DEFAULT_CATEGORIES } from '../categories.js'
 
@@ -88,7 +88,10 @@ export async function buildZip({ tabs, items, categories = [], getPhoto, now = n
   const meta = { app: 'andata-ritorno', version: 2, exportedAt: now.toISOString(), tabs, categories, items, photos: integrity }
   const json = strToU8(JSON.stringify(meta))
   entries.push({ name: 'backup.json', data: json, size: json.length, crc32: crc32(json) })
-  return writeZip(entries, now)
+  const zip = writeZip(entries, now)
+  // The archive references the photo Blobs: read it all back before anyone gets it.
+  await verifyZip(zip, new Map(entries.map((e) => [e.name, { size: e.size, crc32: e.crc32 }])))
+  return zip
 }
 
 /**
@@ -104,7 +107,10 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     index = await readIndex(blob)
     const meta = index.get('backup.json')
     if (!meta) throw new Error('bad-file')
-    json = JSON.parse(await new Blob(await readEntry(blob, meta)).text())
+    const chunks = await readEntry(blob, meta)
+    const got = measureChunks(chunks)
+    if (got.size !== meta.usize || got.crc32 !== meta.crc32) throw new Error('bad-file')
+    json = JSON.parse(await new Blob(chunks).text())
   } catch {
     throw new Error('bad-file')
   }
@@ -131,13 +137,10 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     if (!read.has(photoId)) {
       read.set(photoId, (async () => {
         const chunks = await readEntry(blob, file.entry)
-        const want = integrity[photoId]
-        if (want) {
-          let size = 0
-          let crc = 0
-          for (const c of chunks) { size += c.length; crc = crc32(c, crc) }
-          if (want.size !== size || want.crc32 !== crc) throw new Error('corrupt')
-        }
+        // The backup's own map when it has an entry, else the ZIP central directory.
+        const want = integrity[photoId] ?? { size: file.entry.usize, crc32: file.entry.crc32 }
+        const got = measureChunks(chunks)
+        if (want.size !== got.size || want.crc32 !== got.crc32) throw new Error('corrupt')
         const photo = new Blob(chunks, { type: file.type })
         await decodeImage(photo)
         return photo
