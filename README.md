@@ -7,47 +7,53 @@ Each item has one state — **at school** or **at home** — and moves with a ta
 
 ```
 legacy/          Frozen localStorage mockup (shows a "moved to ar.gioxx.org" banner)
-app/             A/R v2 (in progress)
-worker/          Cloudflare Worker API + D1 schema + R2 photos
+app/             A/R v2: Vite + plain JS, IndexedDB, ZIP backup (deployed to ar.gioxx.org)
+worker/          Wrangler configs (app, mockup) + old API Worker / D1 schema (not deployed in v2)
 ```
 
-## Try the mockup
+## Develop (v2)
+
+```bash
+cd app && npm install && npm run dev
+npm test
+```
+
+## Deploy (Cloudflare Workers, static assets)
+
+```bash
+cd worker && npm install
+npm run deploy:app       # builds app/ and publishes to https://ar.gioxx.org
+npm run deploy:mockup    # publishes legacy/ (the old mockup)
+```
+
+The old API Worker (`npm run deploy`, D1 + R2) is not used by v2.
+
+## Migrazione dal mockup
+
+1. Nel mockup tocca "Esporta backup" e salva il file.
+2. Apri ar.gioxx.org.
+3. Tocca "Importa un backup" e scegli il file.
+4. Confronta i numeri del riepilogo con quelli del mockup.
+5. Non cancellare nulla dal mockup finché non hai controllato.
+
+## Try the old mockup
 
 ```bash
 npx serve legacy     # or: python3 -m http.server -d legacy
 ```
 
-Open on a phone (same LAN) to test the camera flow. Data stays in the browser.
-
-To share the mockup over HTTPS (installable PWA), deploy the static files only:
-
-```bash
-cd worker && npm install && npm run deploy:mockup
-```
-
-Target device for the mockup: Android (Chrome). iOS comes later.
-
-## Deploy (Cloudflare free tier)
-
-```bash
-cd worker
-npm install
-npx wrangler d1 create andata-ritorno          # paste the id into wrangler.toml
-npx wrangler r2 bucket create andata-ritorno-photos
-npm run db:init
-npm run deploy
-```
-
-Then protect the Worker hostname with **Cloudflare Access** (Zero Trust → Applications), allowing only your email addresses.
-
 ## Roadmap
 
-- [ ] Replace localStorage in `legacy/index.html` with calls to `/api/*`
-- [ ] Multi-select move (done in mockup) wired to `POST /api/move`
-- [x] PWA icons
+- [x] Configurable tabs
+- [x] IndexedDB storage (replaces localStorage)
+- [x] Item viewer
+- [x] ZIP backup / restore
+- [x] Select all via section counter
+- [x] PWA icons, manifest and offline cache
+- [ ] Optional counters/categories (body, pants, spare outfit...)
 - [ ] Per-item movement history view
-- [ ] Tap a section's item counter to select all items in that section (quick "move everything")
-- [ ] Optional counters/categories (body, pants, spare outfit…)
+- [ ] Family sharing
+- [ ] Payments
 
 ## API
 
