@@ -6,9 +6,9 @@ Each item has one state — **at school** or **at home** — and moves with a ta
 ## Structure
 
 ```
-legacy/          Frozen localStorage mockup (shows a "moved to ar.gioxx.org" banner)
+legacy/          Old localStorage mockup (offline since 2026-10-25; kept as reference for the v1 backup format)
 app/             A/R v2: Vite + plain JS, IndexedDB, ZIP backup (deployed to ar.gioxx.org)
-worker/          Wrangler configs (app, mockup) + old API Worker / D1 schema (not deployed in v2)
+worker/          Wrangler config for the app + old API Worker / D1 schema (not deployed in v2)
 ```
 
 ## Develop (v2)
@@ -25,24 +25,13 @@ Target device: Android (Chrome). iOS comes later.
 ```bash
 cd worker && npm install
 npm run deploy:app       # builds app/ and publishes to https://ar.gioxx.org
-npm run deploy:mockup    # publishes legacy/ (the old mockup)
 ```
 
 The old API Worker (`npm run deploy`, D1 + R2) is not used by v2.
 
-## Migrazione dal mockup
+## Backup del vecchio mockup
 
-1. Nel mockup tocca "Esporta backup" e salva il file.
-2. Apri ar.gioxx.org.
-3. Tocca "Importa un backup" e scegli il file.
-4. Confronta i numeri del riepilogo con quelli del mockup.
-5. Non cancellare nulla dal mockup finché non hai controllato.
-
-## Try the old mockup
-
-```bash
-npx serve legacy     # or: python3 -m http.server -d legacy
-```
+Il mockup non è più online. Un file `andata-ritorno-AAAA-MM-GG.json` esportato dal mockup si può ancora importare in ar.gioxx.org con "Importa un backup".
 
 ## Roadmap
 

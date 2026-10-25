@@ -1,7 +1,0 @@
-# Mockup deploy: static PWA only (localStorage), no D1/R2.
-# npm run deploy:mockup  ->  https://andata-ritorno-mockup.<account>.workers.dev
-name = "andata-ritorno-mockup"
-compatibility_date = "2026-10-01"
-
-[assets]
-directory = "../legacy"
