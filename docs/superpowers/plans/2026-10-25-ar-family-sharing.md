@@ -6,7 +6,7 @@
 
 **Architecture:** The `ar.gioxx.org` Worker gains an API under `/api/*` (D1 for licences, families, devices, invites and encrypted records; R2 for encrypted photos). The app gets a `sync/` layer: Web Crypto AES-GCM codec, a pure merge of remote records into local state, an IndexedDB outbox and tombstones written in the same transactions as local edits, and an engine that pulls then pushes in the background. UI adds a "Famiglia" menu section, a status line, join/invite/recovery flows and a few path-routed pages (`/unlock`, `/join`, `/licence`).
 
-**Tech Stack:** App: Vite, plain JS, idb, fflate, lucide, Vitest (+ fake-indexeddb, jsdom), `uqr` (QR SVG generation, new dependency). Worker: Wrangler 4, D1, R2, Workers Rate Limiting binding, Cloudflare Email Service binding, raw `fetch` to the Stripe API with Web Crypto webhook verification (no Stripe SDK), Vitest + `@cloudflare/vitest-pool-workers`.
+**Tech Stack:** App: Vite, plain JS, idb, fflate, lucide, Vitest (+ fake-indexeddb, jsdom), `uqr` (QR SVG generation, new dependency). Worker: Wrangler 4, D1, R2, Workers Rate Limiting binding, Resend HTTP API for email (owner's decision: Cloudflare outbound email needs Workers Paid), raw `fetch` to the Stripe API with Web Crypto webhook verification (no Stripe SDK), Vitest + `@cloudflare/vitest-pool-workers`.
 
 **Spec:** `docs/superpowers/specs/2026-10-25-ar-family-sharing-design.md` (builds on the v2 and v2.2 specs in the same folder)
 
@@ -40,7 +40,7 @@
 
 ```
 worker/
-  wrangler.app.toml        + main, D1, R2, ratelimits, send_email, assets.run_worker_first=["/api/*"]
+  wrangler.app.toml        + main, D1, R2, ratelimits, assets.run_worker_first=["/api/*"]
   schema.sql               replaced (tables below)
   src/index.js             replaced: router; non-/api requests fall through to env.ASSETS
   src/http.js              json(), error(code,status), readJson(), b64url helpers
@@ -206,7 +206,7 @@ Rules (from the spec, all must have a test):
 **Interfaces:**
 - `auth.js`: `sha256Hex(s): Promise<string>`, `randomToken(): string`, `requireDevice(env, req): Promise<{deviceId, familyId}>` (throws `HttpError(401,'unauthorized')`, touches `last_seen_at`).
 - `http.js`: `class HttpError(status, code, extra?)`, `json(obj, status=200)`, `readJson(req, maxBytes=65536)`, `route(req, table)`.
-- Config: bindings `DB` (D1 `andata-ritorno`), `PHOTOS` (R2 `andata-ritorno-photos`), `RL_STRICT` (ratelimit 10/60s), `RL_API` (ratelimit 120/60s), `EMAIL` (send_email); vars `APP_ORIGIN="https://ar.gioxx.org"`, `PRICE_FAMILY`, `PRICE_SLOT` (Stripe price ids); secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `EMAIL_HMAC_KEY`. `assets.run_worker_first = ["/api/*"]`, keep `not_found_handling = "single-page-application"`. Scripts: `test`, `db:init` (`--remote --file=schema.sql`), `db:init:local`, `deploy:app` (unchanged command).
+- Config: bindings `DB` (D1 `andata-ritorno`), `PHOTOS` (R2 `andata-ritorno-photos`), `RL_STRICT` (ratelimit 10/60s), `RL_API` (ratelimit 120/60s); vars `APP_ORIGIN="https://ar.gioxx.org"`, `PRICE_FAMILY`, `PRICE_SLOT` (Stripe price ids); secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `EMAIL_HMAC_KEY`, `CODE_HMAC_KEY`, `RESEND_API_KEY`. If the account refuses the ratelimit bindings on the free plan, the code must work without them (`env.RL_*` absent → no limiting; tokens/codes have enough entropy). `assets.run_worker_first = ["/api/*"]`, keep `not_found_handling = "single-page-application"`. Scripts: `test`, `db:init` (`--remote --file=schema.sql`), `db:init:local`, `deploy:app` (unchanged command).
 - Schema (exact):
   ```sql
   CREATE TABLE licences (id TEXT PRIMARY KEY, base_limit INTEGER NOT NULL DEFAULT 4, extra_slots INTEGER NOT NULL DEFAULT 0,
@@ -227,7 +227,7 @@ Rules (from the spec, all must have a test):
   CREATE TABLE photos (family_id TEXT NOT NULL, pid TEXT NOT NULL, size INTEGER NOT NULL, uploaded_at TEXT NOT NULL,
     PRIMARY KEY (family_id, pid));
   ```
-- [ ] **Step 1:** Read the `wrangler`, `cloudflare-email-service` and `workers-best-practices` skills; set up `@cloudflare/vitest-pool-workers` with a version compatible with the chosen Vitest, D1 migrations applied from `schema.sql` in test setup.
+- [ ] **Step 1:** Read the `wrangler` and `workers-best-practices` skills; set up `@cloudflare/vitest-pool-workers` with a version compatible with the chosen Vitest, D1 migrations applied from `schema.sql` in test setup.
 - [ ] **Step 2: Failing tests** (`auth.test.js`): non-`/api` path is served by assets (`env.ASSETS.fetch` called); `/api/unknown` → 404 `not-found`; authed route with no/invalid token → 401; valid token → passes and updates `last_seen_at`.
 - [ ] **Step 3:** Run `npm --prefix worker test` → fail. Implement. Run → pass.
 - [ ] **Step 4:** `npx wrangler deploy --dry-run --config wrangler.app.toml` succeeds.
@@ -246,7 +246,7 @@ Rules (from the spec, all must have a test):
 - Redeem: in one D1 `batch`: mark code redeemed (`WHERE redeemed_at IS NULL`), create licence (`email_hmac` copied from the code row), family (`seq 0`), device. Slot: code kind `slot`, add 1 to the caller family's licence `extra_slots`.
 - Licence email: `HMAC-SHA256(EMAIL_HMAC_KEY, lowercase(trim(email)))`; if a licence matches, create link token (30 min) and email `${APP_ORIGIN}/licence#${token}`; respond 202 regardless.
 - Licence restart: valid link → in one batch: delete old family's records, photos rows, devices, invites, family row; create new family + device on the same licence; mark link used; then delete R2 objects with prefix `${oldFamilyId}/`.
-- `email.js`: plain-text Italian + English emails, sender `A/R <noreply@gioxx.org>`.
+- `email.js`: plain-text Italian + English emails via `POST https://api.resend.com/emails` (`Authorization: Bearer ${RESEND_API_KEY}`), sender `A/R <noreply@gioxx.org>`; a failed send is logged and never fails the webhook/request (the code is also on the /unlock page).
 - `scripts/code.mjs`: `node scripts/code.mjs family|slot [--remote]` → prints a new code, inserts its hash with `source='manual'`; `node scripts/code.mjs recover <code> [--remote]` → finds the licence through the code hash, creates a licence link, prints the URL. Uses `npx wrangler d1 execute andata-ritorno --command …` with the code generated locally.
 
 - [ ] **Step 1: Failing tests:** redeem happy path returns token + limit 4 and makes the code unusable (`code-used` on second try); lowercase/space/O-for-0 input still redeems; slot code via `/api/redeem` → `code-is-slot`; slot raises limit to 5; webhook with bad signature → 400; webhook + `/api/unlock/session` for the same paid session (fetch to Stripe mocked) called 3 times in any order → one `codes` row, same code every time (**Review Focus 4**); unpaid session → 402; price id decides kind; licence email for unknown address → 202 and no email sent; known address → one email with a link; restart purges the old family and keeps `extra_slots`; redeem rate limit returns 429.
@@ -359,10 +359,10 @@ Rules (from the spec, all must have a test):
 
 **Files:**
 - Create: `app/public/privacy.html`
-- Modify: `app/src/ui/menu.js` (link "Privacy" in the App section), `app/src/ui/pages.js` and `familyDialogs.js` (link from unlock flow and `/unlock` page), `README.md` (Privacy section, roadmap ticks, deploy steps: D1 create, R2 create, `db:init`, secrets, Stripe Payment Links with Managed Payments and success URL `https://ar.gioxx.org/unlock?session_id={CHECKOUT_SESSION_ID}`, webhook `checkout.session.completed` to `/api/stripe/webhook`), `app/package.json` (`3.0.0`), in-app copy that says nothing is stored on a server (now "free tier")
+- Modify: `app/src/ui/menu.js` (link "Privacy" in the App section), `app/src/ui/pages.js` and `familyDialogs.js` (link from unlock flow and `/unlock` page), `README.md` (Privacy section, roadmap ticks, deploy steps: D1 create, R2 create, `db:init`, secrets, Resend domain verification for gioxx.org, Stripe Payment Links with Managed Payments and success URL `https://ar.gioxx.org/unlock?session_id={CHECKOUT_SESSION_ID}`, webhook `checkout.session.completed` to `/api/stripe/webhook`), `app/package.json` (`3.0.0`), in-app copy that says nothing is stored on a server (now "free tier")
 - Test: `app/tests/a11y.test.js` (new dialogs/pages labelled), `app/tests/i18n.test.js` (key parity covers new keys)
 
-- [ ] **Step 1: Write `privacy.html`** (Italian first, English below, same CSS tokens as the app, light/dark, no scripts). Must state: free use keeps everything on the device; family sharing stores encrypted records and photos on Cloudflare (D1, R2, EU/US per Cloudflare), unreadable by the developer, and lists the visible metadata (random ids, sizes, times, device count, which device uploaded what); payer email used only to send the code and, as a keyed hash, to recover the licence; Stripe is merchant of record and processes payment data under its own policy; Cloudflare is the hosting provider; retention: data deleted when the last device leaves or on licence restart, licence record kept to honour the purchase; rights (access/deletion) and contact address `privacy@gioxx.org` (owner to confirm the address before release); no tracking, no analytics, no ads. No personal references.
+- [ ] **Step 1: Write `privacy.html`** (Italian first, English below, same CSS tokens as the app, light/dark, no scripts). Must state: free use keeps everything on the device; family sharing stores encrypted records and photos on Cloudflare (D1, R2, EU/US per Cloudflare), unreadable by the developer, and lists the visible metadata (random ids, sizes, times, device count, which device uploaded what); payer email used only to send the code and, as a keyed hash, to recover the licence; Stripe is merchant of record and processes payment data under its own policy; Cloudflare is the hosting provider; Resend sends the emails; retention: data deleted when the last device leaves or on licence restart, licence record kept to honour the purchase; rights (access/deletion) and contact address `privacy@gioxx.org` (owner to confirm the address before release); no tracking, no analytics, no ads. No personal references.
 - [ ] **Step 2:** Link it; update README and copy; bump version.
 - [ ] **Step 3:** Run `npm --prefix app test && npm --prefix worker test && npm --prefix app run build` → all green, build succeeds.
 - [ ] **Step 4: Release rehearsal (manual, blocks release):** local `wrangler dev` with D1/R2 local; manual code → create family on desktop Chrome profile A; join from profile B (merge) and C (replace, export verified); concurrent offline edits on A and B, reconnect → identical; remove C from A → C shows "no longer in the family"; recovery kit restores on a fresh profile; Stripe test mode Payment Link → `/unlock` shows code, email received, webhook retry doesn't duplicate. Then the same two-device check on a real Android phone and a real iPhone installed PWA (owner). Upgrade an existing v2.6 profile with real data → nothing lost.
