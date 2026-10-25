@@ -100,11 +100,17 @@ export function clearSelection() {
 // Serialize every mutation: read-await-write sequences (counter bumps, moves) would
 // otherwise interleave on a double tap and lose updates.
 let chain = Promise.resolve()
+let inFlight = 0
 function queue(fn) {
+  inFlight++
   const run = chain.then(fn)
   chain = run.catch(() => {}) // a failed action must not block the next one
+  chain.then(() => { inFlight-- })
   return run
 }
+
+/** True while any queued mutation (save, import, export, wipe) is pending or running. */
+export const isBusy = () => inFlight > 0
 
 /**
  * Run `fn` alone in the mutation queue: it starts after every pending mutation and later

@@ -8,7 +8,8 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) }, // shown in the menu footer
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt', // the app decides when to reload (see ui/updateToast.js)
+      injectRegister: false, // registered from main.js via virtual:pwa-register
       manifest: false, // hand-written public/manifest.webmanifest, linked from index.html
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],

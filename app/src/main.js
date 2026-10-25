@@ -15,10 +15,14 @@ import { initViewer } from './ui/viewer.js';
 import { initMenu } from './ui/menu.js';
 import { desktopGate } from './ui/desktop.js';
 import { initIosBanner } from './ui/iosBanner.js';
+import { registerSW } from 'virtual:pwa-register';
+import { initUpdateToast } from './ui/updateToast.js';
 import { initInstall } from './install.js';
 import { initInstallStrip } from './ui/installStrip.js';
 import { t, onLangChange } from './i18n.js';
 
+// A waiting version is announced, never applied by surprise; ignored, it applies on the next full reopen.
+initUpdateToast((handlers) => registerSW(handlers));
 initInstall(); // the browser may fire beforeinstallprompt before the UI is ready
 const root = document.getElementById('app');
 await desktopGate(root);
