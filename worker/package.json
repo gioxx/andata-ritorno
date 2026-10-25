@@ -1,6 +1,7 @@
 {
   "name": "andata-ritorno-worker",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

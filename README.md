@@ -75,3 +75,7 @@ npx wrangler r2 bucket create andata-ritorno-photos
 npm run db:init
 npm run deploy
 ```
+
+## License
+
+Copyright © 2026 Giovanni Solone. A/R is free software, released under the [GNU Affero General Public License v3.0](LICENSE): you may use, modify and redistribute it, and if you run a modified version as a network service you must make its source code available to its users under the same license.
