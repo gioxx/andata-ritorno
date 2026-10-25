@@ -5,6 +5,7 @@ import { openDB } from 'idb'
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
 /** @typedef {import('./types.js').Photo} Photo */
+/** @typedef {import('./types.js').Category} Category */
 /** @typedef {import('./types.js').ImportPlan} ImportPlan */
 
 let versionChangeHandler = null
@@ -16,12 +17,19 @@ export function setVersionChangeHandler(fn) {
 
 /** @param {string} [name] */
 export async function openDb(name = 'ar') {
-  return openDB(name, 1, {
-    upgrade(db) {
-      db.createObjectStore('tabs', { keyPath: 'id' })
-      db.createObjectStore('items', { keyPath: 'id' }).createIndex('tabId', 'tabId')
-      db.createObjectStore('photos', { keyPath: 'id' })
-      db.createObjectStore('meta')
+  return openDB(name, 2, {
+    // Additive steps only: existing v1 records (real user data) are never touched.
+    upgrade(db, oldVersion, _newVersion, tx) {
+      if (oldVersion < 1) {
+        db.createObjectStore('tabs', { keyPath: 'id' })
+        db.createObjectStore('items', { keyPath: 'id' }).createIndex('tabId', 'tabId')
+        db.createObjectStore('photos', { keyPath: 'id' })
+        db.createObjectStore('meta')
+      }
+      if (oldVersion < 2) {
+        db.createObjectStore('categories', { keyPath: 'id' })
+        tx.objectStore('items').createIndex('category', 'category')
+      }
     },
   }).then((db) => {
     db.addEventListener('versionchange', () => {
@@ -32,16 +40,24 @@ export async function openDb(name = 'ar') {
   })
 }
 
-/** @returns {Promise<{tabs:Tab[], items:Item[]}>} */
+/** @returns {Promise<{tabs:Tab[], items:Item[], categories:Category[]}>} */
 export async function loadAll(db) {
-  const [tabs, items] = await Promise.all([db.getAll('tabs'), db.getAll('items')])
+  const [tabs, items, categories] = await Promise.all([
+    db.getAll('tabs'), db.getAll('items'), db.getAll('categories'),
+  ])
   tabs.sort((a, b) => a.order - b.order)
-  return { tabs, items }
+  categories.sort((a, b) => a.order - b.order)
+  return { tabs, items, categories }
 }
 
 /** @param {Tab} tab */
 export async function putTab(db, tab) {
   await db.put('tabs', tab)
+}
+
+/** @param {Category} cat */
+export async function putCategory(db, cat) {
+  await db.put('categories', cat)
 }
 
 /**
@@ -66,6 +82,32 @@ async function withTx(db, stores, fn) {
   const results = await Promise.allSettled([...pending, tx.done])
   for (const r of results) if (r.status === 'rejected') record(r.reason)
   if (first) throw first
+}
+
+/** @param {Tab[]} tabs  One tx, so a reorder is never half-saved. */
+export async function putTabs(db, tabs) {
+  await withTx(db, ['tabs'], (tx, track) => {
+    for (const t of tabs) track(tx.store.put(t))
+  })
+}
+
+/** @param {Category[]} cats  One tx, so a reorder is never half-saved. */
+export async function putCategories(db, cats) {
+  await withTx(db, ['categories'], (tx, track) => {
+    for (const c of cats) track(tx.store.put(c))
+  })
+}
+
+/** Delete a category; its items stay, uncategorised, with `updatedAt = now` so merges see the edit. */
+export async function deleteCategory(db, id, now) {
+  await withTx(db, ['categories', 'items'], async (tx) => {
+    const items = await tx.objectStore('items').index('category').getAll(id)
+    for (const it of items) {
+      const { category: _gone, ...rest } = it
+      await tx.objectStore('items').put({ ...rest, updatedAt: now })
+    }
+    await tx.objectStore('categories').delete(id)
+  })
 }
 
 export async function deleteTab(db, tabId) {
@@ -96,9 +138,13 @@ export async function moveItems(db, ids, location, now) {
   await patchItems(db, ids, (it) => ({ ...it, location, movedAt: now }))
 }
 
-/** @param {{label?:string, tabId?:string, category?:string}} patch */
+const EDITABLE = ['label', 'tabId', 'category']
+
+/** @param {{label?:string, tabId?:string, category?:string}} patch  Other keys are ignored. */
 export async function updateItem(db, id, patch, now) {
-  await patchItems(db, [id], (it) => ({ ...it, ...patch, updatedAt: now }))
+  const clean = {}
+  for (const k of EDITABLE) if (k in patch) clean[k] = patch[k]
+  await patchItems(db, [id], (it) => ({ ...it, ...clean, updatedAt: now }))
 }
 
 /** @param {Photo} photo */
@@ -135,8 +181,9 @@ export const setMeta = async (db, key, value) => {
 
 /** @param {ImportPlan} plan  One tx over everything (incl. meta): all-or-nothing. */
 export async function applyPlan(db, plan) {
-  await withTx(db, ['tabs', 'items', 'photos', 'meta'], (tx, track) => {
+  await withTx(db, ['tabs', 'categories', 'items', 'photos', 'meta'], (tx, track) => {
     for (const t of plan.tabsPut) track(tx.objectStore('tabs').put(t))
+    for (const c of plan.categoriesPut ?? []) track(tx.objectStore('categories').put(c))
     for (const it of plan.itemsPut) track(tx.objectStore('items').put(it))
     // Dimensions are unknown for imported blobs; 0 means "not measured".
     for (const [id, blob] of plan.photosPut) track(tx.objectStore('photos').put({ id, blob, width: 0, height: 0 }))

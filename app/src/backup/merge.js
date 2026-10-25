@@ -35,7 +35,7 @@ function collapse(list, merge) {
 export function buildPlan(local, incoming) {
   const localItems = new Map(local.items.map((i) => [i.id, i]))
   const localTabs = new Map(local.tabs.map((t) => [t.id, t]))
-  const plan = { tabsPut: [], itemsPut: [], photosPut: new Map(), photosDelete: [], added: 0, updated: 0, metaPut: [] }
+  const plan = { tabsPut: [], categoriesPut: [], itemsPut: [], photosPut: new Map(), photosDelete: [], added: 0, updated: 0, metaPut: [] }
 
   const newerTab = (a, b) => (b.updatedAt > a.updatedAt ? b : a)
   for (const t of collapse(incoming.tabs, newerTab).values()) {

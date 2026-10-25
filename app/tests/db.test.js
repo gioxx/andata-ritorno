@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import { openDB } from 'idb'
 import {
   openDb, loadAll, putTab, deleteTab, addItems, moveItems, updateItem,
   replacePhoto, deleteItems, getPhoto, getMeta, setMeta, applyPlan, setVersionChangeHandler,
+  putCategory, deleteCategory, putCategories, putTabs,
 } from '../src/db.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
@@ -19,6 +21,7 @@ async function expectBlob(b, text, type = 'image/jpeg') {
   expect(await b.text()).toBe(text)
 }
 const count = (db, store) => db.count(store)
+const cat = (id, order = 0) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
 
 async function seed(db) {
   await putTab(db, tab('A', 0))
@@ -177,7 +180,7 @@ describe('db', () => {
     setVersionChangeHandler(() => { calls++ })
     await openDb(name)
     const db2 = await new Promise((resolve, reject) => {
-      const req = indexedDB.open(name, 2)
+      const req = indexedDB.open(name, 3)
       req.onsuccess = () => resolve(req.result)
       req.onerror = () => reject(req.error)
       req.onblocked = () => reject(new Error('blocked'))
@@ -185,5 +188,110 @@ describe('db', () => {
     expect(calls).toBe(1)
     db2.close()
     setVersionChangeHandler(null)
+  })
+  it('upgrade from v1 keeps everything', async () => {
+    const name = 'ar-test-' + crypto.randomUUID()
+    // Exact v1 schema, as shipped.
+    const v1 = await openDB(name, 1, {
+      upgrade(db) {
+        db.createObjectStore('tabs', { keyPath: 'id' })
+        db.createObjectStore('items', { keyPath: 'id' }).createIndex('tabId', 'tabId')
+        db.createObjectStore('photos', { keyPath: 'id' })
+        db.createObjectStore('meta')
+      },
+    })
+    const tabs = [tab('A', 0), tab('B', 1)]
+    const items = [item('i1', 'A'), { ...item('i2', 'A'), category: 'shirt' }, item('i3', 'B')]
+    const photos = [photo('p-i1', 'one'), photo('p-i2', 'two!'), photo('p-i3', 'three')]
+    for (const t of tabs) await v1.put('tabs', t)
+    for (const i of items) await v1.put('items', i)
+    for (const p of photos) await v1.put('photos', p)
+    await v1.put('meta', { a: 1 }, 'k1')
+    await v1.put('meta', ['x'], 'k2')
+    v1.close()
+
+    const db = await openDb(name)
+    expect(db.version).toBe(2)
+    expect(await db.getAll('tabs')).toEqual(tabs)
+    expect(await db.getAll('items')).toEqual(items)
+    for (const p of photos) {
+      const got = await db.get('photos', p.id)
+      expect({ ...got, blob: null }).toEqual({ ...p, blob: null })
+      await expectBlob(got.blob, await p.blob.text())
+    }
+    expect(await getMeta(db, 'k1')).toEqual({ a: 1 })
+    expect(await getMeta(db, 'k2')).toEqual(['x'])
+    expect(db.objectStoreNames.contains('categories')).toBe(true)
+    expect(await count(db, 'categories')).toBe(0)
+    expect(await db.getAllFromIndex('items', 'category', 'shirt')).toEqual([items[1]])
+    expect(await db.getAllFromIndex('items', 'tabId', 'A')).toHaveLength(2)
+    db.close()
+  })
+
+  it('loadAll returns categories sorted by order', async () => {
+    const db = await fresh()
+    await putCategory(db, cat('c2', 1))
+    await putCategory(db, cat('c1', 0))
+    const { categories } = await loadAll(db)
+    expect(categories.map((c) => c.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('putCategories and putTabs write all records', async () => {
+    const db = await fresh()
+    await putCategories(db, [cat('c1', 1), cat('c2', 0)])
+    await putTabs(db, [tab('A', 1), tab('B', 0)])
+    const { tabs, categories } = await loadAll(db)
+    expect(categories.map((c) => c.id)).toEqual(['c2', 'c1'])
+    expect(tabs.map((t) => t.id)).toEqual(['B', 'A'])
+  })
+
+  it('deleteCategory leaves items uncategorised', async () => {
+    const db = await fresh()
+    await putTab(db, tab('A'))
+    await putCategories(db, [cat('c1', 0), cat('c2', 1)])
+    await addItems(db, [
+      { ...item('i1', 'A'), category: 'c1' },
+      { ...item('i2', 'A'), category: 'c1' },
+      { ...item('i3', 'A'), category: 'c2' },
+      item('i4', 'A'),
+    ], [photo('p-i1'), photo('p-i2'), photo('p-i3'), photo('p-i4')])
+    await deleteCategory(db, 'c1', T1)
+    expect(await db.getAllKeys('categories')).toEqual(['c2'])
+    for (const id of ['i1', 'i2']) {
+      const it = await db.get('items', id)
+      expect(it).toBeDefined()
+      expect('category' in it).toBe(false)
+      expect(it.updatedAt).toBe(T1)
+      expect(it.movedAt).toBe(T0)
+    }
+    expect(await db.get('items', 'i3')).toEqual({ ...item('i3', 'A'), category: 'c2' })
+    expect(await db.get('items', 'i4')).toEqual(item('i4', 'A'))
+    expect(await count(db, 'photos')).toBe(4)
+  })
+
+  it('updateItem ignores unknown fields', async () => {
+    const db = await fresh()
+    await seed(db)
+    await updateItem(db, 'i1', { label: 'x', id: 'evil', movedAt: 'y' }, T1)
+    expect(await db.get('items', 'evil')).toBeUndefined()
+    expect(await db.get('items', 'i1')).toEqual({ ...item('i1', 'A'), label: 'x', updatedAt: T1 })
+  })
+
+  it('applyPlan writes categoriesPut atomically', async () => {
+    const db = await fresh()
+    await seed(db)
+    await expect(applyPlan(db, {
+      tabsPut: [],
+      categoriesPut: [cat('c1', 0)],
+      itemsPut: [{ label: 'no id' }],
+      photosPut: new Map(), photosDelete: [], metaPut: [],
+      added: 1, updated: 0,
+    })).rejects.toThrow()
+    expect(await count(db, 'categories')).toBe(0)
+    await applyPlan(db, {
+      tabsPut: [], categoriesPut: [cat('c1', 0)], itemsPut: [],
+      photosPut: new Map(), photosDelete: [], metaPut: [], added: 0, updated: 0,
+    })
+    expect(await db.getAllKeys('categories')).toEqual(['c1'])
   })
 })

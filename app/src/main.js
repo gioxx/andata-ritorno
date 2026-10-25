@@ -2,7 +2,7 @@ import '@fontsource/plus-jakarta-sans/500.css';
 import '@fontsource/plus-jakarta-sans/600.css';
 import '@fontsource/plus-jakarta-sans/700.css';
 import './styles.css';
-import { openDb } from './db.js';
+import { openDb, setVersionChangeHandler } from './db.js';
 import { store, load, subscribe, addTab } from './store.js';
 import { renderApp, hooks } from './ui/render.js';
 import { renderWelcome } from './ui/welcome.js';
@@ -38,6 +38,8 @@ function draw(force = false) {
 let db = null;
 try {
   db = await openDb();
+  // A newer tab wants to upgrade the DB: our connection is closed, so reload onto the new code.
+  setVersionChangeHandler(() => location.reload());
 } catch {
   root.innerHTML = `<div class="welcome">
     <h1>${t('main.storageFailed.title')}</h1>

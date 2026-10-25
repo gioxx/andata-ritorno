@@ -1,6 +1,6 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, deleteTab, updateItem, replacePhoto } from './db.js'
+import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto } from './db.js'
 import { compress } from './photos.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
@@ -230,7 +230,7 @@ export function reorderTabs(ids) {
       if (t && t.order !== order) changed.push({ ...t, order, updatedAt: now })
     })
     if (!changed.length) return
-    for (const t of changed) await putTab(store.db, t)
+    await putTabs(store.db, changed)
     for (const t of changed) Object.assign(byId.get(t.id), t)
     store.tabs.sort((a, b) => a.order - b.order)
     await bump(1)
