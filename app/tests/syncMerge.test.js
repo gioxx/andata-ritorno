@@ -88,12 +88,39 @@ describe('mergeRemote: remote value vs local record', () => {
     expect(keys(plan.pushBack)).toEqual(['category:c1', 'tab:A'])
   })
 
-  it('a tie keeps local; it is pushed back only when the remote differs', () => {
-    const same = mergeRemote(local({ tabs: [tab('A', 0, T1, 'x')] }), [val('tab', tab('A', 0, T1, 'x'))], opts)
-    expectEmpty(same)
-    const diff = mergeRemote(local({ tabs: [tab('A', 0, T1, 'x')] }), [val('tab', tab('A', 0, T1, 'y'))], opts)
-    expect(diff.tabsPut).toEqual([])
-    expect(keys(diff.pushBack)).toEqual(['tab:A'])
+  it('a tie with identical content changes nothing', () => {
+    expectEmpty(mergeRemote(local({ tabs: [tab('A', 0, T1, 'x')] }), [val('tab', tab('A', 0, T1, 'x'))], opts))
+  })
+
+  it('a tie with different content goes to the greater JSON on both devices, whatever the key order', () => {
+    const x = tab('A', 0, T1, 'x')
+    const y = { updatedAt: T1, name: 'y', order: 0, createdAt: T0, id: 'A' } // same record shape, other key order
+    const onX = mergeRemote(local({ tabs: [x] }), [val('tab', y)], opts)
+    expect(onX.tabsPut).toEqual([y])
+    expect(onX.pushBack).toEqual([])
+    const onY = mergeRemote(local({ tabs: [y] }), [val('tab', x)], opts)
+    expect(onY.tabsPut).toEqual([])
+    expect(keys(onY.pushBack)).toEqual(['tab:A'])
+  })
+
+  it('tied item fields converge on two devices; the second round pushes nothing back', () => {
+    // Every stamp equal, every field group different: each group goes its own way.
+    const onX = item('i1', 'A', { label: 'b', location: 'school', photoId: 'p-a', photoAt: T1 })
+    const onY = item('i1', 'A', { label: 'a', location: 'home', photoId: 'p-b', photoAt: T1, category: 'c1' })
+    const lx = local({ items: [onX] })
+    const ly = local({ items: [onY] })
+    const px = mergeRemote(lx, [val('item', onY)], opts)
+    const py = mergeRemote(ly, [val('item', onX)], opts)
+    const ax = apply(lx, px).items[0]
+    const ay = apply(ly, py).items[0]
+    expect(ax).toEqual(ay)
+    expect(ax).toMatchObject({ label: 'b', location: 'school', photoId: 'p-b' })
+    expect(ax.category).toBeUndefined() // goes with label/tabId: ["b","A",null] > ["a","A","c1"]
+    // Round 2: each device receives what the other now holds.
+    for (const [l, p, theirs] of [[lx, px, ay], [ly, py, ax]]) {
+      const again = mergeRemote(apply(l, p), [val('item', theirs)], opts)
+      expectEmpty(again)
+    }
   })
 
   it('a replaced photo: the old local blob goes, the new one is needed', () => {
@@ -123,10 +150,10 @@ describe('mergeRemote: remote tombstone vs local record', () => {
     }
   })
 
-  it('an equal stamp is not "newer": the local record is kept (re-creation wins)', () => {
+  it('an exact tie between deletedAt and the newest stamp: the deletion wins', () => {
     const plan = mergeRemote(local({ items: [item('i1', 'A', { updatedAt: T2 })] }), [dead('item', 'i1', T2)], opts)
-    expect(plan.itemsDelete).toEqual([])
-    expect(keys(plan.pushBack)).toEqual(['item:i1'])
+    expect(plan.itemsDelete).toEqual(['i1'])
+    expect(plan.pushBack).toEqual([])
   })
 
   it('tabs and categories compare deletedAt with updatedAt', () => {
@@ -185,6 +212,12 @@ describe('mergeRemote: orphan items and tabs', () => {
     expect(plan.itemsDelete).toEqual([])
     expect(plan.movedOrphans).toBe(1)
     expect(keys(plan.pushBack)).toEqual(['item:i1'])
+  })
+
+  it('tabs sharing an order: the smaller id is first, so every device picks the same one', () => {
+    const l = local({ tabs: [tab('Z', 0), tab('M', 0), tab('X', 1)], items: [item('i1', 'X')] })
+    const plan = mergeRemote(l, [dead('tab', 'X', T2)], opts)
+    expect(plan.itemsPut).toEqual([item('i1', 'M', { updatedAt: NOW })])
   })
 
   it('an incoming item on an unknown tab is moved too', () => {

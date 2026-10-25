@@ -5,6 +5,7 @@ import { compress } from './photos.js'
 import { rotatePhoto } from './rotate.js'
 import { missingDefaults, categoryName } from './categories.js'
 import { t } from './i18n.js'
+import { byOrder } from './order.js'
 import { visibleItems, usableFilters, effectiveCategory } from './ui/filter.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
@@ -370,7 +371,7 @@ export function reorderTabs(ids) {
     if (!changed.length) return
     await putTabs(store.db, changed)
     for (const t of changed) Object.assign(byId.get(t.id), t)
-    store.tabs.sort((a, b) => a.order - b.order)
+    store.tabs.sort(byOrder)
     await bump(1)
     notify()
   })
@@ -436,7 +437,7 @@ export function reorderCategories(ids) {
     if (!changed.length) return
     await putCategories(store.db, changed)
     for (const c of changed) Object.assign(byId.get(c.id), c)
-    store.categories.sort((a, b) => a.order - b.order)
+    store.categories.sort(byOrder)
     await bump(1)
     notify()
   })

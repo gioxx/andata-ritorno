@@ -1,11 +1,16 @@
 // Per-field last-writer-wins merge. Pure: no I/O. ISO strings compare lexicographically.
 
-/** Merge two versions of one item; ties keep `a` (the local / first-seen side). */
-export function mergeItem(a, b) {
-  const move = b.movedAt > a.movedAt ? b : a // location travels with movedAt
-  const edit = b.updatedAt > a.updatedAt ? b : a // everything else with updatedAt
+/**
+ * Merge two versions of one item; ties keep `a` (the local / first-seen side).
+ * `breakTies` (sync only): on an exact tie the field group with the greater JSON wins instead,
+ * so two devices merging each other's version end up with the same item.
+ */
+export function mergeItem(a, b, { breakTies = false } = {}) {
+  const wins = (at, val) => at(b) > at(a) || (breakTies && at(b) === at(a) && JSON.stringify(val(b)) > JSON.stringify(val(a)))
+  const move = wins((x) => x.movedAt, (x) => x.location) ? b : a // location travels with movedAt
+  const edit = wins((x) => x.updatedAt, (x) => [x.label, x.tabId, x.category ?? null]) ? b : a // everything else with updatedAt
   // The photo has its own clock: a label edit must not drag an older photo along (or lose a newer one).
-  const photo = (b.photoAt ?? b.updatedAt) > (a.photoAt ?? a.updatedAt) ? b : a
+  const photo = wins((x) => x.photoAt ?? x.updatedAt, (x) => x.photoId) ? b : a
   const out = {
     ...a,
     location: move.location,

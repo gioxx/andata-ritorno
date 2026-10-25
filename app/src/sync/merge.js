@@ -1,7 +1,9 @@
 // Merge pulled sync records into local state. Pure: no I/O and no clock (time comes in as
 // `now`); the result is a plan that db.applySyncPlan writes in one transaction.
-// ISO strings compare lexicographically. Ties keep the local side.
+// ISO strings compare lexicographically. Exact ties with different content go to the greater
+// JSON (key order normalised) so every device converges; a deletion wins an exact tie.
 import { mergeItem } from '../backup/merge.js'
+import { byOrder } from '../order.js'
 
 /** @typedef {import('../types.js').Tab} Tab */
 /** @typedef {import('../types.js').Category} Category */
@@ -24,6 +26,13 @@ function same(a, b) {
   return true
 }
 
+/** Plain record as JSON with sorted keys: devices may build the same record in another key order. */
+const canon = (r) => JSON.stringify(r, Object.keys(r).sort())
+
+/** Tabs and categories: the newer updatedAt wins; an exact tie goes to the greater canonical JSON. */
+const newerRecord = (cur, v) =>
+  v.updatedAt > cur.updatedAt || (v.updatedAt === cur.updatedAt && canon(v) > canon(cur)) ? v : cur
+
 const byId = (list) => new Map(list.map((x) => [x.id, x]))
 
 /** @returns {boolean} whether local state changed */
@@ -36,7 +45,7 @@ function applyValue(kind, recs, tombs, v) {
     recs.set(v.id, v)
     return true
   }
-  const merged = kind === 'item' ? mergeItem(cur, v) : v.updatedAt > cur.updatedAt ? v : cur
+  const merged = kind === 'item' ? mergeItem(cur, v, { breakTies: true }) : newerRecord(cur, v)
   if (same(merged, cur)) return false
   recs.set(v.id, merged)
   return true
@@ -45,7 +54,7 @@ function applyValue(kind, recs, tombs, v) {
 /** @returns {boolean} whether local state changed */
 function applyTombstone(kind, recs, tombs, { id, deletedAt }) {
   const cur = recs.get(id)
-  if (cur && !(deletedAt > stamp(kind, cur))) return false // touched after the deletion: it stays
+  if (cur && deletedAt < stamp(kind, cur)) return false // touched after the deletion: it stays
   const old = tombs.get(id)
   // Kept even without a local record, so a late older version cannot resurrect it.
   if (!old || deletedAt > old.deletedAt) tombs.set(id, { kind, id, deletedAt })
@@ -89,7 +98,7 @@ export function mergeRemote(local, remote, { now, defaultTabName, deviceId }) {
   }
 
   // Items are never lost with their tab: they move to the first remaining one (a new one if none is left).
-  let home = [...state.tab.values()].sort((a, b) => a.order - b.order)[0]
+  let home = [...state.tab.values()].sort(byOrder)[0]
   if (!home) {
     home = { id: crypto.randomUUID(), name: defaultTabName, order: 0, createdAt: now, updatedAt: now }
     state.tab.set(home.id, home)

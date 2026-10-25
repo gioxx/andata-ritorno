@@ -1,6 +1,7 @@
 // The only module that touches IndexedDB. Every multi-store change runs in one
 // transaction so a crash or error never leaves orphan photos or half-imported data.
 import { openDB } from 'idb'
+import { byOrder } from './order.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -56,8 +57,8 @@ export async function loadAll(db) {
   const [tabs, items, categories] = await Promise.all([
     db.getAll('tabs'), db.getAll('items'), db.getAll('categories'),
   ])
-  tabs.sort((a, b) => a.order - b.order)
-  categories.sort((a, b) => a.order - b.order)
+  tabs.sort(byOrder)
+  categories.sort(byOrder)
   return { tabs, items, categories }
 }
 

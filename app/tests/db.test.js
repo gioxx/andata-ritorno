@@ -31,6 +31,16 @@ async function seed(db) {
 }
 
 describe('db', () => {
+  it('loadAll breaks order ties by id, so every device shows the same order', async () => {
+    const db = await fresh()
+    for (const id of ['b', 'c', 'a']) await putTab(db, tab(id, 0))
+    for (const id of ['y', 'x']) await putCategory(db, cat(id, 3))
+    await putCategory(db, cat('z', 1))
+    const { tabs, categories } = await loadAll(db)
+    expect(tabs.map((t) => t.id)).toEqual(['a', 'b', 'c'])
+    expect(categories.map((c) => c.id)).toEqual(['z', 'x', 'y'])
+  })
+
   it('loadAll returns tabs sorted by order', async () => {
     const db = await fresh()
     await putTab(db, tab('B', 1))
