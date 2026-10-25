@@ -1,14 +1,18 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto } from './db.js'
+import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto, putCategory, putCategories, deleteCategory, EDITABLE_FIELDS } from './db.js'
 import { compress } from './photos.js'
+import { missingDefaults } from './categories.js'
+import { t } from './i18n.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
+/** @typedef {import('./types.js').Category} Category */
 
 export const store = {
   db: /** @type {any} */ (null),
   /** @type {Tab[]} */ tabs: [],
+  /** @type {Category[]} */ categories: [],
   /** @type {Item[]} */ items: [],
   /** @type {string|null} */ currentTabId: null,
   /** @type {Set<string>} */ selected: new Set(),
@@ -26,9 +30,10 @@ export function notify() {
 }
 
 export async function load(db) {
-  const { tabs, items } = await loadAll(db)
+  const { tabs, items, categories } = await loadAll(db)
   store.db = db
   store.tabs = tabs
+  store.categories = categories
   store.items = items
   store.unsaved = (await getMeta(db, 'unsavedCount')) ?? 0
   store.selected = new Set()
@@ -149,15 +154,13 @@ export function addPhotos(photos, { location, label }) {
   })
 }
 
-const EDITABLE = ['label', 'tabId', 'category']
-
 /**
  * Edit label / tab / category (anything else is ignored) and optionally replace the photo,
  * as ONE change. Changes updatedAt, never movedAt. Nothing changed = nothing written.
  * The replaced blob is deleted in replacePhoto's transaction; the old object URL is dropped
  * by the next render (it revokes URLs of photos no longer in use).
  * @param {string} id
- * @param {{label?:string, tabId?:string, category?:string}} patch
+ * @param {{label?:string, tabId?:string, category?:string|null}} patch (category null clears it)
  * @param {import('./types.js').Photo|null} [photo] already compressed, see prepareReplacement
  */
 export function editItem(id, patch, photo = null) {
@@ -165,10 +168,10 @@ export function editItem(id, patch, photo = null) {
     const it = store.items.find((i) => i.id === id)
     if (!it) throw new Error('not-found')
     const clean = {}
-    for (const k of EDITABLE) if (patch[k] !== undefined) clean[k] = patch[k]
+    for (const k of EDITABLE_FIELDS) if (patch[k] !== undefined) clean[k] = patch[k]
     if (clean.label !== undefined) clean.label = String(clean.label).trim()
     if (clean.tabId !== undefined && !store.tabs.some((t) => t.id === clean.tabId)) throw new Error('not-found')
-    for (const k of Object.keys(clean)) if (clean[k] === (it[k] ?? (k === 'label' ? '' : undefined))) delete clean[k]
+    for (const k of Object.keys(clean)) if ((clean[k] ?? undefined) === (it[k] ?? (k === 'label' ? '' : undefined))) delete clean[k]
     if (!Object.keys(clean).length && !photo) return
     const now = new Date().toISOString()
     if (photo) {
@@ -178,6 +181,7 @@ export function editItem(id, patch, photo = null) {
     if (Object.keys(clean).length) await updateItem(store.db, id, clean, now)
     const leaves = clean.tabId !== undefined
     Object.assign(it, clean, { updatedAt: now })
+    if (it.category == null) delete it.category // mirror updateItem: absent key, never null
     if (leaves) store.selected.clear() // it is no longer in the visible tab
     await bump(1)
     notify()
@@ -249,6 +253,86 @@ export function removeTab(id) {
     store.selected.clear()
     if (store.currentTabId === id || !tabs.some((t) => t.id === store.currentTabId)) store.currentTabId = tabs[0]?.id ?? null
     await bump(Math.max(1, n))
+    notify()
+  })
+}
+
+/** Create a category at the end. @param {string} name */
+export function addCategory(name) {
+  return queue(async () => {
+    if (!name.trim()) throw new Error('empty-name')
+    const now = new Date().toISOString()
+    const order = store.categories.reduce((m, c) => Math.max(m, c.order), -1) + 1
+    const cat = { id: crypto.randomUUID(), name: name.trim(), order, createdAt: now, updatedAt: now }
+    await putCategory(store.db, cat)
+    store.categories.push(cat)
+    await bump(1)
+    notify()
+  })
+}
+
+/** Renaming makes a default a custom category: nameKey is dropped so the typed name sticks in every language. */
+export function renameCategory(id, name) {
+  return queue(async () => {
+    if (!name.trim()) throw new Error('empty-name')
+    const cat = store.categories.find((c) => c.id === id)
+    if (!cat) throw new Error('not-found')
+    const { nameKey: _key, ...rest } = cat
+    const next = { ...rest, name: name.trim(), updatedAt: new Date().toISOString() }
+    await putCategory(store.db, next)
+    delete cat.nameKey
+    Object.assign(cat, next)
+    await bump(1)
+    notify()
+  })
+}
+
+/** Rewrite `order` as 0..n-1 following `ids`; only categories whose order changed get a new updatedAt. */
+export function reorderCategories(ids) {
+  return queue(async () => {
+    const now = new Date().toISOString()
+    const byId = new Map(store.categories.map((c) => [c.id, c]))
+    const changed = []
+    ids.forEach((id, order) => {
+      const c = byId.get(id)
+      if (c && c.order !== order) changed.push({ ...c, order, updatedAt: now })
+    })
+    if (!changed.length) return
+    await putCategories(store.db, changed)
+    for (const c of changed) Object.assign(byId.get(c.id), c)
+    store.categories.sort((a, b) => a.order - b.order)
+    await bump(1)
+    notify()
+  })
+}
+
+/** Delete a category; its items stay, uncategorised (db.js bumps their updatedAt). */
+export function removeCategory(id) {
+  return queue(async () => {
+    const now = new Date().toISOString()
+    await deleteCategory(store.db, id, now)
+    store.categories = store.categories.filter((c) => c.id !== id)
+    for (const it of store.items) {
+      if (it.category === id) { delete it.category; it.updatedAt = now }
+    }
+    await bump(1)
+    notify()
+  })
+}
+
+/** Add the defaults that are missing (never automatic), named in the current language, as ONE change. */
+export function addDefaultCategories() {
+  return queue(async () => {
+    const missing = missingDefaults(store.categories)
+    if (!missing.length) return
+    const now = new Date().toISOString()
+    const start = store.categories.reduce((m, c) => Math.max(m, c.order), -1) + 1
+    const cats = missing.map((d, i) => ({
+      id: d.id, name: t(d.nameKey), nameKey: d.nameKey, order: start + i, createdAt: now, updatedAt: now,
+    }))
+    await putCategories(store.db, cats)
+    store.categories.push(...cats)
+    await bump(1)
     notify()
   })
 }

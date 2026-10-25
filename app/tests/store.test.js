@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, prepareReplacement } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, prepareReplacement, addCategory, removeCategory } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -226,5 +226,31 @@ describe('edit item', () => {
 
   it('prepareReplacement rejects a non-image', async () => {
     await expect(prepareReplacement(new File(['x'], 'x.txt', { type: 'text/plain' }))).rejects.toThrow('not-an-image')
+  })
+
+  it('removeCategory keeps items, uncategorised, and bumps their updatedAt', async () => {
+    await addCategory('Costumi')
+    const cid = store.categories[0].id
+    await editItem('a1', { category: cid })
+    expect(store.items.find((i) => i.id === 'a1').category).toBe(cid)
+    await removeCategory(cid)
+    const mem = store.items.find((i) => i.id === 'a1')
+    expect(mem).toBeDefined()
+    expect('category' in mem).toBe(false)
+    expect(mem.updatedAt > T0).toBe(true)
+    await load(db)
+    const stored = store.items.find((i) => i.id === 'a1')
+    expect('category' in stored).toBe(false)
+    expect(store.items).toHaveLength(4)
+  })
+
+  it('editItem({ category: null }) clears the category without storing undefined', async () => {
+    await addCategory('Costumi')
+    const cid = store.categories[0].id
+    await editItem('a1', { category: cid })
+    await editItem('a1', { category: null })
+    expect('category' in store.items.find((i) => i.id === 'a1')).toBe(false)
+    const { items } = await loadAll(db)
+    expect('category' in items.find((i) => i.id === 'a1')).toBe(false)
   })
 })

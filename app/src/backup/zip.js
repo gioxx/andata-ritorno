@@ -1,6 +1,7 @@
 // v2 backup container: a ZIP with backup.json + photos/<photoId>.<ext> (no base64, no giant string).
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
 import { decodeImage } from '../photos.js'
+import { DEFAULT_CATEGORIES } from '../categories.js'
 
 /** @typedef {import('../types.js').Incoming} Incoming */
 /** @typedef {import('../types.js').Failure} Failure */
@@ -45,6 +46,22 @@ function normTab(t, index) {
   }
 }
 
+const DEFAULT_KEYS = new Set(DEFAULT_CATEGORIES.map((d) => d.nameKey))
+
+/** Exact Category shape, or null when the id is unusable. nameKey only for known default keys. */
+function normCategory(c, index) {
+  if (!str(c?.id)) return null
+  const out = {
+    id: c.id,
+    name: String(c.name ?? '').trim() || 'Categoria',
+    order: Number.isFinite(c.order) ? c.order : index,
+    createdAt: iso(c.createdAt),
+    updatedAt: iso(c.updatedAt),
+  }
+  if (DEFAULT_KEYS.has(c.nameKey)) out.nameKey = c.nameKey
+  return out
+}
+
 /** Exact Item shape (unknown keys dropped), or the Failure reason. */
 function normItem(raw) {
   if (!str(raw?.id) || !str(raw.tabId) || !str(raw.photoId)) return 'incomplete'
@@ -59,10 +76,10 @@ function normItem(raw) {
 }
 
 /**
- * @param {{ tabs:any[], items:any[], getPhoto:(id:string)=>Promise<Blob|undefined> }} src
+ * @param {{ tabs:any[], items:any[], categories?:any[], getPhoto:(id:string)=>Promise<Blob|undefined> }} src
  * @returns {Promise<Blob>}
  */
-export async function buildZip({ tabs, items, getPhoto, now = new Date() }) {
+export async function buildZip({ tabs, items, categories = [], getPhoto, now = new Date() }) {
   const files = {}
   const integrity = {}
   const done = new Set()
@@ -77,7 +94,7 @@ export async function buildZip({ tabs, items, getPhoto, now = new Date() }) {
     // Photos are already compressed: store them, level 0.
     files[`photos/${it.photoId}.${ext}`] = [bytes, { level: 0 }]
   }
-  const meta = { app: 'andata-ritorno', version: 2, exportedAt: now.toISOString(), tabs, items, photos: integrity }
+  const meta = { app: 'andata-ritorno', version: 2, exportedAt: now.toISOString(), tabs, categories, items, photos: integrity }
   files['backup.json'] = strToU8(JSON.stringify(meta))
   return new Blob([zipSync(files)], { type: 'application/zip' })
 }
@@ -113,6 +130,8 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
   // The `photos` integrity map is additive: a v2 file without it still imports, just unchecked.
   const integrity = json.photos && typeof json.photos === 'object' ? json.photos : {}
   const tabs = json.tabs.map(normTab).filter(Boolean)
+  // Additive: v2 files from before categories have no array.
+  const categories = Array.isArray(json.categories) ? json.categories.map(normCategory).filter(Boolean) : []
   const tabNames = new Map(tabs.map((t) => [t.id, t.name]))
   const known = new Set([...tabNames.keys(), ...localTabIds])
 
@@ -140,5 +159,5 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     photos.set(item.photoId, photo)
     items.push(item)
   }
-  return { tabs, items, photos, failures }
+  return { tabs, categories, items, photos, failures }
 }

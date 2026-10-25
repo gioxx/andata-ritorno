@@ -141,4 +141,13 @@ export default {
   'error.badDataUrl': 'Immagine non valida',
   'error.generic': 'Operazione non riuscita: {message}',
   'error.missingPhoto': 'La foto di «{name}»{where} non si trova: cambiala o elimina il capo, poi riprova.',
+  'category.default.body': 'Body',
+  'category.default.tops': 'Maglie',
+  'category.default.trousers': 'Pantaloni',
+  'category.default.dresses': 'Vestiti',
+  'category.default.jackets': 'Felpe e giacche',
+  'category.default.pyjamas': 'Pigiami',
+  'category.default.underwear': 'Intimo',
+  'category.default.socks': 'Calze',
+  'category.default.accessories': 'Accessori',
 }

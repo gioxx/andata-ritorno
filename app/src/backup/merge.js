@@ -28,13 +28,14 @@ function collapse(list, merge) {
 }
 
 /**
- * @param {{tabs:import('../types.js').Tab[], items:import('../types.js').Item[]}} local
+ * @param {{tabs:import('../types.js').Tab[], items:import('../types.js').Item[], categories?:import('../types.js').Category[]}} local
  * @param {import('../types.js').Incoming} incoming
  * @returns {import('../types.js').ImportPlan}
  */
 export function buildPlan(local, incoming) {
   const localItems = new Map(local.items.map((i) => [i.id, i]))
   const localTabs = new Map(local.tabs.map((t) => [t.id, t]))
+  const localCats = new Map((local.categories ?? []).map((c) => [c.id, c]))
   const plan = { tabsPut: [], categoriesPut: [], itemsPut: [], photosPut: new Map(), photosDelete: [], added: 0, updated: 0, metaPut: [] }
 
   const newerTab = (a, b) => (b.updatedAt > a.updatedAt ? b : a)
@@ -44,6 +45,23 @@ export function buildPlan(local, incoming) {
     else if (t.updatedAt > cur.updatedAt) {
       plan.tabsPut.push({ ...cur, name: t.name, order: t.order, updatedAt: t.updatedAt })
     }
+  }
+
+  for (const c of collapse(incoming.categories ?? [], newerTab).values()) {
+    const cur = localCats.get(c.id)
+    if (!cur) plan.categoriesPut.push(c)
+    else if (c.updatedAt > cur.updatedAt) {
+      // Keep local createdAt; nameKey follows the winner (a rename removes it).
+      const { nameKey: _old, ...rest } = cur
+      plan.categoriesPut.push({ ...rest, ...(c.nameKey ? { nameKey: c.nameKey } : {}), name: c.name, order: c.order, updatedAt: c.updatedAt })
+    }
+  }
+  const knownCats = new Set([...localCats.keys(), ...(incoming.categories ?? []).map((c) => c.id)])
+  // A category that exists nowhere (old backup, dangling id) must not survive on an item.
+  const strip = (it) => {
+    if (it.category === undefined || knownCats.has(it.category)) return it
+    const { category: _gone, ...rest } = it
+    return rest
   }
 
   const needPhoto = (item) => {
@@ -56,7 +74,7 @@ export function buildPlan(local, incoming) {
     const cur = localItems.get(inc.id)
     if (!cur) {
       needPhoto(inc)
-      plan.itemsPut.push(inc)
+      plan.itemsPut.push(strip(inc))
       plan.added++
       continue
     }
@@ -66,7 +84,7 @@ export function buildPlan(local, incoming) {
       needPhoto(merged)
       plan.photosDelete.push(cur.photoId)
     }
-    plan.itemsPut.push(merged)
+    plan.itemsPut.push(strip(merged))
     plan.updated++
   }
   return plan

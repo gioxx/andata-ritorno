@@ -140,4 +140,13 @@ export default {
   'error.badDataUrl': 'Invalid image',
   'error.generic': 'Operation failed: {message}',
   'error.missingPhoto': 'The photo of "{name}"{where} cannot be found: change it or delete the item, then try again.',
+  'category.default.body': 'Bodysuits',
+  'category.default.tops': 'Tops',
+  'category.default.trousers': 'Trousers',
+  'category.default.dresses': 'Dresses',
+  'category.default.jackets': 'Sweatshirts & jackets',
+  'category.default.pyjamas': 'Pyjamas',
+  'category.default.underwear': 'Underwear',
+  'category.default.socks': 'Socks',
+  'category.default.accessories': 'Accessories',
 }

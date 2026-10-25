@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { zipSync, unzipSync } from 'fflate'
-import { openDb, loadAll, putTab, addItems, getPhoto } from '../src/db.js'
+import { openDb, loadAll, putTab, putCategory, updateItem, addItems, getPhoto } from '../src/db.js'
 import { buildZip } from '../src/backup/zip.js'
 import { prepareImport, commitImport, ImportBlocked } from '../src/backup/importer.js'
 
@@ -26,8 +26,8 @@ async function seeded() {
   return db
 }
 const zipOf = async (db) => {
-  const { tabs, items } = await loadAll(db)
-  return buildZip({ tabs, items, getPhoto: (id) => getPhoto(db, id) })
+  const { tabs, items, categories } = await loadAll(db)
+  return buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id) })
 }
 const asFile = (blob) => new File([blob], 'b.zip', { type: 'application/zip' })
 
@@ -215,5 +215,53 @@ describe('v2 zip', () => {
     const { tabs, items } = await loadAll(src)
     await expect(buildZip({ tabs, items, getPhoto: async (id) => (id === 'p2' ? undefined : getPhoto(src, id)) }))
       .rejects.toThrow('missing-photo:i2')
+  })
+
+  it('zip round-trip keeps categories', async () => {
+    const src = await seeded()
+    await putCategory(src, { id: 'default-body', name: 'Body', nameKey: 'category.default.body', order: 0, createdAt: T, updatedAt: T })
+    await putCategory(src, { id: 'c-custom', name: 'Costumi', order: 1, createdAt: T, updatedAt: T })
+    await updateItem(src, 'i1', { category: 'c-custom' }, T)
+    const dst = await fresh()
+    await commitImport(dst, await prepareImport(dst, asFile(await zipOf(src))), { partial: false })
+    const a = await loadAll(src)
+    const b = await loadAll(dst)
+    expect(b.categories).toEqual(a.categories)
+    expect(b.categories).toHaveLength(2)
+    expect(b.items.find((i) => i.id === 'i1').category).toBe('c-custom')
+  })
+
+  it('item with unknown category imports uncategorised; a v2 file without categories still imports', async () => {
+    const src = await seeded()
+    await updateItem(src, 'i1', { category: 'ghost' }, T)
+    const entries = unzipSync(await bytesOf(await zipOf(src)))
+    const json = JSON.parse(new TextDecoder().decode(entries['backup.json']))
+    expect(json.categories).toEqual([])
+    delete json.categories
+    entries['backup.json'] = new TextEncoder().encode(JSON.stringify(json))
+    const dst = await fresh()
+    const prepared = await prepareImport(dst, asFile(new Blob([zipSync(entries)])))
+    expect(prepared.incoming.categories).toEqual([])
+    await commitImport(dst, prepared, { partial: false })
+    const { items } = await loadAll(dst)
+    expect(items).toHaveLength(3)
+    expect('category' in items.find((i) => i.id === 'i1')).toBe(false)
+  })
+
+  it('normalises untrusted categories', async () => {
+    const entries = unzipSync(await bytesOf(await zipOf(await seeded())))
+    const json = JSON.parse(new TextDecoder().decode(entries['backup.json']))
+    json.categories = [
+      { id: 'default-tops', name: 'x', nameKey: 'category.default.tops', order: 3, createdAt: 'bad', updatedAt: T, extra: 1 },
+      { id: 'c2', name: 'Y', nameKey: 'evil.key', order: 'nope' },
+      { name: 'no id' },
+    ]
+    entries['backup.json'] = new TextEncoder().encode(JSON.stringify(json))
+    const dst = await fresh()
+    const { incoming } = await prepareImport(dst, asFile(new Blob([zipSync(entries)])))
+    expect(incoming.categories).toEqual([
+      { id: 'default-tops', name: 'x', nameKey: 'category.default.tops', order: 3, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: T },
+      { id: 'c2', name: 'Y', order: 1, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z' },
+    ])
   })
 })

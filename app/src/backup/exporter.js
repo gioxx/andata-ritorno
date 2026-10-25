@@ -25,8 +25,8 @@ export const backupFileName = (now) => `andata-ritorno-${now.toISOString().slice
  * @returns {Promise<'shared'|'downloaded'|'cancelled'>}
  */
 export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date() } = {}) {
-  const { tabs, items } = await loadAll(db)
-  const blob = await buildZip({ tabs, items, getPhoto: (id) => getPhoto(db, id), now })
+  const { tabs, items, categories } = await loadAll(db)
+  const blob = await buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id), now })
   const name = backupFileName(now)
   const file = new File([blob], name, { type: 'application/zip' })
 

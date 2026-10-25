@@ -138,13 +138,19 @@ export async function moveItems(db, ids, location, now) {
   await patchItems(db, ids, (it) => ({ ...it, location, movedAt: now }))
 }
 
-const EDITABLE = ['label', 'tabId', 'category']
+/** The only item fields an edit may change. */
+export const EDITABLE_FIELDS = ['label', 'tabId', 'category']
 
-/** @param {{label?:string, tabId?:string, category?:string}} patch  Other keys are ignored. */
+/** @param {{label?:string, tabId?:string, category?:string|null}} patch  Other keys are ignored; a null/undefined category clears it. */
 export async function updateItem(db, id, patch, now) {
   const clean = {}
-  for (const k of EDITABLE) if (k in patch) clean[k] = patch[k]
-  await patchItems(db, [id], (it) => ({ ...it, ...clean, updatedAt: now }))
+  for (const k of EDITABLE_FIELDS) if (k in patch) clean[k] = patch[k]
+  await patchItems(db, [id], (it) => {
+    const next = { ...it, ...clean, updatedAt: now }
+    // Never store an explicit undefined/null: "no category" is an absent key.
+    if (next.category == null) delete next.category
+    return next
+  })
 }
 
 /** @param {Photo} photo */

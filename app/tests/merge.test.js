@@ -11,7 +11,9 @@ const blob = (s) => new Blob([s])
 const incoming = (items, photos, tabs = []) => ({
   tabs, items, photos: new Map(photos ?? items.map((i) => [i.photoId, blob(i.photoId)])), failures: [],
 })
-const empty = { tabs: [], items: [] }
+const empty = { tabs: [], items: [], categories: [] }
+const cat = (id, over = {}) => ({ id, name: id, order: 0, createdAt: d(1), updatedAt: d(1), ...over })
+const withCats = (inc, categories) => ({ ...inc, categories })
 
 describe('buildPlan', () => {
   it('new item is added with its photo', () => {
@@ -90,5 +92,34 @@ describe('buildPlan', () => {
     expect(byId.t2).toBeUndefined()
     expect(byId.t3).toBeDefined()
     expect(plan.tabsPut).toHaveLength(2)
+  })
+
+  it('two devices with defaults merge without duplicates', () => {
+    const ids = ['default-body', 'default-tops', 'default-socks']
+    const local = { tabs: [], items: [], categories: ids.map((id, i) => cat(id, { order: i })) }
+    const inc = withCats(incoming([]), ids.map((id, i) => cat(id, { order: i, updatedAt: id === 'default-tops' ? d(5) : d(1), name: id === 'default-tops' ? 'Magliette' : id })))
+    const plan = buildPlan(local, inc)
+    expect(plan.categoriesPut).toHaveLength(1)
+    expect(plan.categoriesPut[0]).toMatchObject({ id: 'default-tops', name: 'Magliette', updatedAt: d(5) })
+  })
+
+  it('new incoming categories are put; duplicates inside the file collapse to the newest', () => {
+    const inc = withCats(incoming([]), [cat('c1'), cat('c1', { name: 'new', updatedAt: d(3) }), cat('c2')])
+    const plan = buildPlan(empty, inc)
+    expect(plan.categoriesPut.map((c) => [c.id, c.name]).sort()).toEqual([['c1', 'new'], ['c2', 'c2']])
+  })
+
+  it('an item pointing to an unknown category is stored uncategorised', () => {
+    const inc = withCats(incoming([item('a', { category: 'ghost' }), item('b', { category: 'c1' })]), [cat('c1')])
+    const plan = buildPlan(empty, inc)
+    const byId = Object.fromEntries(plan.itemsPut.map((i) => [i.id, i]))
+    expect('category' in byId.a).toBe(false)
+    expect(byId.b.category).toBe('c1')
+  })
+
+  it('a category known only locally keeps incoming items categorised', () => {
+    const local = { tabs: [], items: [], categories: [cat('c1')] }
+    const plan = buildPlan(local, withCats(incoming([item('a', { category: 'c1' })]), []))
+    expect(plan.itemsPut[0].category).toBe('c1')
   })
 })
