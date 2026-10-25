@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, prepareReplacement, addCategory, removeCategory } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -252,5 +252,78 @@ describe('edit item', () => {
     expect('category' in store.items.find((i) => i.id === 'a1')).toBe(false)
     const { items } = await loadAll(db)
     expect('category' in items.find((i) => i.id === 'a1')).toBe(false)
+  })
+
+  it('editItem rejects an unknown category id and writes nothing', async () => {
+    await expect(editItem('a1', { category: 'ghost' })).rejects.toThrow('not-found')
+    expect('category' in store.items.find((i) => i.id === 'a1')).toBe(false)
+    expect(store.unsaved).toBe(0)
+  })
+
+  it('addPhotos stores a valid category and rejects an unknown one', async () => {
+    await addCategory('Costumi')
+    const cid = store.categories[0].id
+    await addPhotos([photo('n1')], { location: 'home', label: 'x', category: cid })
+    expect(store.items.find((i) => i.photoId === 'n1').category).toBe(cid)
+    await expect(addPhotos([photo('n2')], { location: 'home', label: 'x', category: 'ghost' })).rejects.toThrow('not-found')
+    expect(store.items.some((i) => i.photoId === 'n2')).toBe(false)
+    await addPhotos([photo('n3')], { location: 'home', label: 'x' })
+    expect('category' in store.items.find((i) => i.photoId === 'n3')).toBe(false)
+  })
+
+  it('renameCategory to the text already shown is a no-op and keeps the nameKey', async () => {
+    await addDefaultCategories()
+    const c = store.categories[0]
+    const before = { unsaved: store.unsaved, updatedAt: c.updatedAt }
+    await renameCategory(c.id, `  ${c.name}  `)
+    expect(c.nameKey).toBe('category.default.body')
+    expect(store.unsaved).toBe(before.unsaved)
+    expect(c.updatedAt).toBe(before.updatedAt)
+    await renameCategory(c.id, 'Tutine')
+    expect('nameKey' in c).toBe(false)
+    expect(store.unsaved).toBe(before.unsaved + 1)
+  })
+
+  it('removeCategory on an unknown id throws not-found and counts nothing', async () => {
+    await expect(removeCategory('ghost')).rejects.toThrow('not-found')
+    expect(store.unsaved).toBe(0)
+  })
+
+  describe('tag filter', () => {
+    let c1, c2
+    beforeEach(async () => {
+      await addCategory('Uno'); await addCategory('Due')
+      ;[c1, c2] = store.categories.map((c) => c.id)
+      await editItem('a1', { category: c1 })
+      await editItem('a2', { category: c2 })
+      await editItem('b1', { category: c1 })
+    })
+
+    it('selectSection respects the filter', () => {
+      toggleFilter(c1)
+      selectSection('school')
+      expect([...store.selected]).toEqual(['a1'])
+    })
+
+    it('switching tab clears the filter', () => {
+      toggleFilter(c1)
+      setCurrentTab('B')
+      expect(store.filter.size).toBe(0)
+    })
+
+    it('changing the filter drops selected items that became hidden; clearFilter keeps the rest', () => {
+      selectToggle('a1'); selectToggle('a2')
+      toggleFilter(c1)
+      expect([...store.selected]).toEqual(['a1'])
+      clearFilter()
+      expect(store.filter.size).toBe(0)
+      expect([...store.selected]).toEqual(['a1'])
+    })
+
+    it('a filter category that no item of the tab uses any more is dropped', async () => {
+      toggleFilter(c2)
+      await editItem('a2', { category: null })
+      expect(store.filter.size).toBe(0)
+    })
   })
 })

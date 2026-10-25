@@ -30,6 +30,8 @@ export default {
   'render.menu': 'Menu',
   'render.addTab': 'Add tab',
   'render.confirmDelete': 'Delete the selected items?',
+  'render.tags': 'Filter by category',
+  'render.tagsAll': 'All ✕',
 
   'welcome.title': 'Welcome to Andata e Ritorno',
   'welcome.placeholder': "E.g. Sofia's nursery",
@@ -65,6 +67,10 @@ export default {
   'dialogs.editTitle': 'Edit item',
   'dialogs.label': 'Description',
   'dialogs.tab': 'Tab',
+  'dialogs.category': 'Category',
+  'dialogs.categoryNone': 'None',
+  'dialogs.categoryHint': 'No categories yet.',
+  'dialogs.categoryManage': 'Manage categories',
   'dialogs.changeAgain': 'Change again',
   'dialogs.newItem': 'New item · {tab}',
   'dialogs.newItems': '{n} new items · {tab}',
@@ -85,6 +91,20 @@ export default {
     other: 'Delete the tab "{name}" and its {n} items? This cannot be undone.',
   },
 
+  'category.manageTitle': 'Manage categories',
+  'category.nameLabel': 'Category name',
+  'category.empty': 'No categories. Create one or add the default ones.',
+  'category.newPlaceholder': 'New category',
+  'category.add': 'Add',
+  'category.addDefaults': 'Add the default categories',
+  'category.up': 'Move up',
+  'category.down': 'Move down',
+  'category.delete': 'Delete category',
+  'category.delete.confirm': {
+    one: 'Delete the category "{name}"? Its item stays, uncategorised.',
+    other: 'Delete the category "{name}"? Its {n} items stay, uncategorised.',
+  },
+
   'viewer.hintOne': 'Pinch to zoom',
   'viewer.hintMany': 'Pinch to zoom · swipe for the other items',
 
@@ -94,6 +114,7 @@ export default {
   'menu.import': 'Import backup',
   'menu.tabsSection': 'Tabs',
   'menu.manageTabs': 'Manage tabs',
+  'menu.manageCategories': 'Manage categories',
   'menu.todo': 'To redo',
   'menu.todoTitle': 'To redo ({n})',
   'menu.done': 'Done',

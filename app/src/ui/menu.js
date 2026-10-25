@@ -4,12 +4,13 @@ import { getMeta, setMeta } from '../db.js'
 import { exportBackup, backupFileName } from '../backup/exporter.js'
 import { hooks } from './render.js'
 import { openTabManager } from './tabs.js'
+import { openCategoryManager } from './categories.js'
 import { reportError } from './dialogs.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
 import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
 import { menuFooter } from './about.js'
-import { downloadIcon, uploadIcon, layersIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
+import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessage } from './model.js'
 
 let dlg = null
@@ -66,6 +67,7 @@ const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="clos
     ${menuItem('import', uploadIcon, t('menu.import'))}
     <h4>${t('menu.tabsSection')}</h4>
     ${menuItem('tabs', layersIcon, t('menu.manageTabs'))}
+    ${menuItem('categories', tagsIcon, t('menu.manageCategories'))}
     ${menuItem('todo', todoIcon, t('menu.todo'), '<span class="badge"></span>')}
     <h4>${t('menu.theme')}</h4>
     <div class="seg" id="themeSeg"></div>
@@ -93,7 +95,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), todo: openTodo }[item.dataset.menu]
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo }[item.dataset.menu]
     run()
   })
   // Swipe right on the drawer to close it.

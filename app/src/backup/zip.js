@@ -46,8 +46,6 @@ function normTab(t, index) {
   }
 }
 
-const DEFAULT_KEYS = new Set(DEFAULT_CATEGORIES.map((d) => d.nameKey))
-
 /** Exact Category shape, or null when the id is unusable. nameKey only for known default keys. */
 function normCategory(c, index) {
   if (!str(c?.id)) return null
@@ -58,7 +56,8 @@ function normCategory(c, index) {
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
   }
-  if (DEFAULT_KEYS.has(c.nameKey)) out.nameKey = c.nameKey
+  // Only the key that belongs to this very default id (else a custom id could show a default's name).
+  if (c.nameKey && c.nameKey === DEFAULT_CATEGORIES.find((d) => d.id === c.id)?.nameKey) out.nameKey = c.nameKey
   return out
 }
 

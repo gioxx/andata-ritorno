@@ -31,6 +31,8 @@ export default {
   'render.menu': 'Menu',
   'render.addTab': 'Aggiungi scheda',
   'render.confirmDelete': 'Eliminare i capi selezionati?',
+  'render.tags': 'Filtra per categoria',
+  'render.tagsAll': 'Tutti ✕',
 
   'welcome.title': 'Benvenuto in Andata e Ritorno',
   'welcome.placeholder': 'Es. Nido di Sofia',
@@ -66,6 +68,10 @@ export default {
   'dialogs.editTitle': 'Modifica capo',
   'dialogs.label': 'Descrizione',
   'dialogs.tab': 'Scheda',
+  'dialogs.category': 'Categoria',
+  'dialogs.categoryNone': 'Nessuna',
+  'dialogs.categoryHint': 'Nessuna categoria ancora.',
+  'dialogs.categoryManage': 'Gestisci categorie',
   'dialogs.changeAgain': 'Cambia di nuovo',
   'dialogs.newItem': 'Nuovo capo · {tab}',
   'dialogs.newItems': '{n} nuovi capi · {tab}',
@@ -86,6 +92,20 @@ export default {
     other: 'Eliminare la scheda "{name}" e i suoi {n} capi? Non si può annullare.',
   },
 
+  'category.manageTitle': 'Gestisci categorie',
+  'category.nameLabel': 'Nome categoria',
+  'category.empty': 'Nessuna categoria. Creane una o aggiungi quelle predefinite.',
+  'category.newPlaceholder': 'Nuova categoria',
+  'category.add': 'Aggiungi',
+  'category.addDefaults': 'Aggiungi le categorie predefinite',
+  'category.up': 'Sposta su',
+  'category.down': 'Sposta giù',
+  'category.delete': 'Elimina categoria',
+  'category.delete.confirm': {
+    one: 'Eliminare la categoria "{name}"? Il suo capo resta, senza categoria.',
+    other: 'Eliminare la categoria "{name}"? I suoi {n} capi restano, senza categoria.',
+  },
+
   'viewer.hintOne': 'Due dita per ingrandire',
   'viewer.hintMany': 'Due dita per ingrandire · scorri per gli altri capi',
 
@@ -95,6 +115,7 @@ export default {
   'menu.import': 'Importa backup',
   'menu.tabsSection': 'Schede',
   'menu.manageTabs': 'Gestisci schede',
+  'menu.manageCategories': 'Gestisci categorie',
   'menu.todo': 'Da rifare',
   'menu.todoTitle': 'Da rifare ({n})',
   'menu.done': 'Fatto',

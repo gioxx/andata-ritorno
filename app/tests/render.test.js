@@ -36,3 +36,42 @@ describe('open-photo button on selected tiles', () => {
     expect([...selected]).toEqual(['h1', 's2'])
   })
 })
+
+describe('tag row', () => {
+  const cats = [{ id: 'c1', name: 'Maglie', order: 0 }, { id: 'c2', name: 'Pantaloni', order: 1 }]
+  const mk = (id, category) => ({ id, tabId: 'A', location: 'school', label: id, photoId: 'p' + id, ...(category ? { category } : {}) })
+  const state = (items, filter = new Set()) => ({ tabs: [tab], items, categories: cats, filter, currentTabId: 'A', selected: new Set(), unsaved: 0 })
+
+  it('is absent when no item of the tab has a category', () => {
+    const root = document.createElement('div')
+    renderApp(root, state([mk('x')]))
+    expect(root.querySelector('.tags')).toBeNull()
+  })
+
+  it('lists only the used categories, filters the grid and shows "Tutti ✕" first', () => {
+    const root = document.createElement('div')
+    const items = [mk('x', 'c1'), mk('y'), mk('z', 'c1')]
+    renderApp(root, state(items))
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Maglie'])
+    expect(root.querySelectorAll('.item')).toHaveLength(3)
+    renderApp(root, state(items, new Set(['c1'])))
+    const pills = [...root.querySelectorAll('.tags .chip')]
+    expect(pills[0].textContent).toBe('Tutti ✕')
+    expect(pills[1].classList.contains('on')).toBe(true)
+    expect(root.querySelectorAll('.item')).toHaveLength(2)
+    expect(root.querySelector('.count').textContent).toBe('2')
+  })
+
+  it('tapping a pill toggles the store filter; "Tutti ✕" clears it', async () => {
+    const { store: st } = await import('../src/store.js')
+    Object.assign(st, { tabs: [tab], items: [mk('x', 'c1')], categories: cats, currentTabId: 'A' })
+    st.filter.clear(); st.selected.clear()
+    const root = document.createElement('div')
+    renderApp(root, st)
+    root.querySelector('[data-tag="c1"]').click()
+    expect([...st.filter]).toEqual(['c1'])
+    renderApp(root, st)
+    root.querySelector('[data-tagclear]').click()
+    expect(st.filter.size).toBe(0)
+  })
+})

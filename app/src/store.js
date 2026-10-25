@@ -2,8 +2,9 @@
 // then updates memory and notifies, so the UI never shows something that isn't saved.
 import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto, putCategory, putCategories, deleteCategory, EDITABLE_FIELDS } from './db.js'
 import { compress } from './photos.js'
-import { missingDefaults } from './categories.js'
+import { missingDefaults, categoryName } from './categories.js'
 import { t } from './i18n.js'
+import { visibleItems } from './ui/filter.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -16,6 +17,7 @@ export const store = {
   /** @type {Item[]} */ items: [],
   /** @type {string|null} */ currentTabId: null,
   /** @type {Set<string>} */ selected: new Set(),
+  /** Category ids of the active tag filter (empty = all); session only, never persisted. @type {Set<string>} */ filter: new Set(),
   unsaved: 0,
 }
 
@@ -38,6 +40,31 @@ export async function load(db) {
   store.unsaved = (await getMeta(db, 'unsavedCount')) ?? 0
   store.selected = new Set()
   if (!tabs.some((t) => t.id === store.currentTabId)) store.currentTabId = tabs[0]?.id ?? null
+  settle()
+  notify()
+}
+
+/**
+ * Keep filter and selection coherent after any change: the filter only holds categories
+ * still used in the current tab (else the screen could be empty with no pill to clear),
+ * and the selection only holds visible items.
+ */
+function settle() {
+  const used = new Set(store.items.filter((i) => i.tabId === store.currentTabId && i.category).map((i) => i.category))
+  for (const id of [...store.filter]) if (!used.has(id)) store.filter.delete(id)
+  if (!store.filter.size) return
+  const shown = new Set(visibleItems(store.items, store.filter).map((i) => i.id))
+  for (const id of [...store.selected]) if (!shown.has(id)) store.selected.delete(id)
+}
+
+export function toggleFilter(id) {
+  if (!store.filter.delete(id)) store.filter.add(id)
+  settle()
+  notify()
+}
+
+export function clearFilter() {
+  store.filter.clear()
   notify()
 }
 
@@ -45,6 +72,7 @@ export function setCurrentTab(id) {
   if (id === store.currentTabId) return
   store.currentTabId = id
   store.selected.clear()
+  store.filter.clear()
   notify()
 }
 
@@ -53,10 +81,10 @@ export function selectToggle(id) {
   notify()
 }
 
-/** Select every item of the current tab in `location`; if all are already selected, deselect them. */
+/** Select every visible (filter-respecting) item of the current tab in `location`; if all are already selected, deselect them. */
 export function selectSection(location) {
-  const ids = store.items
-    .filter((i) => i.tabId === store.currentTabId && i.location === location)
+  const ids = visibleItems(store.items.filter((i) => i.tabId === store.currentTabId), store.filter)
+    .filter((i) => i.location === location)
     .map((i) => i.id)
   const allSelected = ids.length > 0 && ids.every((id) => store.selected.has(id))
   for (const id of ids) allSelected ? store.selected.delete(id) : store.selected.add(id)
@@ -128,6 +156,7 @@ export function deleteSelected() {
       const set = new Set(ids)
       store.items = store.items.filter((i) => !set.has(i.id))
       await bump(ids.length)
+      settle()
       notify()
     } catch (e) { restoreSelection(ids); throw e }
   })
@@ -137,14 +166,16 @@ export function deleteSelected() {
  * Add one item per photo to the current tab. Rejects (e.g. QuotaExceededError) with
  * nothing added: addItems writes photos and items in one transaction.
  * @param {import('./types.js').Photo[]} photos
- * @param {{location: 'school'|'home', label: string}} opts
+ * @param {{location: 'school'|'home', label: string, category?: string}} opts
  */
-export function addPhotos(photos, { location, label }) {
+export function addPhotos(photos, { location, label, category }) {
   const tabId = store.currentTabId
   return queue(async () => {
+    if (category && !store.categories.some((c) => c.id === category)) throw new Error('not-found')
     const now = new Date().toISOString()
     const items = photos.map((photo) => ({
       id: crypto.randomUUID(), tabId, location, label, photoId: photo.id,
+      ...(category ? { category } : {}),
       createdAt: now, movedAt: now, updatedAt: now,
     }))
     await addItems(store.db, items, photos)
@@ -171,6 +202,7 @@ export function editItem(id, patch, photo = null) {
     for (const k of EDITABLE_FIELDS) if (patch[k] !== undefined) clean[k] = patch[k]
     if (clean.label !== undefined) clean.label = String(clean.label).trim()
     if (clean.tabId !== undefined && !store.tabs.some((t) => t.id === clean.tabId)) throw new Error('not-found')
+    if (clean.category && !store.categories.some((c) => c.id === clean.category)) throw new Error('not-found')
     for (const k of Object.keys(clean)) if ((clean[k] ?? undefined) === (it[k] ?? (k === 'label' ? '' : undefined))) delete clean[k]
     if (!Object.keys(clean).length && !photo) return
     const now = new Date().toISOString()
@@ -183,6 +215,7 @@ export function editItem(id, patch, photo = null) {
     Object.assign(it, clean, { updatedAt: now })
     if (it.category == null) delete it.category // mirror updateItem: absent key, never null
     if (leaves) store.selected.clear() // it is no longer in the visible tab
+    settle()
     await bump(1)
     notify()
   })
@@ -252,6 +285,7 @@ export function removeTab(id) {
     store.items = items
     store.selected.clear()
     if (store.currentTabId === id || !tabs.some((t) => t.id === store.currentTabId)) store.currentTabId = tabs[0]?.id ?? null
+    settle()
     await bump(Math.max(1, n))
     notify()
   })
@@ -277,6 +311,7 @@ export function renameCategory(id, name) {
     if (!name.trim()) throw new Error('empty-name')
     const cat = store.categories.find((c) => c.id === id)
     if (!cat) throw new Error('not-found')
+    if (name.trim() === categoryName(cat)) return // same text as shown: keep a default's nameKey, count nothing
     const { nameKey: _key, ...rest } = cat
     const next = { ...rest, name: name.trim(), updatedAt: new Date().toISOString() }
     await putCategory(store.db, next)
@@ -309,12 +344,14 @@ export function reorderCategories(ids) {
 /** Delete a category; its items stay, uncategorised (db.js bumps their updatedAt). */
 export function removeCategory(id) {
   return queue(async () => {
+    if (!store.categories.some((c) => c.id === id)) throw new Error('not-found')
     const now = new Date().toISOString()
     await deleteCategory(store.db, id, now)
     store.categories = store.categories.filter((c) => c.id !== id)
     for (const it of store.items) {
       if (it.category === id) { delete it.category; it.updatedAt = now }
     }
+    settle()
     await bump(1)
     notify()
   })

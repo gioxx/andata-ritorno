@@ -1,7 +1,9 @@
 // Main screen. Whole-screen innerHTML re-render on every store change (small data set),
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
-import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected } from '../store.js'
+import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, toggleFilter, clearFilter } from '../store.js'
+import { visibleItems } from './filter.js'
+import { categoryName } from '../categories.js'
 import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
@@ -10,7 +12,7 @@ import { t } from '../i18n.js'
 /** Later tasks assign their actions here. */
 export const hooks = {
   onAddTab() {}, onTabLongPress(_id) {}, onImportFile(_file) {}, onAdd() {}, onPaste() {}, onMenu() {}, onExport() {},
-  onEdit(_id) {}, onOpenViewer(_ids, _startId) {},
+  onEdit(_id) {}, onOpenViewer(_ids, _startId) {}, onManageCategories() {},
 }
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
@@ -55,6 +57,16 @@ function section(loc, title, cls, list) {
       : `<div class="empty">${t('render.empty')}</div>`}</div></section>`
 }
 
+/** Pills for the categories used in this tab (category order); none when nothing is categorised. */
+function tagRow(tabItems, s) {
+  const used = new Set(tabItems.map((i) => i.category).filter(Boolean))
+  const cats = (s.categories ?? []).filter((c) => used.has(c.id))
+  if (!cats.length) return ''
+  const filter = s.filter ?? new Set()
+  return `<nav class="tags" aria-label="${t('render.tags')}">${filter.size ? `<button class="chip tag clear" data-tagclear="1">${t('render.tagsAll')}</button>` : ''}${
+    cats.map((c) => `<button class="chip tag${filter.has(c.id) ? ' on' : ''}" data-tag="${esc(c.id)}" aria-pressed="${filter.has(c.id)}">${esc(categoryName(c))}</button>`).join('')}</nav>`
+}
+
 function bar(sel) {
   if (!sel.length) {
     return `<button class="primary" data-act="add">${cameraIcon}${t('render.add')}</button>${canShowPaste() ? `<button class="ghost" data-act="paste">${pasteIcon}${t('render.paste')}</button>` : ''}`
@@ -72,7 +84,10 @@ export function renderApp(root, s = store) {
   wire(root)
   const chipsOld = root.querySelector('.chips')
   const chipsScroll = chipsOld ? chipsOld.scrollLeft : 0
-  const items = s.items.filter((i) => i.tabId === s.currentTabId)
+  const tagsOld = root.querySelector('.tags')
+  const tagsScroll = tagsOld ? tagsOld.scrollLeft : 0
+  const tabItems = s.items.filter((i) => i.tabId === s.currentTabId)
+  const items = visibleItems(tabItems, s.filter)
   const sel = [...s.selected].map((id) => s.items.find((i) => i.id === id)).filter(Boolean)
   const n = s.unsaved
   const banner = n
@@ -80,11 +95,13 @@ export function renderApp(root, s = store) {
     : ''
   root.innerHTML = `<header>
       <div class="row1"><h1>${t('app.name')}</h1><button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
-      <nav class="chips">${s.tabs.map((t) => `<button class="chip${t.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(t.id)}">${esc(t.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>
+      <nav class="chips">${s.tabs.map((t) => `<button class="chip${t.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(t.id)}">${esc(t.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
     </header>
     <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'))}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'))}</main>
     <footer class="bar">${bar(sel)}</footer>`
   root.querySelector('.chips').scrollLeft = chipsScroll
+  const tags = root.querySelector('.tags')
+  if (tags) tags.scrollLeft = tagsScroll
 
   lastLocation = new Map(s.items.map((i) => [i.id, i.location]))
   revokeGone()
@@ -98,9 +115,11 @@ function wire(root) {
   wired.add(root)
   wireLongPress(root)
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-tab],[data-view],[data-id],[data-section],[data-act]')
+    const t = e.target.closest('[data-tab],[data-tag],[data-tagclear],[data-view],[data-id],[data-section],[data-act]')
     if (!t) return
     if (t.dataset.tab) return setCurrentTab(t.dataset.tab)
+    if (t.dataset.tag) return toggleFilter(t.dataset.tag)
+    if (t.dataset.tagclear) return clearFilter()
     if (t.dataset.view) return act(() => hooks.onOpenViewer(selectedIds(root), t.dataset.view))
     if (t.dataset.section) return selectSection(t.dataset.section)
     if (t.dataset.id) return selectToggle(t.dataset.id)

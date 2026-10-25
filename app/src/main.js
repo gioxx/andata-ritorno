@@ -7,6 +7,7 @@ import { store, load, subscribe, addTab } from './store.js';
 import { renderApp, hooks } from './ui/render.js';
 import { renderWelcome } from './ui/welcome.js';
 import { initTabs } from './ui/tabs.js';
+import { initCategories } from './ui/categories.js';
 import { reportError } from './ui/dialogs.js';
 import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
@@ -53,6 +54,7 @@ if (db) {
   watchClipboard(draw);
   initAddFlow();
   initTabs();
+  initCategories();
   initViewer();
   initMenu(db);
 }

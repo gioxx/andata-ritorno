@@ -254,6 +254,8 @@ describe('v2 zip', () => {
     json.categories = [
       { id: 'default-tops', name: 'x', nameKey: 'category.default.tops', order: 3, createdAt: 'bad', updatedAt: T, extra: 1 },
       { id: 'c2', name: 'Y', nameKey: 'evil.key', order: 'nope' },
+      { id: 'c3', name: 'Z', nameKey: 'category.default.socks', order: 5 }, // a default key on another id
+      { id: 'default-body', name: 'W', nameKey: 'category.default.socks', order: 6 }, // wrong default key for this id
       { name: 'no id' },
     ]
     entries['backup.json'] = new TextEncoder().encode(JSON.stringify(json))
@@ -262,6 +264,8 @@ describe('v2 zip', () => {
     expect(incoming.categories).toEqual([
       { id: 'default-tops', name: 'x', nameKey: 'category.default.tops', order: 3, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: T },
       { id: 'c2', name: 'Y', order: 1, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z' },
+      { id: 'c3', name: 'Z', order: 5, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z' },
+      { id: 'default-body', name: 'W', order: 6, createdAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z' },
     ])
   })
 })

@@ -1,8 +1,10 @@
 // Add-flow dialogs. Built once on first use and appended to <body>, so the whole-screen
 // innerHTML re-render of the main screen never touches them.
-import { store, editItem, prepareReplacement } from '../store.js'
+import { store, editItem, prepareReplacement, subscribe } from '../store.js'
+import { categoryName } from '../categories.js'
 import { errorMessage } from './model.js'
 import { cameraIcon, imageIcon } from './icons.js'
+import { esc } from './render.js'
 import { t, onLangChange } from '../i18n.js'
 
 let filesHandler = () => {}
@@ -10,6 +12,38 @@ let filesHandler = () => {}
 let pickOverride = null
 /** The add flow registers what happens with picked files. */
 export function setFilesHandler(fn) { filesHandler = fn }
+
+let manageCategories = () => {}
+/** categories.js registers the manager opener (it imports this module, so no import back). */
+export function setManageCategories(fn) { manageCategories = fn }
+
+/**
+ * Single-choice category pills ("Nessuna" clears) inside `box`. Redraws on store changes,
+ * so categories created from the manager link show up while the dialog is open.
+ * @returns {{get: () => string, stop: () => void}} get() = chosen id or '' for none
+ */
+function categoryPicker(box, initial = '') {
+  let chosen = initial
+  const draw = () => {
+    if (chosen && !store.categories.some((c) => c.id === chosen)) chosen = ''
+    if (!store.categories.length) {
+      box.innerHTML = `<span class="hint">${t('dialogs.categoryHint')}</span><button type="button" class="linkbtn" data-managecat>${t('dialogs.categoryManage')}</button>`
+      return
+    }
+    const pill = (id, label) => `<button type="button" class="chip tag${chosen === id ? ' on' : ''}" data-cat="${esc(id)}" aria-pressed="${chosen === id}">${label}</button>`
+    box.innerHTML = pill('', t('dialogs.categoryNone')) + store.categories.map((c) => pill(c.id, esc(categoryName(c)))).join('')
+  }
+  box.onclick = (e) => {
+    if (e.target.closest('[data-managecat]')) return manageCategories()
+    const b = e.target.closest('[data-cat]')
+    if (!b) return
+    chosen = b.dataset.cat
+    draw()
+  }
+  draw()
+  const off = subscribe(draw)
+  return { get: () => chosen, stop: () => { off(); box.onclick = null } }
+}
 
 let dom = null
 let nodes = []
@@ -31,6 +65,7 @@ function ensureDom() {
       <h3 id="newTitle"></h3>
       <div class="preview" id="newPreview"></div>
       <input type="text" id="newLabel" placeholder="${t('dialogs.labelPlaceholder')}" autocomplete="off">
+      <div class="catpick" id="newCat" role="group" aria-label="${t('dialogs.category')}"></div>
       <div class="row">
         <button value="school" class="primary">🏫 ${t('loc.school')}</button>
         <button value="home">🏠 ${t('loc.home')}</button>
@@ -41,6 +76,7 @@ function ensureDom() {
       <h3>${t('dialogs.editTitle')}</h3>
       <input type="text" id="editLabel" placeholder="${t('dialogs.label')}" aria-label="${t('dialogs.label')}" autocomplete="off">
       <select id="editTab" aria-label="${t('dialogs.tab')}"></select>
+      <div class="catpick" id="editCat" role="group" aria-label="${t('dialogs.category')}"></div>
       <img id="editPreview" class="edit-preview" alt="" hidden>
       <button type="button" id="editPhoto">${t('dialogs.changePhotoTitle')}</button>
       <div class="row">
@@ -54,7 +90,7 @@ function ensureDom() {
   document.body.append(...nodes)
   const $ = (id) => document.getElementById(id)
   dom = { source: $('source'), newItem: $('newItem'), title: $('newTitle'), preview: $('newPreview'), label: $('newLabel'),
-    sourceTitle: $('sourceTitle'), gallery: $('gallery'),
+    sourceTitle: $('sourceTitle'), gallery: $('gallery'), newCat: $('newCat'), editCat: $('editCat'),
     edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editPreview: $('editPreview'), editSave: $('editSave') }
   // Click the input inside the same tap, so the browser lets the picker open.
   dom.source.addEventListener('click', (e) => {
@@ -95,20 +131,25 @@ export function openSourcePicker(override = null) {
  * Ask where new photos go and an optional description.
  * @param {string[]} previewUrls
  * @param {string} tabName
- * @returns {Promise<{location: 'school'|'home', label: string}|null>} null if cancelled
+ * @returns {Promise<{location: 'school'|'home', label: string, category?: string}|null>} null if cancelled
  */
 export function askNewItem(previewUrls, tabName) {
-  const { newItem: dlg, title, preview, label } = ensureDom()
+  const d = ensureDom()
+  const { newItem: dlg, title, preview, label } = d
   const n = previewUrls.length
   title.textContent = n === 1 ? t('dialogs.newItem', { tab: tabName }) : t('dialogs.newItems', { n, tab: tabName })
   preview.replaceChildren(...previewUrls.map((src) => Object.assign(document.createElement('img'), { src, alt: '' })))
   label.value = ''
   // Several photos: one description would be wrong for all of them, so skip it.
   label.hidden = n > 1
+  const picker = categoryPicker(d.newCat) // none preselected
   dlg.returnValue = ''
   dlg.showModal()
-  return new Promise((resolve) => dlg.addEventListener('close', () =>
-    resolve(dlg.returnValue ? { location: dlg.returnValue, label: label.hidden ? '' : label.value.trim() } : null), { once: true }))
+  return new Promise((resolve) => dlg.addEventListener('close', () => {
+    const category = picker.get()
+    picker.stop()
+    resolve(dlg.returnValue ? { location: dlg.returnValue, label: label.hidden ? '' : label.value.trim(), ...(category ? { category } : {}) } : null)
+  }, { once: true }))
 }
 
 /** Edit dialog for one item: label, tab, photo. Saving goes through the store; errors are reported here. */
@@ -138,11 +179,14 @@ export function openEditItem(id) {
       else reportError(e)
     }
   })
+  const picker = categoryPicker(d.editCat, it.category ?? '')
   d.edit.returnValue = ''
   d.edit.addEventListener('close', () => {
     clearPreview()
+    const category = picker.get() || null // null clears
+    picker.stop()
     if (d.edit.returnValue !== 'ok') return
-    editItem(id, { label: d.editLabel.value, tabId: d.editTab.value }, pending).catch(reportError)
+    editItem(id, { label: d.editLabel.value, tabId: d.editTab.value, category }, pending).catch(reportError)
   }, { once: true })
   d.edit.showModal()
 }
