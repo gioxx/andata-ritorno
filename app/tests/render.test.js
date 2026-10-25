@@ -75,3 +75,20 @@ describe('tag row', () => {
     expect(st.filter.size).toBe(0)
   })
 })
+
+describe('categorize button', () => {
+  const cats = [{ id: 'c1', name: 'Maglie', order: 0 }]
+  const mk = (id) => ({ id, tabId: 'A', location: 'school', label: id, photoId: 'p' + id })
+  const draw = (sel, categories) => {
+    const root = document.createElement('div')
+    renderApp(root, { tabs: [tab], items: [mk('x'), mk('y')], categories, filter: new Set(), currentTabId: 'A', selected: new Set(sel), unsaved: 0 })
+    return root
+  }
+  it('shows with two or more selected items when categories exist', () => {
+    expect(draw(['x', 'y'], cats).querySelector('[data-act="categorize"]')).not.toBeNull()
+  })
+  it('stays hidden with one item (the pencil covers it) or without categories', () => {
+    expect(draw(['x'], cats).querySelector('[data-act="categorize"]')).toBeNull()
+    expect(draw(['x', 'y'], []).querySelector('[data-act="categorize"]')).toBeNull()
+  })
+})

@@ -1,12 +1,12 @@
 // Main screen. Whole-screen innerHTML re-render on every store change (small data set),
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
-import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, toggleFilter, clearFilter } from '../store.js'
+import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, categorizeSelected, toggleFilter, clearFilter } from '../store.js'
 import { visibleItems } from './filter.js'
 import { categoryName } from '../categories.js'
-import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon } from './icons.js'
+import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon, tagIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
-import { reportError } from './dialogs.js'
+import { reportError, askCategory } from './dialogs.js'
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { keepFocus, noteActivator } from './focus.js'
@@ -75,7 +75,7 @@ function tagRow(tabItems, s) {
     cats.map((c) => `<button class="chip tag${filter.has(c.id) ? ' on' : ''}" data-tag="${esc(c.id)}" aria-pressed="${filter.has(c.id)}">${esc(categoryName(c))}</button>`).join('')}</nav>`
 }
 
-function bar(sel) {
+function bar(sel, hasCategories) {
   if (!sel.length) {
     return `<button class="primary" data-act="add">${cameraIcon}${t('render.add')}</button>${canShowPaste() ? `<button class="ghost" data-act="paste">${pasteIcon}${t('render.paste')}</button>` : ''}`
   }
@@ -85,6 +85,7 @@ function bar(sel) {
     ${allSchool ? '' : `<button class="primary" data-act="toSchool">${t('render.toSchool')}</button>`}
     ${allHome ? '' : `<button class="primary" data-act="toHome">${t('render.toHome')}</button>`}
     ${sel.length === 1 ? `<button class="ghost icon" data-act="edit" aria-label="${t('common.edit')}">${pencilIcon}</button>` : ''}
+    ${sel.length > 1 && hasCategories ? `<button class="ghost icon" data-act="categorize" aria-label="${t('render.categorize')}">${tagIcon}</button>` : ''}
     <button class="ghost icon" data-act="del" aria-label="${t('common.delete')}">${trashIcon}</button>`
 }
 
@@ -107,7 +108,7 @@ export function renderApp(root, s = store) {
       <nav class="chips" aria-label="${t('render.tabs')}">${s.tabs.map((tb) => `<button class="chip${tb.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(tb.id)}"${tb.id === s.currentTabId ? ' aria-current="true"' : ''}>${esc(tb.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
     </header>
     <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}</main>
-    <footer class="bar">${bar(sel)}</footer>` })
+    <footer class="bar">${bar(sel, cats.length > 0)}</footer>` })
   root.querySelector('.chips').scrollLeft = chipsScroll
   const tags = root.querySelector('.tags')
   if (tags) tags.scrollLeft = tagsScroll
@@ -141,11 +142,20 @@ function wire(root) {
       case 'export': return act(hooks.onExport)
       case 'edit': return act(() => hooks.onEdit([...store.selected][0]))
       case 'clear': return clearSelection()
+      case 'categorize': return act(categorize)
       case 'toSchool': return act(() => move('school'))
       case 'toHome': return act(() => move('home'))
       case 'del': if (confirm(t('render.confirmDelete'))) return act(deleteSelected)
     }
   })
+}
+
+/** Category for the whole selection; the pill they all share starts chosen. */
+async function categorize() {
+  const sel = store.items.filter((i) => store.selected.has(i.id))
+  const shared = new Set(sel.map((i) => i.category ?? ''))
+  const category = await askCategory(sel.length, shared.size === 1 ? [...shared][0] : undefined)
+  if (category !== null) await categorizeSelected(category)
 }
 
 const LONG_PRESS_MS = 450

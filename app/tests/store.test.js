@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -389,5 +389,45 @@ describe('edit item', () => {
       await editItem('a2', { category: null })
       expect(store.filter.size).toBe(0)
     })
+  })
+})
+
+describe('categorize selection', () => {
+  it('sets one category on every selected item as one action, counting only real changes', async () => {
+    await addCategory('Maglie')
+    const cat = store.categories[0].id
+    await editItem('a1', { category: cat })
+    const before = store.unsaved
+    selectToggle('a1'); selectToggle('a2'); selectToggle('a3')
+    await categorizeSelected(cat)
+    expect(store.selected.size).toBe(0)
+    expect(store.items.filter((i) => i.tabId === 'A').map((i) => i.category)).toEqual([cat, cat, cat])
+    expect(store.unsaved).toBe(before + 2)
+    const saved = (await loadAll(db)).items.filter((i) => i.tabId === 'A')
+    expect(saved.map((i) => i.category)).toEqual([cat, cat, cat])
+    expect(saved.find((i) => i.id === 'a2').movedAt).toBe(T0)
+    expect(saved.find((i) => i.id === 'a2').updatedAt).not.toBe(T0)
+  })
+
+  it('an empty category clears it (absent key), nothing changed = nothing counted', async () => {
+    await addCategory('Maglie')
+    const cat = store.categories[0].id
+    selectToggle('a1'); selectToggle('a2')
+    await categorizeSelected(cat)
+    const before = store.unsaved
+    selectToggle('a1'); selectToggle('a2')
+    await categorizeSelected('')
+    expect(store.unsaved).toBe(before + 2)
+    const saved = (await loadAll(db)).items.find((i) => i.id === 'a1')
+    expect('category' in saved).toBe(false)
+    selectToggle('a1')
+    await categorizeSelected('')
+    expect(store.unsaved).toBe(before + 2)
+  })
+
+  it('an unknown category is refused and the selection comes back', async () => {
+    selectToggle('a1'); selectToggle('a2')
+    await expect(categorizeSelected('nope')).rejects.toThrow('not-found')
+    expect([...store.selected].sort()).toEqual(['a1', 'a2'])
   })
 })

@@ -97,9 +97,10 @@ export function setManageCategories(fn) { manageCategories = fn }
 /**
  * Single-choice category pills ("Nessuna" clears) inside `box`. Redraws on store changes,
  * so categories created from the manager link show up while the dialog is open.
+ * @param {(id: string) => void} [onPick] called on every tap of a pill
  * @returns {{get: () => string, stop: () => void}} get() = chosen id or '' for none
  */
-function categoryPicker(box, initial = '') {
+function categoryPicker(box, initial = '', onPick = null) {
   let chosen = initial
   const draw = () => keepFocus(box, redraw)
   const redraw = () => {
@@ -117,6 +118,7 @@ function categoryPicker(box, initial = '') {
     if (!b) return
     chosen = b.dataset.cat
     draw()
+    onPick?.(chosen)
   }
   draw()
   const off = subscribe(draw)
@@ -163,6 +165,11 @@ function ensureDom() {
         <button value="ok" class="primary" id="editSave">${t('common.save')}</button>
       </div>
     </form></dialog>
+    <dialog id="catItems"><form method="dialog">
+      <h3 id="catItemsTitle"></h3>
+      <div class="catpick" id="catItemsPick" role="group" aria-label="${t('dialogs.category')}"></div>
+      <button value="" class="cancel">${t('common.cancel')}</button>
+    </form></dialog>
     <input type="file" id="camera" accept="image/*" capture="environment" hidden>
     <input type="file" id="gallery" accept="image/*" multiple hidden>`
   nodes = [...wrap.children]
@@ -170,6 +177,7 @@ function ensureDom() {
   const $ = (id) => document.getElementById(id)
   dom = { source: $('source'), newItem: $('newItem'), title: $('newTitle'), preview: $('newPreview'), label: $('newLabel'),
     sourceTitle: $('sourceTitle'), gallery: $('gallery'), newCat: $('newCat'), editCat: $('editCat'),
+    catItems: $('catItems'), catItemsTitle: $('catItemsTitle'), catItemsPick: $('catItemsPick'),
     edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editRotate: $('editRotate'), editPreview: $('editPreview'), editSave: $('editSave') }
   // Click the input inside the same tap, so the browser lets the picker open.
   dom.source.addEventListener('click', (e) => {
@@ -228,6 +236,25 @@ export function askNewItem(previewUrls, tabName) {
     const category = picker.get()
     picker.stop()
     resolve(dlg.returnValue ? { location: dlg.returnValue, label: label.hidden ? '' : label.value.trim(), ...(category ? { category } : {}) } : null)
+  }, { once: true }))
+}
+
+/**
+ * Ask one category for several items: one tap on a pill answers and closes.
+ * @param {number} n how many items
+ * @param {string} [initial] category they all share, shown as chosen
+ * @returns {Promise<string|null>} chosen id, '' for none, null if cancelled
+ */
+export function askCategory(n, initial = '') {
+  const d = ensureDom()
+  d.catItemsTitle.textContent = t('dialogs.categorizeTitle', { n })
+  let picked = null
+  const picker = categoryPicker(d.catItemsPick, initial, (id) => { picked = id; d.catItems.close('ok') })
+  d.catItems.returnValue = ''
+  openModal(d.catItems)
+  return new Promise((resolve) => d.catItems.addEventListener('close', () => {
+    picker.stop()
+    resolve(d.catItems.returnValue === 'ok' ? picked : null)
   }, { once: true }))
 }
 

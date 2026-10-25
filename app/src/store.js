@@ -1,6 +1,6 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { getPhoto, loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto, putCategory, putCategories, deleteCategory, EDITABLE_FIELDS } from './db.js'
+import { getPhoto, loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto, putCategory, putCategories, deleteCategory, setItemsCategory, EDITABLE_FIELDS } from './db.js'
 import { compress } from './photos.js'
 import { rotatePhoto } from './rotate.js'
 import { missingDefaults, categoryName } from './categories.js'
@@ -152,6 +152,35 @@ export function move(location) {
       const set = new Set(ids)
       for (const it of store.items) if (set.has(it.id)) { it.location = location; it.movedAt = now }
       await bump(ids.length)
+      notify()
+    } catch (e) { restoreSelection(ids); throw e }
+  })
+}
+
+/**
+ * Give every selected item one category ('' or null clears it) as one action.
+ * Items that already have it are left alone and not counted as changes.
+ * @param {string|null} category
+ */
+export function categorizeSelected(category) {
+  const ids = takeSelection()
+  if (!ids.length) return Promise.resolve()
+  return queue(async () => {
+    try {
+      if (category && !store.categories.some((c) => c.id === category)) throw new Error('not-found')
+      const set = new Set(ids)
+      const changed = store.items.filter((i) => set.has(i.id) && (i.category ?? '') !== (category || ''))
+      if (changed.length) {
+        const now = new Date().toISOString()
+        await setItemsCategory(store.db, changed.map((i) => i.id), category, now)
+        for (const it of changed) {
+          if (category) it.category = category
+          else delete it.category
+          it.updatedAt = now
+        }
+        await bump(changed.length)
+      }
+      settle()
       notify()
     } catch (e) { restoreSelection(ids); throw e }
   })

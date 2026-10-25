@@ -42,6 +42,7 @@ export default {
   'item.aria': '{label}, {place}, {category}',
   'item.noCategory': 'senza categoria',
   'render.tagsAll': 'Tutti ✕',
+  'render.categorize': 'Scegli la categoria',
 
   'welcome.title': 'Benvenuto in Andata e Ritorno',
   'welcome.placeholder': 'Es. Nido di Sofia',
@@ -100,6 +101,7 @@ export default {
   'dialogs.tab': 'Scheda',
   'dialogs.category': 'Categoria',
   'dialogs.categoryNone': 'Nessuna',
+  'dialogs.categorizeTitle': 'Categoria per {n} capi',
   'dialogs.categoryHint': 'Nessuna categoria ancora.',
   'dialogs.categoryManage': 'Gestisci categorie',
   'dialogs.changeAgain': 'Cambia di nuovo',

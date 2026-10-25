@@ -143,6 +143,15 @@ export async function moveItems(db, ids, location, now) {
   await patchItems(db, ids, (it) => ({ ...it, location, movedAt: now }))
 }
 
+/** One category on many items in one transaction; an empty/null category clears it (absent key). */
+export async function setItemsCategory(db, ids, category, now) {
+  await patchItems(db, ids, (it) => {
+    const next = { ...it, category, updatedAt: now }
+    if (!category) delete next.category
+    return next
+  })
+}
+
 /** The only item fields an edit may change. */
 export const EDITABLE_FIELDS = ['label', 'tabId', 'category']
 

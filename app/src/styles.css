@@ -68,11 +68,16 @@ section h2 { display: flex; justify-content: space-between; align-items: center;
 .unsaved span { flex: 1; }
 .unsaved button { min-height: 44px; padding: 7px 12px; border-radius: var(--r-pill); background: var(--accent-strong); color: var(--bg); font-weight: 700; }
 .bar { flex-wrap: wrap; position: fixed; z-index: 4; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto; display: flex; gap: 8px; padding: 12px max(14px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); background: var(--surface); }
-.bar button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 16px; border-radius: var(--r-pill); font-weight: 700; font-size: 0.875rem; text-align: center; }
+.bar button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 16px; border-radius: var(--r-pill); font-weight: 700; font-size: 0.875rem; text-align: center; }
 .bar .primary { flex: 1; background: var(--accent-strong); color: var(--bg); }
 .bar .ghost { background: var(--chip); }
 .bar .icon { flex: none; width: 46px; padding: 13px 0; }
 @media (max-width: 380px) { .bar { gap: 6px; padding-left: 10px; padding-right: 10px; } .bar button { padding: 13px 10px; font-size: 0.8125rem; } .bar .icon { width: 42px; padding: 13px 0; } }
+/* Five buttons (mixed selection + category): tighter, so no label wraps onto two lines. */
+.bar:has(> button:nth-child(5)) { gap: 6px; }
+.bar:has(> button:nth-child(5)) button { padding-left: 8px; padding-right: 8px; }
+.bar:has(> button:nth-child(5)) .icon { width: 44px; padding: 13px 0; }
+@media (max-width: 380px) { .bar:has(> button:nth-child(5)) button { padding-left: 6px; padding-right: 6px; } }
 
 /* ---- Dialogs (add flow) ---- */
 dialog { max-height: calc(90dvh - env(safe-area-inset-bottom)); overflow-y: auto; border: 0; border-radius: var(--r-section); padding: 18px; background: var(--surface); color: var(--fg); width: min(92vw, 360px); font-family: var(--font); }

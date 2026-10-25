@@ -41,6 +41,7 @@ export default {
   'item.aria': '{label}, {place}, {category}',
   'item.noCategory': 'no category',
   'render.tagsAll': 'All ✕',
+  'render.categorize': 'Choose the category',
 
   'welcome.title': 'Welcome to Andata e Ritorno',
   'welcome.placeholder': "E.g. Sofia's nursery",
@@ -99,6 +100,7 @@ export default {
   'dialogs.tab': 'Tab',
   'dialogs.category': 'Category',
   'dialogs.categoryNone': 'None',
+  'dialogs.categorizeTitle': 'Category for {n} items',
   'dialogs.categoryHint': 'No categories yet.',
   'dialogs.categoryManage': 'Manage categories',
   'dialogs.changeAgain': 'Change again',
