@@ -3,7 +3,9 @@
 import { store, editItem, prepareReplacement, subscribe } from '../store.js'
 import { categoryName } from '../categories.js'
 import { errorMessage } from './model.js'
-import { cameraIcon, imageIcon } from './icons.js'
+import { cameraIcon, imageIcon, rotateIcon } from './icons.js'
+import { getPhoto } from '../db.js'
+import { rotatePhoto, normTurns } from '../rotate.js'
 import { esc } from './render.js'
 import { t, onLangChange } from '../i18n.js'
 
@@ -78,6 +80,7 @@ function ensureDom() {
       <select id="editTab" aria-label="${t('dialogs.tab')}"></select>
       <div class="catpick" id="editCat" role="group" aria-label="${t('dialogs.category')}"></div>
       <img id="editPreview" class="edit-preview" alt="" hidden>
+      <button type="button" id="editRotate">${rotateIcon}${t('common.rotate')}</button>
       <button type="button" id="editPhoto">${t('dialogs.changePhotoTitle')}</button>
       <div class="row">
         <button value="" class="cancel-inline">${t('common.cancel')}</button>
@@ -91,7 +94,7 @@ function ensureDom() {
   const $ = (id) => document.getElementById(id)
   dom = { source: $('source'), newItem: $('newItem'), title: $('newTitle'), preview: $('newPreview'), label: $('newLabel'),
     sourceTitle: $('sourceTitle'), gallery: $('gallery'), newCat: $('newCat'), editCat: $('editCat'),
-    edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editPreview: $('editPreview'), editSave: $('editSave') }
+    edit: $('editItem'), editLabel: $('editLabel'), editTab: $('editTab'), editPhoto: $('editPhoto'), editRotate: $('editRotate'), editPreview: $('editPreview'), editSave: $('editSave') }
   // Click the input inside the same tap, so the browser lets the picker open.
   dom.source.addEventListener('click', (e) => {
     const b = e.target.closest('[data-source]')
@@ -159,20 +162,31 @@ export function openEditItem(id) {
   const d = ensureDom()
   d.editLabel.value = it.label || ''
   d.editTab.replaceChildren(...store.tabs.map((t) => Object.assign(new Option(t.name, t.id), { selected: t.id === it.tabId })))
-  // The picked photo is only held here; Salva commits it with the fields, Annulla drops it.
+  // The picked photo and the rotation are only held here; Salva commits them with the fields, Annulla drops them.
   let pending = null
   let previewUrl = ''
-  const clearPreview = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = ''; d.editPreview.hidden = true; d.editPreview.removeAttribute('src') }
+  let angle = 0 // degrees shown in the preview, keeps growing so the turn never spins back
+  let closed = false
+  const setPreview = (blob) => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    previewUrl = URL.createObjectURL(blob)
+    d.editPreview.src = previewUrl
+    d.editPreview.hidden = false
+  }
+  const clearPreview = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = ''; d.editPreview.hidden = true; d.editPreview.removeAttribute('src'); d.editPreview.style.transform = '' }
   clearPreview()
+  // Show the stored photo so a rotation is visible even without picking a new one.
+  getPhoto(store.db, it.photoId).then((blob) => { if (blob && !closed && !pending) setPreview(blob) }).catch(() => {})
+  d.editRotate.onclick = () => {
+    angle += 90
+    d.editPreview.style.transform = `rotate(${angle}deg)`
+  }
   d.editPhoto.textContent = t('dialogs.changePhotoTitle')
   d.editPhoto.onclick = () => openSourcePicker(async (files) => {
     if (!files[0]) return
     try {
       pending = await prepareReplacement(files[0])
-      clearPreview()
-      previewUrl = URL.createObjectURL(pending.blob)
-      d.editPreview.src = previewUrl
-      d.editPreview.hidden = false
+      setPreview(pending.blob) // a rotation already chosen applies to this new photo
       d.editPhoto.textContent = t('dialogs.changeAgain')
     } catch (e) {
       if (e?.message === 'not-an-image') alert(t('add.skipped', { n: 1 }))
@@ -182,11 +196,23 @@ export function openEditItem(id) {
   const picker = categoryPicker(d.editCat, it.category ?? '')
   d.edit.returnValue = ''
   d.edit.addEventListener('close', () => {
+    closed = true
     clearPreview()
     const category = picker.get() || null // null clears
     picker.stop()
     if (d.edit.returnValue !== 'ok') return
-    editItem(id, { label: d.editLabel.value, tabId: d.editTab.value, category }, pending).catch(reportError)
+    const patch = { label: d.editLabel.value, tabId: d.editTab.value, category }
+    const turns = normTurns(angle / 90)
+    const picked = pending
+    ;(async () => {
+      let photo = picked
+      if (turns) {
+        // Rotate the newly picked photo if there is one, else the stored one: one re-encode either way.
+        const src = picked?.blob ?? (await getPhoto(store.db, store.items.find((i) => i.id === id)?.photoId))
+        if (src) photo = await rotatePhoto(src, turns)
+      }
+      await editItem(id, patch, photo)
+    })().catch(reportError)
   }, { once: true })
   d.edit.showModal()
 }

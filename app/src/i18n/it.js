@@ -12,6 +12,7 @@ export default {
   'common.delete': 'Elimina',
   'common.ok': 'OK',
   'common.save': 'Salva',
+  'common.rotate': 'Ruota',
   'common.never': 'mai',
   'common.unnamed': 'senza nome',
 

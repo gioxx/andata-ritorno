@@ -224,6 +224,12 @@ describe('edit item', () => {
     expect(store.unsaved).toBe(0)
   })
 
+  it('a net-zero rotation (no photo, no field change) writes nothing', async () => {
+    await editItem('a1', {}, null)
+    expect(store.items.find((i) => i.id === 'a1').photoId).toBe('p-a1')
+    expect(store.unsaved).toBe(0)
+  })
+
   it('prepareReplacement rejects a non-image', async () => {
     await expect(prepareReplacement(new File(['x'], 'x.txt', { type: 'text/plain' }))).rejects.toThrow('not-an-image')
   })

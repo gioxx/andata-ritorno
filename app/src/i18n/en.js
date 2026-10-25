@@ -11,6 +11,7 @@ export default {
   'common.delete': 'Delete',
   'common.ok': 'OK',
   'common.save': 'Save',
+  'common.rotate': 'Rotate',
   'common.never': 'never',
   'common.unnamed': 'unnamed',
 

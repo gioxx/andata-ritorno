@@ -1,10 +1,12 @@
 // Full-screen photo viewer. Lives on <body> (like dialogs) so main-screen re-renders never touch it.
 // Gestures use Pointer Events on one surface with touch-action:none; the math is in gesture.js.
 import { getPhoto } from '../db.js'
-import { store } from '../store.js'
+import { store, editItem } from '../store.js'
 import { hooks } from './render.js'
 import { openEditItem, reportError } from './dialogs.js'
-import { closeIcon } from './icons.js'
+import { closeIcon, rotateIcon } from './icons.js'
+import { rotatePhoto } from '../rotate.js'
+import { viewerAction, idleRotation } from './rotation.js'
 import { pinch, swipeIntent, stepIndex, containSize, clampPan, DOUBLE_TAP_SCALE } from './gesture.js'
 import { t as tr, onLangChange } from '../i18n.js'  // `t` is the pan/zoom state here
 
@@ -24,6 +26,9 @@ let vp = { w: 1, h: 1 }, content = { w: 1, h: 1 }
 let t = { s: 1, x: 0, y: 0 }
 const pointers = new Map()
 let drag = null, base = null, lastTap = null
+let rot = idleRotation() // pending rotation (see rotation.js); nothing is saved until Salva
+let angle = 0 // degrees shown, keeps growing so a turn never spins back
+let busy = false // encoding + saving a rotation
 
 function ensureDom() {
   if (dom) return dom
@@ -35,13 +40,15 @@ function ensureDom() {
   el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="${tr('common.close')}">${closeIcon}</button></div>
     <div class="stage"><img alt="" draggable="false"></div>
     <p class="vhint"></p>
-    <div class="vbot"><button type="button" data-v="edit">${tr('common.edit')}</button><button type="button" class="vclose" data-v="close">${tr('common.close')}</button></div>`
+    <div class="vbot"><button type="button" data-v="rotate">${rotateIcon}<span>${tr('common.rotate')}</span></button><button type="button" class="n" data-v="edit">${tr('common.edit')}</button><button type="button" class="n vclose" data-v="close">${tr('common.close')}</button><button type="button" class="p" data-v="cancel">${tr('common.cancel')}</button><button type="button" class="p vclose" data-v="save">${tr('common.save')}</button></div>`
   document.body.append(el)
   dom = { el, label: el.querySelector('.vlabel'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-v]')
     if (!b) return
-    if (b.dataset.v === 'close') return close()
+    if (busy) return
+    const v = b.dataset.v
+    if (v === 'close' || v === 'rotate' || v === 'save' || v === 'cancel') return run(v)
     const id = ids[index]
     close() // hide first: the edit dialog replaces the viewer
     openEditItem(id)
@@ -54,6 +61,7 @@ function ensureDom() {
   dom.img.addEventListener('load', () => {
     content = containSize(vp.w, vp.h, dom.img.naturalWidth, dom.img.naturalHeight)
   })
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) { e.preventDefault(); if (!busy) run('close') } })
   window.addEventListener('popstate', () => {
     if (expectPop) { expectPop = false; return }
     if (isOpen) { pushed = false; teardown() } // Android back
@@ -62,13 +70,71 @@ function ensureDom() {
   onLangChange(() => {
     el.querySelector('.vx').setAttribute('aria-label', tr('common.close'))
     el.querySelector('[data-v="edit"]').textContent = tr('common.edit')
-    el.querySelector('.vclose').textContent = tr('common.close')
+    el.querySelector('[data-v="rotate"] span').textContent = tr('common.rotate')
+    el.querySelector('.n.vclose').textContent = tr('common.close')
+    el.querySelector('[data-v="cancel"]').textContent = tr('common.cancel')
+    el.querySelector('[data-v="save"]').textContent = tr('common.save')
     if (isOpen) dom.hint.textContent = hintText()
   })
   return dom
 }
 
-const draw = (x = t.x, y = t.y, s = t.s) => { dom.img.style.transform = `translate(${x}px,${y}px) scale(${s})` }
+// While a rotation is pending the image is turned about its centre and scaled to fit the stage.
+const rotTransform = () => {
+  const odd = (angle / 90) % 2 !== 0
+  const c = containSize(vp.w, vp.h, dom.img.naturalWidth || 1, dom.img.naturalHeight || 1)
+  const k = odd ? Math.min(vp.w / c.h, vp.h / c.w) : 1
+  return `rotate(${angle}deg) scale(${k})`
+}
+const draw = (x = t.x, y = t.y, s = t.s) => { dom.img.style.transform = rot.active ? rotTransform() : `translate(${x}px,${y}px) scale(${s})` }
+
+function exitPending() {
+  rot = idleRotation()
+  angle = 0
+  dom.el.classList.remove('pending')
+  setT({ s: 1, x: 0, y: 0 }, true)
+}
+
+/** Feed an event to the pending-rotation rules and carry out the effects. */
+function run(event) {
+  if (busy) return
+  const r = viewerAction(rot, event)
+  rot = r.state
+  for (const fx of r.effects) {
+    if (fx === 'resetZoom') {
+      const b = dom.stage.getBoundingClientRect()
+      vp = { w: b.width, h: b.height }
+      t = { s: 1, x: 0, y: 0 }
+      dom.el.classList.add('pending')
+    } else if (fx === 'turn') {
+      angle += 90
+      dom.img.classList.add('snap')
+      draw()
+    } else if (fx === 'discard') exitPending()
+    else if (fx === 'close') close()
+    else if (fx === 'commit') commitRotation()
+  }
+}
+const allowed = (event) => viewerAction(rot, event).effects.includes(event)
+
+async function commitRotation() {
+  const id = ids[index]
+  const it = store.items.find((x) => x.id === id)
+  if (!it) return exitPending()
+  busy = true
+  dom.el.classList.add('busy')
+  try {
+    const blob = await getPhoto(store.db, it.photoId)
+    if (!blob) throw new Error('not-found')
+    const photo = await rotatePhoto(blob, rot.turns)
+    const oldId = it.photoId
+    await editItem(id, {}, photo)
+    const old = urls.get(oldId)
+    if (old) { URL.revokeObjectURL(old); urls.delete(oldId) }
+    if (isOpen && ids[index] === id) { exitPending(); show(index) } // stay on the item, show the new photo
+  } catch (e) { reportError(e) } // stay pending so the user can retry or cancel
+  finally { busy = false; dom.el.classList.remove('busy') }
+}
 function setT(next, snap = false) {
   t = next
   dom.img.classList.toggle('snap', snap)
@@ -127,6 +193,9 @@ function teardown() {
   urls.clear()
   pointers.clear()
   drag = base = lastTap = null
+  rot = idleRotation()
+  angle = 0
+  dom.el.classList.remove('pending', 'busy')
 }
 
 /** Close from the UI; popping our history entry keeps no stray entry behind. */
@@ -140,7 +209,7 @@ function onDown(e) {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
   const r = dom.stage.getBoundingClientRect()
   vp = { w: r.width, h: r.height }
-  if (pointers.size === 2) {
+  if (pointers.size === 2 && !rot.active) {
     const [a, b] = [...pointers.values()]
     base = { t: { ...t }, mid: rel(mid(a, b)), dist: Math.hypot(a.x - b.x, a.y - b.y) || 1 }
     if (drag) drag.multi = true
@@ -154,6 +223,7 @@ const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
 function onMove(e) {
   if (!pointers.has(e.pointerId)) return
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  if (rot.active) return // no pan / pinch / follow while a rotation is pending
   if (pointers.size >= 2 && base) {
     const [a, b] = [...pointers.values()]
     const ratio = (Math.hypot(a.x - b.x, a.y - b.y) || 1) / base.dist
@@ -181,15 +251,15 @@ function onUp(e, ok) {
   if (pointers.size > 0 || !drag) return
   const d = drag
   drag = base = null
-  if (d.multi) { if (t.s <= 1.02) setT({ s: 1, x: 0, y: 0 }, true); return }
+  if (d.multi) { if (rot.active) return; if (t.s <= 1.02) setT({ s: 1, x: 0, y: 0 }, true); return }
   const dx = e.clientX - d.sx, dy = e.clientY - d.sy
   const intent = ok ? swipeIntent(dx, dy, t.s) : null
-  if (intent === 'close') return close()
-  if (intent === 'next' || intent === 'prev') {
+  if (intent === 'close') return run('close')
+  if ((intent === 'next' || intent === 'prev') && allowed('swipe')) {
     const j = stepIndex(index, intent, ids.length)
     if (j !== null) return void show(j)
   }
-  if (ok && !d.moved) return tap(e)
+  if (ok && !d.moved) return allowed('zoom') ? tap(e) : undefined
   setT({ ...t }, true) // snap back from the follow offset
 }
 
