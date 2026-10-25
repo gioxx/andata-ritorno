@@ -25,10 +25,11 @@ export function initIosBanner() {
       <button type="button" class="ios-ok">${t('ios.gotIt')}</button>`
   }
   draw()
-  onLangChange(draw)
+  const off = onLangChange(draw)
   el.addEventListener('click', (e) => {
     if (!e.target.closest('.ios-ok')) return
     dismissIosBanner()
+    off()
     el.remove()
   })
   document.body.prepend(el)

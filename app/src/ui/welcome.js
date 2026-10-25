@@ -2,6 +2,7 @@
 import { esc } from './render.js'
 import { t } from '../i18n.js'
 import { installSteps, currentPlatform, isStandalone } from '../platform.js'
+import { shouldShowIosBanner } from './iosBanner.js'
 
 /**
  * @param {HTMLElement} root
@@ -11,7 +12,9 @@ export function renderWelcome(root, { onCreate, onImport }) {
   // Keep the typed name if the screen is redrawn (e.g. store notifications) while typing.
   const prev = root.querySelector('#firstTab')?.value ?? ''
   // Install hint for the detected platform; nothing once installed.
-  const steps = isStandalone() ? [] : installSteps(currentPlatform())
+  // On iOS the banner already lists the steps while it is visible: don't repeat them.
+  const platform = currentPlatform(), standalone = isStandalone()
+  const steps = standalone || shouldShowIosBanner(platform, standalone) ? [] : installSteps(platform)
   const install = steps.length ? `<div class="install"><p>${t('welcome.install')}</p><ol>${steps.map((k) => `<li>${t(k)}</li>`).join('')}</ol></div>` : ''
   root.innerHTML = `<div class="welcome">
     <h1>${t('welcome.title')}</h1>
