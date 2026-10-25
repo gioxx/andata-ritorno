@@ -62,6 +62,8 @@ function draw() {
 
 async function run(act, id) {
   const d = ensureDom()
+  // A rename leaves the row as typed: redrawing would detach a button tapped right after (blur fires first).
+  let redraw = act !== 'rename'
   try {
     if (act === 'add') {
       const name = d.input.value.trim()
@@ -73,6 +75,7 @@ async function run(act, id) {
     } else if (act === 'rename') {
       const input = d.list.querySelector(`[data-id="${CSS.escape(id)}"] input`)
       if (input?.value.trim()) await renameCategory(id, input.value)
+      else redraw = true // blank: restore the old name
     } else if (act === 'up' || act === 'down') {
       const ids = store.categories.map((c) => c.id)
       const i = ids.indexOf(id)
@@ -89,8 +92,9 @@ async function run(act, id) {
     }
   } catch (e) {
     reportError(e)
+    redraw = true
   }
-  draw() // also restores a blanked / rejected rename field
+  if (redraw) draw()
 }
 
 export function openCategoryManager() {

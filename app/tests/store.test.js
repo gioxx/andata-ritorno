@@ -305,6 +305,14 @@ describe('edit item', () => {
       expect([...store.selected]).toEqual(['a1'])
     })
 
+    it('removing a filtered category empties the filter and shows every item', async () => {
+      toggleFilter(c1)
+      await removeCategory(c1)
+      expect(store.filter.size).toBe(0)
+      const { visibleItems } = await import('../src/ui/filter.js')
+      expect(visibleItems(store.items, store.filter)).toBe(store.items)
+    })
+
     it('switching tab clears the filter', () => {
       toggleFilter(c1)
       setCurrentTab('B')
