@@ -1,11 +1,11 @@
 // Add-flow dialogs. Built once on first use and appended to <body>, so the whole-screen
 // innerHTML re-render of the main screen never touches them.
-import { store, editItem, prepareReplacement, subscribe } from '../store.js'
+import { store, rotateAndEdit, prepareReplacement, subscribe } from '../store.js'
 import { categoryName } from '../categories.js'
 import { errorMessage } from './model.js'
 import { cameraIcon, imageIcon, rotateIcon } from './icons.js'
 import { getPhoto } from '../db.js'
-import { rotatePhoto, normTurns } from '../rotate.js'
+import { normTurns } from '../rotate.js'
 import { esc } from './render.js'
 import { t, onLangChange } from '../i18n.js'
 
@@ -203,16 +203,8 @@ export function openEditItem(id) {
     if (d.edit.returnValue !== 'ok') return
     const patch = { label: d.editLabel.value, tabId: d.editTab.value, category }
     const turns = normTurns(angle / 90)
-    const picked = pending
-    ;(async () => {
-      let photo = picked
-      if (turns) {
-        // Rotate the newly picked photo if there is one, else the stored one: one re-encode either way.
-        const src = picked?.blob ?? (await getPhoto(store.db, store.items.find((i) => i.id === id)?.photoId))
-        if (src) photo = await rotatePhoto(src, turns)
-      }
-      await editItem(id, patch, photo)
-    })().catch(reportError)
+    // Reading, rotating and saving happen inside the store's queue, so quick saves can't race.
+    rotateAndEdit(id, patch, turns, pending).then((rotationError) => { if (rotationError) reportError(rotationError) }).catch(reportError)
   }, { once: true })
   d.edit.showModal()
 }

@@ -1,7 +1,8 @@
 // In-memory state mirrored from IndexedDB. Every action writes via db.js first,
 // then updates memory and notifies, so the UI never shows something that isn't saved.
-import { loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto, putCategory, putCategories, deleteCategory, EDITABLE_FIELDS } from './db.js'
+import { getPhoto, loadAll, moveItems, deleteItems, addItems, getMeta, setMeta, putTab, putTabs, deleteTab, updateItem, replacePhoto, putCategory, putCategories, deleteCategory, EDITABLE_FIELDS } from './db.js'
 import { compress } from './photos.js'
+import { rotatePhoto } from './rotate.js'
 import { missingDefaults, categoryName } from './categories.js'
 import { t } from './i18n.js'
 import { visibleItems } from './ui/filter.js'
@@ -195,7 +196,41 @@ export function addPhotos(photos, { location, label, category }) {
  * @param {import('./types.js').Photo|null} [photo] already compressed, see prepareReplacement
  */
 export function editItem(id, patch, photo = null) {
+  return queue(() => applyEdit(id, patch, photo))
+}
+
+/**
+ * editItem with an optional rotation, all inside ONE queue slot: the source blob is read and
+ * rotated after earlier saves have settled, so quick successive saves never lose a turn.
+ * The field edits (and a picked photo, unrotated) are saved even if the rotation fails.
+ * @param {number} turns quarter turns clockwise (0 = none)
+ * @param {import('./types.js').Photo|null} pendingPhoto a newly picked photo; it is the one rotated
+ * @param {Function} [encode] test seam for rotatePhoto
+ * @returns {Promise<Error|null>} the rotation error, if any (the rest was still saved)
+ */
+export function rotateAndEdit(id, patch, turns, pendingPhoto = null, encode) {
   return queue(async () => {
+    let photo = pendingPhoto
+    let rotationError = null
+    if (turns) {
+      try {
+        const it = store.items.find((i) => i.id === id)
+        if (!it) throw new Error('not-found')
+        const src = pendingPhoto?.blob ?? (await getPhoto(store.db, it.photoId))
+        if (!src) throw new Error('rotate-missing')
+        photo = await rotatePhoto(src, turns, encode)
+      } catch (e) {
+        rotationError = e
+        if (e?.message === 'not-found') throw e
+      }
+    }
+    await applyEdit(id, patch, photo)
+    return rotationError
+  })
+}
+
+async function applyEdit(id, patch, photo) {
+  {
     const it = store.items.find((i) => i.id === id)
     if (!it) throw new Error('not-found')
     const clean = {}
@@ -218,7 +253,7 @@ export function editItem(id, patch, photo = null) {
     settle()
     await bump(1)
     notify()
-  })
+  }
 }
 
 /** Compress a picked file for editItem(..., photo). Slow, so it runs outside the queue. */

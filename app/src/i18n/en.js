@@ -12,6 +12,7 @@ export default {
   'common.ok': 'OK',
   'common.save': 'Save',
   'common.rotate': 'Rotate',
+  'rotate.missingPhoto': "The original photo can't be found: please try again.",
   'common.never': 'never',
   'common.unnamed': 'unnamed',
 

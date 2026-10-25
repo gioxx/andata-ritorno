@@ -13,6 +13,7 @@ export default {
   'common.ok': 'OK',
   'common.save': 'Salva',
   'common.rotate': 'Ruota',
+  'rotate.missingPhoto': 'La foto originale non si trova: riprova.',
   'common.never': 'mai',
   'common.unnamed': 'senza nome',
 

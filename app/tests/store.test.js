@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -228,6 +228,31 @@ describe('edit item', () => {
     await editItem('a1', {}, null)
     expect(store.items.find((i) => i.id === 'a1').photoId).toBe('p-a1')
     expect(store.unsaved).toBe(0)
+  })
+
+  it('two back-to-back 1-turn saves rotate 180 degrees and leave one photo record', async () => {
+    vi.stubGlobal('createImageBitmap', async (b) => ({ width: b.size !== 2 ? 600 : 400, height: b.size !== 2 ? 400 : 600, close() {} }))
+    const canvas = { width: 0, height: 0, getContext: () => ({ translate() {}, rotate() {}, drawImage() {} }) }
+    vi.stubGlobal('document', { createElement: () => canvas })
+    // blob size encodes orientation: 2 bytes = portrait, anything else = landscape
+    const encode = async (c) => new Blob([c.width > c.height ? 'a' : 'bb'], { type: 'image/webp' })
+    await Promise.all([rotateAndEdit('a1', {}, 1, null, encode), rotateAndEdit('a1', {}, 1, null, encode)])
+    const id = store.items.find((i) => i.id === 'a1').photoId
+    const blob = await getPhoto(db, id)
+    expect(blob.size).toBe(1) // landscape again: 90 + 90 = 180
+    expect(await getPhoto(db, 'p-a1')).toBeUndefined()
+    vi.unstubAllGlobals()
+  })
+
+  it('a failed rotation still saves the field edits and returns the error', async () => {
+    vi.stubGlobal('createImageBitmap', async () => ({ width: 2, height: 1, close() {} }))
+    vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({ translate() {}, rotate() {}, drawImage() {} }) }) })
+    const err = await rotateAndEdit('a1', { label: 'nuova' }, 1, null, async () => { throw new Error('boom') })
+    vi.unstubAllGlobals()
+    expect(err.message).toBe('boom')
+    const it = store.items.find((i) => i.id === 'a1')
+    expect(it.label).toBe('nuova')
+    expect(it.photoId).toBe('p-a1')
   })
 
   it('prepareReplacement rejects a non-image', async () => {

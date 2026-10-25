@@ -14,27 +14,34 @@ describe('normTurns', () => {
 })
 
 describe('rotatePhoto', () => {
-  const stub = () => {
-    const canvas = { width: 0, height: 0, getContext: () => ({ translate() {}, rotate() {}, drawImage() {} }) }
-    vi.stubGlobal('createImageBitmap', async () => ({ width: 600, height: 400, close() {} }))
+  const stub = (closed = { n: 0 }) => {
+    const calls = []
+    const canvas = { width: 0, height: 0, getContext: () => ({
+      translate: (...a) => calls.push(['translate', ...a]),
+      rotate: (...a) => calls.push(['rotate', ...a]),
+      drawImage: (...a) => calls.push(['drawImage', ...a.slice(1)]),
+    }) }
+    vi.stubGlobal('createImageBitmap', async () => ({ width: 600, height: 400, close() { closed.n++ } }))
     vi.stubGlobal('document', { createElement: () => canvas })
-    return canvas
+    return { canvas, calls, closed }
   }
 
-  it('one turn swaps dimensions and gives a new photo id, no downscale', async () => {
-    stub()
+  it.each([[1, 400, 600], [2, 600, 400], [3, 400, 600]])('%i turn(s): exact canvas ops, no downscale', async (n, w, h) => {
+    const { calls, closed } = stub()
     const out = new Blob(['x'], { type: 'image/webp' })
     let seen
-    const photo = await rotatePhoto(new Blob(['in']), 1, async (c) => { seen = { w: c.width, h: c.height }; return out })
-    expect(seen).toEqual({ w: 400, h: 600 })
-    expect(photo).toMatchObject({ width: 400, height: 600, blob: out })
+    const photo = await rotatePhoto(new Blob(['in']), n, async (c) => { seen = { w: c.width, h: c.height }; return out })
+    expect(seen).toEqual({ w, h })
+    expect(calls).toEqual([['translate', w / 2, h / 2], ['rotate', (n * Math.PI) / 2], ['drawImage', -300, -200]])
+    expect(photo).toMatchObject({ width: w, height: h, blob: out })
     expect(photo.id).toMatch(/\S/)
+    expect(closed.n).toBe(1)
   })
 
-  it('two turns keep the dimensions', async () => {
-    stub()
-    const photo = await rotatePhoto(new Blob(['in']), 2, async () => new Blob(['x']))
-    expect([photo.width, photo.height]).toEqual([600, 400])
+  it('closes the bitmap when encoding throws', async () => {
+    const { closed } = stub()
+    await expect(rotatePhoto(new Blob(['in']), 1, async () => { throw new Error('boom') })).rejects.toThrow('boom')
+    expect(closed.n).toBe(1)
   })
 
   it('rejects a net zero rotation', async () => {

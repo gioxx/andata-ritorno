@@ -88,11 +88,11 @@ const rotTransform = () => {
 }
 const draw = (x = t.x, y = t.y, s = t.s) => { dom.img.style.transform = rot.active ? rotTransform() : `translate(${x}px,${y}px) scale(${s})` }
 
-function exitPending() {
+function exitPending(snap = true) {
   rot = idleRotation()
   angle = 0
   dom.el.classList.remove('pending')
-  setT({ s: 1, x: 0, y: 0 }, true)
+  setT({ s: 1, x: 0, y: 0 }, snap)
 }
 
 /** Feed an event to the pending-rotation rules and carry out the effects. */
@@ -131,7 +131,7 @@ async function commitRotation() {
     await editItem(id, {}, photo)
     const old = urls.get(oldId)
     if (old) { URL.revokeObjectURL(old); urls.delete(oldId) }
-    if (isOpen && ids[index] === id) { exitPending(); show(index) } // stay on the item, show the new photo
+    if (isOpen && ids[index] === id) { exitPending(false); show(index) } // no snap: the old image must not spin back // stay on the item, show the new photo
   } catch (e) { reportError(e) } // stay pending so the user can retry or cancel
   finally { busy = false; dom.el.classList.remove('busy') }
 }

@@ -59,6 +59,7 @@ const ERROR_KEY = {
   'last-tab': 'error.lastTab',
   'empty-name': 'error.emptyName',
   'bad-data-url': 'error.badDataUrl',
+  'rotate-missing': 'rotate.missingPhoto',
 }
 
 /** User-facing text for any failed action (see reportError). */
