@@ -2,23 +2,24 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../src/db.js', async (orig) => ({ ...(await orig()), getPhoto: vi.fn(async () => new Blob(['x'], { type: 'image/webp' })) }))
-vi.mock('../src/store.js', async (orig) => ({ ...(await orig()), rotateAndEdit: vi.fn(async () => null) }))
+vi.mock('../src/store.js', async (orig) => ({ ...(await orig()), rotateAndEdit: vi.fn(async () => null), deleteSelected: vi.fn(async () => {}) }))
 
 const { renderApp } = await import('../src/ui/render.js')
-const { store, rotateAndEdit } = await import('../src/store.js')
+const { store, rotateAndEdit, deleteSelected } = await import('../src/store.js')
 const { openEditItem, openModal } = await import('../src/ui/dialogs.js')
 const { openViewer } = await import('../src/ui/viewer.js')
 const { errorMessage } = await import('../src/ui/model.js')
 const { t } = await import('../src/i18n.js')
 
 beforeAll(() => {
-  // jsdom has no <dialog> modality: model show/close/Escape closely enough for the helper.
+  // jsdom has no <dialog> modality: model show/close closely enough for the helper. Like browsers,
+  // `close` is queued (fires after the current task), which the drawer handoff depends on.
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function (rv) {
     if (!this.open) return
     if (rv !== undefined) this.returnValue = rv
     this.removeAttribute('open')
-    this.dispatchEvent(new Event('close'))
+    setTimeout(() => this.dispatchEvent(new Event('close')), 0)
   }
   URL.createObjectURL = () => 'blob:x'
   URL.revokeObjectURL = () => {}
@@ -32,6 +33,7 @@ const setStore = (items) => {
   store.selected.clear(); store.filter.clear()
 }
 const mount = () => { const root = document.createElement('div'); document.body.append(root); return root }
+const tick = () => new Promise((r) => setTimeout(r, 5))
 const key = (target, k) => target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }))
 
 // The viewer is a build-once singleton: keep its element, drop everything else.
@@ -69,7 +71,7 @@ describe('tiles', () => {
 })
 
 describe('dialogs', () => {
-  it('edit dialog takes focus and gives it back to the opener on close (Escape)', () => {
+  it('edit dialog takes focus and gives it back to the opener on close (Escape)', async () => {
     setStore([mk('a')])
     const opener = Object.assign(document.createElement('button'), { textContent: 'edit' })
     document.body.append(opener)
@@ -81,21 +83,62 @@ describe('dialogs', () => {
     expect(dlg.getAttribute('aria-labelledby')).toBeTruthy()
     key(dlg, 'Escape')
     expect(dlg.open).toBe(false)
+    await tick()
     expect(document.activeElement).toBe(opener)
   })
 
-  it('a dialog opened as another closes takes its opener, so focus lands back on the control', () => {
+  it('a dialog opened as another closes takes its opener: the late close event does not steal focus', async () => {
     const opener = document.body.appendChild(document.createElement('button'))
     const mkDlg = () => document.body.appendChild(Object.assign(document.createElement('dialog'), { innerHTML: '<h3>x</h3><button>ok</button>' }))
     const a = mkDlg(), b = mkDlg()
     opener.focus()
     openModal(a)
-    a.close() // the drawer closes, then opens the next dialog right away
-    openModal(b)
-    a.dispatchEvent(new Event('close')) // late: must not steal focus (close() above already dispatched in this model)
+    a.close() // the drawer closes (its close event is queued) ...
+    openModal(b) // ... and opens the next dialog in the same tick
+    await tick() // a's close event fires now
     expect(b.contains(document.activeElement)).toBe(true)
     b.close()
+    await tick()
     expect(document.activeElement).toBe(opener)
+  })
+
+  it('when the opener is gone, focus lands on the menu button, never <body>', async () => {
+    const menu = Object.assign(document.body.appendChild(document.createElement('button')), { className: 'menu' })
+    const gone = document.body.appendChild(document.createElement('button'))
+    const dlg = document.body.appendChild(Object.assign(document.createElement('dialog'), { innerHTML: '<h3>x</h3><button>ok</button>' }))
+    gone.focus()
+    openModal(dlg)
+    gone.remove()
+    dlg.close()
+    await tick()
+    expect(document.activeElement).toBe(menu)
+  })
+
+  it('does not register a modal whose showModal throws', () => {
+    const dlg = document.body.appendChild(Object.assign(document.createElement('dialog'), { innerHTML: '<button>ok</button>' }))
+    const spy = vi.spyOn(dlg, 'showModal').mockImplementation(() => { throw new Error('already open') })
+    expect(() => openModal(dlg)).toThrow()
+    spy.mockRestore()
+    const other = document.body.appendChild(Object.assign(document.createElement('dialog'), { innerHTML: '<button>ok</button>' }))
+    openModal(other) // would pick up a ghost "closed" entry as handoff if one had been pushed
+    expect(other.open).toBe(true)
+  })
+})
+
+describe('delete confirmation', () => {
+  it('deletes the selection only after confirm() says yes', () => {
+    setStore([mk('a')])
+    store.selected.add('a')
+    const root = mount()
+    renderApp(root, store)
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    confirmSpy.mockReturnValueOnce(false)
+    root.querySelector('[data-act="del"]').click()
+    expect(deleteSelected).not.toHaveBeenCalled()
+    confirmSpy.mockReturnValueOnce(true)
+    root.querySelector('[data-act="del"]').click()
+    expect(confirmSpy).toHaveBeenCalledWith(t('render.confirmDelete'))
+    expect(deleteSelected).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -157,6 +200,40 @@ describe('viewer', () => {
     v.querySelector('[data-v="save"]').click()
     await vi.waitFor(() => expect(v.classList.contains('pending')).toBe(false))
     expect(v.querySelector('[data-live="state"]').textContent).toBe('')
+  })
+})
+
+describe('viewer focus', () => {
+  const opener = () => { const b = document.body.appendChild(document.createElement('button')); b.focus(); return b }
+  beforeEach(() => setStore([mk('a'), mk('b')]))
+  afterEach(() => { key(document, 'Escape') })
+
+  it('is named after the item', () => {
+    opener()
+    openViewer(['a', 'b'], 'b')
+    expect(document.getElementById('viewer').getAttribute('aria-label')).toBe('Maglia b')
+  })
+
+  it('after Annulla the focus moves to Ruota instead of the hidden button', () => {
+    opener()
+    openViewer(['a', 'b'], 'a')
+    const v = document.getElementById('viewer')
+    v.querySelector('[data-v="rotate"]').click()
+    v.querySelector('[data-v="cancel"]').focus()
+    v.querySelector('[data-v="cancel"]').click()
+    expect(document.activeElement).not.toBe(document.body)
+    expect(v.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement.classList.contains('p')).toBe(false)
+  })
+
+  it('a single item whose only control state changes never strands focus on <body>', () => {
+    opener()
+    openViewer(['a'], 'a')
+    const v = document.getElementById('viewer')
+    v.querySelector('[data-v="rotate"]').click()
+    v.querySelector('[data-v="save"]').focus()
+    v.querySelector('[data-v="cancel"]').click()
+    expect(v.contains(document.activeElement)).toBe(true)
   })
 })
 

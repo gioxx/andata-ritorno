@@ -37,7 +37,7 @@ function ensureDom() {
   el.hidden = true
   el.setAttribute('role', 'dialog')
   el.setAttribute('aria-modal', 'true')
-  el.setAttribute('aria-label', tr('render.openPhoto'))
+  el.setAttribute('aria-label', tr('viewer.title'))
   el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="${tr('common.close')}">${closeIcon}</button></div>
     <div class="stage"><img alt="" draggable="false"></div>
     <button type="button" class="vnav prev" data-v="prev" aria-label="${tr('viewer.prev')}">${chevronLeftIcon}</button>
@@ -77,7 +77,7 @@ function ensureDom() {
   })
   // The viewer is built once (it owns window listeners): relabel in place on a language change.
   onLangChange(() => {
-    el.setAttribute('aria-label', tr('render.openPhoto'))
+    el.setAttribute('aria-label', dom.label.textContent || tr('viewer.title'))
     dom.prev.setAttribute('aria-label', tr('viewer.prev'))
     dom.next.setAttribute('aria-label', tr('viewer.next'))
     el.querySelector('.vx').setAttribute('aria-label', tr('common.close'))
@@ -107,6 +107,16 @@ function exitPending(snap = true) {
   dom.state.textContent = ''
   refreshNav()
   setT({ s: 1, x: 0, y: 0 }, snap)
+}
+
+/** Controls that are hidden or off in the current state must not hold focus (it would drop to <body>). */
+function keepFocusInside() {
+  if (!isOpen) return
+  const a = document.activeElement
+  const stuck = !dom.el.contains(a) || a.disabled || a.hidden || a.classList.contains(rot.active ? 'n' : 'p')
+  if (!stuck) return
+  const next = [dom.next, dom.prev].find((b) => !b.hidden && !b.disabled)
+  ;(next ?? dom.el.querySelector('[data-v="rotate"]')).focus({ preventScroll: true })
 }
 
 /** Feed an event to the pending-rotation rules and carry out the effects. */
@@ -167,6 +177,7 @@ async function show(i) {
   const my = ++token
   const it = store.items.find((x) => x.id === ids[i])
   d.label.textContent = it?.label || ''
+  d.el.setAttribute('aria-label', it?.label || tr('viewer.title'))
   d.pos.textContent = tr('viewer.position', { label: it?.label || tr('common.unnamed'), n: i + 1, total: ids.length })
   refreshNav()
   setT({ s: 1, x: 0, y: 0 })
@@ -192,9 +203,9 @@ function refreshNav() {
   for (const [b, dir] of [[dom.prev, 'prev'], [dom.next, 'next']]) {
     b.hidden = !many
     const off = rot.active || stepIndex(index, dir, ids.length) === null
-    if (off && !b.disabled && document.activeElement === b) (dir === 'prev' ? dom.next : dom.prev).focus() // never strand the focus
     b.disabled = off
   }
+  keepFocusInside()
 }
 
 /** Go to the previous / next item (buttons, arrow keys, swipes). */

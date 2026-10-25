@@ -112,6 +112,7 @@ export default {
 
   'viewer.hintOne': 'Pinch to zoom',
   'viewer.hintMany': 'Pinch to zoom · swipe for the other items',
+  'viewer.title': 'Photo',
   'viewer.prev': 'Previous photo',
   'viewer.next': 'Next photo',
   'viewer.position': '{label}, {n} of {total}',

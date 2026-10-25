@@ -34,9 +34,15 @@ const PAIRS = [
   ['accent-strong', 'chip', 3, 'focus ring on chips'],
   ['accent-strong', 'school', 3, 'focus ring / selection outline in sections'],
   ['accent-strong', 'home', 3, 'focus ring / selection outline in sections'],
+  ['accent-strong', 'surface', 3, 'focus ring on dialogs and drawer'],
+  ['accent-strong', 'tile', 3, 'focus ring on inputs and tiles'],
   ['accent', 'holder', 3, 'menu icons (UI part)'],
   ['muted', 'bg', 3, 'dashed/outlined chip borders (UI part)'],
 ]
+
+it('the system-dark block carries exactly the forced-dark values', () => {
+  expect(darkAuto).toEqual(dark)
+})
 
 describe.each([['light', light], ['dark', dark], ['dark (system preference)', darkAuto]])('%s theme', (_name, th) => {
   it.each(PAIRS)('%s on %s >= %s (%s)', (fg, bg, min) => {

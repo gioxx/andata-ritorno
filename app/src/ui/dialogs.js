@@ -14,6 +14,14 @@ import { resolve, lastActivator, locator, keepFocus } from './focus.js'
 // ---- Shared modal behaviour -------------------------------------------------------------
 const FOCUSABLE = 'input:not([type="hidden"]), select, textarea, button, a[href], [tabindex]:not([tabindex="-1"])'
 const usable = (el) => !el.disabled && !el.hidden && !el.closest('[hidden], [inert]') && el.getAttribute('tabindex') !== '-1'
+const firstControl = (el) => [...el.querySelectorAll(FOCUSABLE)].find(usable)
+/** The opener is gone (redrawn away): land on the topmost open modal, else the menu button, never <body>. */
+function focusFallback() {
+  const top = [...stack].reverse().find((m) => !m.done && m.isOpen())
+  const target = (top && firstControl(top.el)) || document.querySelector('.menu') || document.querySelector('h1')
+  if (target && !target.matches('button, input, select, textarea, a[href]')) target.setAttribute('tabindex', '-1')
+  target?.focus({ preventScroll: true })
+}
 /** Modals (and the viewer) that are open, or closed with their `close` event still pending. */
 const stack = []
 let titleSeq = 0
@@ -44,17 +52,17 @@ export function openModal(el, { returnFocus = null } = {}) {
   const active = document.activeElement
   const own = active && active !== document.body && !active.closest('dialog:not([open])') ? active : null
   const opener = resolve(returnFocus) ?? handed?.opener?.el ?? own ?? lastActivator()
-  const entry = { opener: opener ? { el: opener, loc: locator(opener) } : null, done: false, handedOff: false, isOpen: () => (isDialog ? el.open : true) }
-  if (handed) handed.handedOff = true
-  stack.push(entry)
+  const entry = { el, opener: opener ? { el: opener, loc: locator(opener) } : null, done: false, handedOff: false, isOpen: () => (isDialog ? el.open : true) }
   labelDialog(el)
   const inerted = []
-  if (isDialog) el.showModal()
+  if (isDialog) el.showModal() // throws if already open: nothing is registered then
   else {
     // A plain element has no native modality: make the rest of the page inert while it is up.
     for (const n of document.body.children) if (n !== el && !n.inert) { n.inert = true; inerted.push(n) }
   }
-  ;[...el.querySelectorAll(FOCUSABLE)].find(usable)?.focus({ preventScroll: true })
+  if (handed) handed.handedOff = true
+  stack.push(entry)
+  firstControl(el)?.focus({ preventScroll: true })
   const onKey = (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented || !isDialog) return
     e.preventDefault() // closed here, through the same path as the native Escape (honours `cancel`)
@@ -69,7 +77,8 @@ export function openModal(el, { returnFocus = null } = {}) {
     if (isDialog) el.removeEventListener('keydown', onKey)
     if (entry.handedOff) return // the modal that replaced this one owns focus now
     const back = entry.opener && (resolve(entry.opener.el) ?? resolve(entry.opener.loc))
-    back?.focus({ preventScroll: true })
+    if (back && !back.disabled && !back.hidden && !back.closest('[hidden]')) back.focus({ preventScroll: true })
+    else focusFallback()
   }
   if (isDialog) el.addEventListener('close', release, { once: true })
   return release

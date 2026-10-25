@@ -113,6 +113,7 @@ export default {
 
   'viewer.hintOne': 'Due dita per ingrandire',
   'viewer.hintMany': 'Due dita per ingrandire · scorri per gli altri capi',
+  'viewer.title': 'Foto',
   'viewer.prev': 'Foto precedente',
   'viewer.next': 'Foto successiva',
   'viewer.position': '{label}, {n} di {total}',
