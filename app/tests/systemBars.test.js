@@ -30,3 +30,12 @@ describe('hidden elements', () => {
     expect(css).toMatch(/\[hidden\]\s*\{\s*display:\s*none\s*!important;?\s*\}/)
   })
 })
+
+describe('bottom bar over the tiles', () => {
+  // Tile layers (pick z-index 2, open 3) must stay inside the tile, or a tile scrolled under
+  // the fixed bar takes the taps meant for its buttons.
+  it('tiles keep their layers to themselves and the bar sits above them', () => {
+    expect(css).toMatch(/\.item \{[^}]*isolation: isolate/)
+    expect(css).toMatch(/\.bar \{[^}]*z-index: 4/)
+  })
+})
