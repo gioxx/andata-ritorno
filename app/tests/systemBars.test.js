@@ -39,3 +39,11 @@ describe('bottom bar over the tiles', () => {
     expect(css).toMatch(/\.bar \{[^}]*z-index: 4/)
   })
 })
+
+describe('focus ring inside the scrolling category list', () => {
+  // overflow clips outlines: the list needs room for the 3px ring at its 2px offset.
+  it('the list keeps 5px of padding around its rows', () => {
+    expect(css).toMatch(/:focus-visible \{ outline: 3px solid var\(--accent-strong\); outline-offset: 2px; \}/)
+    expect(css).toMatch(/dialog \.catlist \{[^}]*padding: 5px;[^}]*overflow-y: auto/)
+  })
+})

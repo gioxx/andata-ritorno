@@ -186,7 +186,8 @@ dialog .catpick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
 dialog .catpick .chip { flex: none; width: auto; padding: 7px 14px; }
 dialog .catpick .hint { flex: none; font-size: 0.8125rem; color: var(--muted); }
 dialog .catpick .linkbtn { flex: none; width: auto; padding: 10px 12px; background: none; color: var(--accent-strong); text-decoration: underline; }
-dialog .catlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 45dvh; overflow-y: auto; }
+/* The list scrolls, which clips anything drawn outside it: 5px of room (3px outline + 2px offset) keeps the focus ring whole. */
+dialog .catlist { list-style: none; margin: -5px -5px 7px; padding: 5px; max-height: 45dvh; overflow-y: auto; }
 dialog .catlist li { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 dialog .catlist input[type="text"] { flex: 1; min-width: 0; margin: 0; }
 dialog .catlist button { flex: none; width: 44px; height: 44px; padding: 0; background: var(--chip); }
