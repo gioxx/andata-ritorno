@@ -26,6 +26,8 @@
   --accent: #e88563; --accent-strong: #e88563; --danger: #ff8a80; --holder: #0d0f15; --school-stripe: #f0a531; --home-stripe: #3bb273;
 }
 * { box-sizing: border-box; }
+/* `hidden` must always win: a component's own `display` rule (e.g. the install strip's flex) would otherwise show an empty box. */
+[hidden] { display: none !important; }
 body { margin: 0; font-family: var(--font); font-weight: 500; background: var(--bg); color: var(--fg); }
 
 /* ---- Main screen (visual option Y) ---- */
