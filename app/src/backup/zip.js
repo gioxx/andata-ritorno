@@ -27,7 +27,36 @@ const crc32 = (bytes) => {
   return (c ^ 0xffffffff) >>> 0
 }
 const PLACES = ['school', 'home']
+const EPOCH = '1970-01-01T00:00:00.000Z'
 const str = (v) => (typeof v === 'string' ? v : '')
+// The file is untrusted: only well-formed dates pass, anything else sorts as "oldest".
+const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v))
+const iso = (v) => (isIso(v) ? v : EPOCH)
+
+/** Exact Tab shape, or null when the id is unusable (its items then fail as 'Scheda mancante'). */
+function normTab(t, index) {
+  if (!str(t?.id)) return null
+  return {
+    id: t.id,
+    name: String(t.name ?? '').trim() || 'Scheda',
+    order: Number.isFinite(t.order) ? t.order : index,
+    createdAt: iso(t.createdAt),
+    updatedAt: iso(t.updatedAt),
+  }
+}
+
+/** Exact Item shape (unknown keys dropped), or the Failure reason. */
+function normItem(raw) {
+  if (!str(raw?.id) || !str(raw.tabId) || !str(raw.photoId)) return 'Dati incompleti'
+  if (!PLACES.includes(raw.location)) return 'Posto sconosciuto'
+  const movedAt = iso(raw.movedAt)
+  const item = {
+    id: raw.id, tabId: raw.tabId, location: raw.location, label: String(raw.label ?? ''),
+    photoId: raw.photoId, createdAt: isIso(raw.createdAt) ? raw.createdAt : movedAt, movedAt, updatedAt: iso(raw.updatedAt),
+  }
+  if (typeof raw.category === 'string') item.category = raw.category
+  return item
+}
 
 /**
  * @param {{ tabs:any[], items:any[], getPhoto:(id:string)=>Promise<Blob|undefined> }} src
@@ -83,7 +112,8 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
   }
   // The `photos` integrity map is additive: a v2 file without it still imports, just unchecked.
   const integrity = json.photos && typeof json.photos === 'object' ? json.photos : {}
-  const tabNames = new Map(json.tabs.map((t) => [t.id, str(t.name)]))
+  const tabs = json.tabs.map(normTab).filter(Boolean)
+  const tabNames = new Map(tabs.map((t) => [t.id, t.name]))
   const known = new Set([...tabNames.keys(), ...localTabIds])
 
   const items = []
@@ -91,24 +121,24 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
   const failures = []
   for (const raw of json.items) {
     const fail = (reason) => failures.push({
-      itemId: str(raw?.id), label: str(raw?.label), tabName: tabNames.get(raw?.tabId) ?? '',
+      itemId: str(raw?.id), label: String(raw?.label ?? ''), tabName: tabNames.get(raw?.tabId) ?? '',
       location: str(raw?.location), reason,
     })
-    if (!str(raw?.id) || !str(raw?.photoId)) { fail('Dati incompleti'); continue }
-    if (!PLACES.includes(raw.location)) { fail('Posto sconosciuto'); continue }
-    if (!known.has(raw.tabId)) { fail('Scheda mancante'); continue }
-    const file = photoFiles.get(raw.photoId)
+    const item = normItem(raw)
+    if (typeof item === 'string') { fail(item); continue }
+    if (!known.has(item.tabId)) { fail('Scheda mancante'); continue }
+    const file = photoFiles.get(item.photoId)
     if (!file) { fail('Foto mancante nel backup'); continue }
     const photo = new Blob([file.bytes], { type: file.type })
-    const want = integrity[raw.photoId]
+    const want = integrity[item.photoId]
     try {
       if (want && (want.size !== file.bytes.length || want.crc32 !== crc32(file.bytes))) throw new Error('corrupt')
       await decodeImage(photo)
     } catch {
       fail('Foto non leggibile'); continue
     }
-    photos.set(raw.photoId, photo)
-    items.push(raw)
+    photos.set(item.photoId, photo)
+    items.push(item)
   }
-  return { tabs: json.tabs, items, photos, failures }
+  return { tabs, items, photos, failures }
 }

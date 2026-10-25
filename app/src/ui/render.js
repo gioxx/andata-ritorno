@@ -42,8 +42,9 @@ function revokeGone() {
 
 function tile(i, moved) {
   const sel = store.selected.has(i.id)
-  return `<div class="item${i.label?.trim() ? ' labeled' : ''}${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
-    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(i.label || '')}</span>${sel ? `<i class="check">${checkIcon}</i><button class="expand" data-view="${esc(i.id)}" aria-label="Apri a schermo intero">${expandIcon}</button>` : ''}</div>`
+  const label = String(i.label ?? '') // safety net: never trust the type of stored data
+  return `<div class="item${label.trim() ? ' labeled' : ''}${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
+    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(label)}</span>${sel ? `<i class="check">${checkIcon}</i><button class="expand" data-view="${esc(i.id)}" aria-label="Apri a schermo intero">${expandIcon}</button>` : ''}</div>`
 }
 
 function section(loc, title, cls, list) {

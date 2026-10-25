@@ -147,6 +147,69 @@ describe('v2 zip', () => {
     expect((await getPhoto(dst, 'p9')).type).toBe('image/png')
   })
 
+  const EPOCH = '1970-01-01T00:00:00.000Z'
+  const incomingOf = async (fn) => {
+    const dst = await fresh()
+    return { dst, prepared: await prepareImport(dst, await edit(editJson(fn))) }
+  }
+
+  it('numeric label imports as a string', async () => {
+    const { dst, prepared } = await incomingOf((j) => { j.items[0].label = 42 })
+    expect(prepared.incoming.items.find((i) => i.id === 'i1').label).toBe('42')
+    await commitImport(dst, prepared, { partial: false })
+    const { items } = await loadAll(dst)
+    expect(items.find((i) => i.id === 'i1').label).toBe('42')
+  })
+
+  it('items keep only the Item keys; category kept only as a string', async () => {
+    const { prepared } = await incomingOf((j) => {
+      Object.assign(j.items[0], { evil: '<x>', category: 'body' })
+      Object.assign(j.items[1], { category: 7 })
+    })
+    const [a, b] = ['i1', 'i2'].map((id) => prepared.incoming.items.find((i) => i.id === id))
+    expect(Object.keys(a).sort()).toEqual(['category', 'createdAt', 'id', 'label', 'location', 'movedAt', 'photoId', 'tabId', 'updatedAt'])
+    expect(a.category).toBe('body')
+    expect('category' in b).toBe(false)
+  })
+
+  it('missing movedAt → epoch; bad createdAt → movedAt; bad updatedAt → epoch', async () => {
+    const { prepared } = await incomingOf((j) => {
+      delete j.items[0].movedAt
+      j.items[1].createdAt = 5
+      j.items[1].updatedAt = 'not a date'
+    })
+    const [a, b] = ['i1', 'i2'].map((id) => prepared.incoming.items.find((i) => i.id === id))
+    expect(a.movedAt).toBe(EPOCH)
+    expect(a.createdAt).toBe('2026-02-01T00:00:00.000Z')
+    expect(b.createdAt).toBe(b.movedAt)
+    expect(b.updatedAt).toBe(EPOCH)
+  })
+
+  it("non-string tabId → 'Dati incompleti'", async () => {
+    const { prepared } = await incomingOf((j) => { j.items[0].tabId = 1 })
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'Dati incompleti']])
+  })
+
+  it("tab without id is dropped: its items fail 'Scheda mancante', no DataError", async () => {
+    const { dst, prepared } = await incomingOf((j) => { delete j.tabs[0].id })
+    expect(prepared.incoming.tabs.map((t) => t.id)).toEqual(['tab-b'])
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'Scheda mancante'], ['i2', 'Scheda mancante']])
+    const s = await commitImport(dst, prepared, { partial: true })
+    expect(s.added).toBe(1)
+    expect((await loadAll(dst)).tabs.map((t) => t.id)).toEqual(['tab-b'])
+  })
+
+  it('tabs are normalised: name, order, dates, extra keys', async () => {
+    const { prepared } = await incomingOf((j) => {
+      Object.assign(j.tabs[0], { name: '   ', order: 'x', createdAt: null, evil: 1 })
+      Object.assign(j.tabs[1], { name: 12, updatedAt: 'nope' })
+    })
+    expect(prepared.incoming.tabs).toEqual([
+      { id: 'tab-a', name: 'Scheda', order: 0, createdAt: EPOCH, updatedAt: T },
+      { id: 'tab-b', name: '12', order: 1, createdAt: T, updatedAt: EPOCH },
+    ])
+  })
+
   it("missing photo on export throws 'missing-photo:<itemId>'", async () => {
     const src = await seeded()
     const { tabs, items } = await loadAll(src)
