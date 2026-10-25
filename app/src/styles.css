@@ -70,7 +70,7 @@ section h2 { display: flex; justify-content: space-between; align-items: center;
 .unsaved { display: flex; align-items: center; gap: 8px; margin: 4px 4px 10px; padding: 10px 12px; border-radius: 12px; background: var(--chip); font-size: 0.8125rem; font-weight: 600; }
 .unsaved span { flex: 1; }
 .unsaved button { min-height: 44px; padding: 7px 12px; border-radius: var(--r-pill); background: var(--accent-strong); color: var(--bg); font-weight: 700; }
-.bar { flex-wrap: wrap; position: fixed; z-index: 4; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto; display: flex; gap: 8px; padding: 12px max(14px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); background: var(--surface); }
+.bar { flex-wrap: wrap; position: fixed; z-index: 4; left: 0; right: 0; bottom: 0; max-width: 640px; margin: 0 auto; display: flex; gap: 8px; padding: 12px max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); background: var(--surface); }
 .bar button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 16px; border-radius: var(--r-pill); font-weight: 700; font-size: 0.875rem; text-align: center; }
 .bar .primary { flex: 1; background: var(--accent-strong); color: var(--bg); }
 .bar .ghost { background: var(--chip); }

@@ -47,3 +47,10 @@ describe('focus ring inside the scrolling category list', () => {
     expect(css).toMatch(/dialog \.catlist \{[^}]*padding: 5px;[^}]*overflow-y: auto/)
   })
 })
+
+describe('bottom bar on phones with a home indicator', () => {
+  // iOS reserves ~34px for the home indicator: that space is the margin, not added to it.
+  it('uses the safe area instead of adding 14px on top of it', () => {
+    expect(css).toMatch(/\.bar \{[^}]*max\(14px, env\(safe-area-inset-bottom\)\)/)
+  })
+})

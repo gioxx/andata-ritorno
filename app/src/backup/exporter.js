@@ -1,5 +1,5 @@
 // Export: build the v2 ZIP, hand it to the share sheet (Android) or download it.
-import { loadAll, getPhoto, setMeta } from '../db.js'
+import { loadAll, getPhoto, getMeta, setMeta } from '../db.js'
 import { buildZip } from './zip.js'
 import { t } from '../i18n.js'
 
@@ -23,25 +23,36 @@ function defaultDownload(file) {
 export const backupFileName = (now) => `andata-ritorno-${now.toISOString().slice(0, 10)}.zip`
 
 /**
- * Side effects are injectable for tests. Meta is only touched on success.
+ * Record a backup: lastBackupAt = now, and the unsaved counter loses the `saved` changes the
+ * backup contains (changes made after it stay counted). Run it in the mutation queue.
+ * @param {number} saved the unsaved counter when the backup was built
+ */
+export async function markBackupDone(db, now, saved) {
+  const current = (await getMeta(db, 'unsavedCount')) ?? 0
+  await setMeta(db, 'lastBackupAt', now.toISOString())
+  await setMeta(db, 'unsavedCount', Math.max(0, current - saved))
+}
+
+/**
+ * Side effects are injectable for tests. Meta is only touched once the file surely reached the
+ * user (shared). A download gives the page no answer: the caller asks, then calls markBackupDone.
  * @returns {Promise<'shared'|'downloaded'|'cancelled'>}
  */
 export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date() } = {}) {
+  const saved = (await getMeta(db, 'unsavedCount')) ?? 0
   const { tabs, items, categories } = await loadAll(db)
   const blob = await buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id), now })
   const name = backupFileName(now)
   const file = new File([blob], name, { type: 'application/zip' })
 
-  let result
   try {
-    result = (await share(file)) ? 'shared' : (download(file), 'downloaded')
+    if (!(await share(file))) { download(file); return 'downloaded' }
   } catch (e) {
     if (e?.name === 'AbortError') return 'cancelled' // user closed the share sheet
     // Android Chrome refuses to share some file types (NotAllowedError): save to Downloads instead.
     download(file)
-    result = 'downloaded'
+    return 'downloaded'
   }
-  await setMeta(db, 'lastBackupAt', now.toISOString())
-  await setMeta(db, 'unsavedCount', 0)
-  return result
+  await markBackupDone(db, now, saved)
+  return 'shared'
 }

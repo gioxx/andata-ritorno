@@ -1,7 +1,7 @@
 // Side drawer (slides from the right): backup info, export/import, tabs, "Da rifare", theme, language.
 import { store, load, runExclusive } from '../store.js'
 import { getMeta, setMeta } from '../db.js'
-import { exportBackup, backupFileName } from '../backup/exporter.js'
+import { exportBackup, backupFileName, markBackupDone } from '../backup/exporter.js'
 import { hooks } from './render.js'
 import { openTabManager } from './tabs.js'
 import { openCategoryManager } from './categories.js'
@@ -121,16 +121,24 @@ function build() {
 /** Export with share sheet / download; tells the user only what they need to know. */
 export async function runExport() {
   const now = new Date()
-  let result
+  let result, saved = 0
   try {
     // Exclusive: a move during the export would be counted, then zeroed with the counter.
-    result = await withBusy(() => runExclusive(() => exportBackup(db, { now })))
+    result = await withBusy(() => runExclusive(async () => {
+      saved = (await getMeta(db, 'unsavedCount')) ?? 0
+      return exportBackup(db, { now })
+    }))
   } catch (e) {
     alert(exportErrorMessage(e, store))
     return
   }
   if (result === 'cancelled') return
-  if (result === 'downloaded') alert(t(currentPlatform() === 'ios' ? 'menu.fileSavedIos' : 'menu.fileSaved', { name: backupFileName(now) }))
+  // A download can be refused or dismissed without the page knowing: only the user can say it is there.
+  if (result === 'downloaded') {
+    const found = confirm(t(currentPlatform() === 'ios' ? 'menu.fileSavedIos' : 'menu.fileSaved', { name: backupFileName(now) }))
+    if (!found) return
+    try { await runExclusive(() => markBackupDone(db, now, saved)) } catch (e) { reportError(e); return }
+  }
   await load(db) // refreshes the unsaved-changes banner
 }
 

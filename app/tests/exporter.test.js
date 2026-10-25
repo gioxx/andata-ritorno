@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { unzipSync } from 'fflate'
 import { openDb, getMeta, setMeta, putTab, addItems } from '../src/db.js'
-import { exportBackup } from '../src/backup/exporter.js'
+import { exportBackup, markBackupDone } from '../src/backup/exporter.js'
 
 const T = '2026-02-01T00:00:00.000Z'
 async function seeded() {
@@ -16,7 +16,7 @@ async function seeded() {
 const now = new Date('2026-10-23T10:00:00.000Z')
 
 describe('exportBackup', () => {
-  it('exportBackup resets unsavedCount and sets lastBackupAt (download fallback)', async () => {
+  it('a download is not counted as a backup yet: the page cannot see whether the file was saved', async () => {
     const db = await seeded()
     const download = vi.fn()
     const r = await exportBackup(db, { share: async () => false, download, now })
@@ -24,7 +24,17 @@ describe('exportBackup', () => {
     const file = download.mock.calls[0][0]
     expect(file.name).toBe('andata-ritorno-2026-10-23.zip')
     expect(file.type).toBe('application/zip')
+    expect(await getMeta(db, 'lastBackupAt')).toBeUndefined()
+    expect(await getMeta(db, 'unsavedCount')).toBe(5)
+  })
+
+  it('markBackupDone records the backup and keeps changes made after it', async () => {
+    const db = await seeded()
+    await setMeta(db, 'unsavedCount', 7) // 5 in the backup, 2 made while the user looked for the file
+    await markBackupDone(db, now, 5)
     expect(await getMeta(db, 'lastBackupAt')).toBe(now.toISOString())
+    expect(await getMeta(db, 'unsavedCount')).toBe(2)
+    await markBackupDone(db, now, 9)
     expect(await getMeta(db, 'unsavedCount')).toBe(0)
   })
 
@@ -52,6 +62,7 @@ describe('exportBackup', () => {
     const share = async () => { throw Object.assign(new Error('x'), { name: 'NotAllowedError' }) }
     expect(await exportBackup(db, { share, download, now })).toBe('downloaded')
     expect(download).toHaveBeenCalledOnce()
+    expect(await getMeta(db, 'unsavedCount')).toBe(5)
   })
 
   it('missing photo → throws with item id, meta untouched', async () => {

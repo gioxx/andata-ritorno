@@ -34,6 +34,27 @@ function placeAfterLocal(puts, local) {
   for (const [r, i] of fresh) puts[i] = { ...r, order: ++max }
 }
 
+/**
+ * Renumber every tab (or category) 0..n-1 once the merge is planned, so no two share an
+ * `order` (a newer record from the file may carry an order already used here). On a tie the
+ * record coming from the file goes first: it is the newer placement. Records only renumbered
+ * keep their updatedAt (they were not edited). An empty device keeps the file's orders.
+ */
+function compactOrder(puts, local) {
+  if (!local.size) return
+  const incoming = new Set(puts.map((r) => r.id))
+  const final = new Map(local)
+  for (const r of puts) final.set(r.id, r)
+  const ordered = [...final.values()].sort((a, b) =>
+    a.order - b.order || incoming.has(b.id) - incoming.has(a.id) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  ordered.forEach((r, order) => {
+    if (r.order === order) return
+    const i = puts.findIndex((p) => p.id === r.id)
+    if (i >= 0) puts[i] = { ...puts[i], order }
+    else puts.push({ ...r, order })
+  })
+}
+
 function collapse(list, merge) {
   const map = new Map()
   for (const x of list) map.set(x.id, map.has(x.id) ? merge(map.get(x.id), x) : x)
@@ -71,6 +92,8 @@ export function buildPlan(local, incoming) {
   }
   placeAfterLocal(plan.tabsPut, localTabs)
   placeAfterLocal(plan.categoriesPut, localCats)
+  compactOrder(plan.tabsPut, localTabs)
+  compactOrder(plan.categoriesPut, localCats)
   const knownCats = new Set([...localCats.keys(), ...(incoming.categories ?? []).map((c) => c.id)])
   // A category that exists nowhere (old backup, dangling id) must not survive on an item.
   const strip = (it) => {

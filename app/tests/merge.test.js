@@ -88,13 +88,13 @@ describe('buildPlan', () => {
     const inc = [tab('t1', { name: 'New', order: 2, updatedAt: d(4) }), tab('t2', { name: 'Stale', order: 9, updatedAt: d(2) }), tab('t3')]
     const plan = buildPlan({ tabs: local, items: [] }, incoming([], [], inc))
     const byId = Object.fromEntries(plan.tabsPut.map((t) => [t.id, t]))
-    expect(byId.t1).toMatchObject({ name: 'New', order: 2, updatedAt: d(4) })
-    expect(byId.t2).toBeUndefined()
-    expect(byId.t3).toBeDefined()
-    expect(plan.tabsPut).toHaveLength(2)
+    expect(byId.t1).toMatchObject({ name: 'New', updatedAt: d(4) })
+    // t2 keeps its name and date; it is only renumbered (t2 1, t1 2, t3 after = 0, 1, 2).
+    expect(byId.t2).toMatchObject({ name: 'Keep', order: 0, updatedAt: d(5) })
+    expect([byId.t1.order, byId.t3.order]).toEqual([1, 2])
   })
 
-  it('new tabs and categories are renumbered after the local max; existing ones keep the merge rule', () => {
+  it('new tabs and categories go after the local max; existing ones keep the merge rule; orders end up 0..n-1', () => {
     const local = {
       tabs: [tab('t1', { order: 0 }), tab('t2', { order: 1, updatedAt: d(2) })],
       items: [],
@@ -106,9 +106,26 @@ describe('buildPlan', () => {
       [cat('c2', { order: 9, updatedAt: d(1) }), cat('k1', { order: 0 })],
     )
     const plan = buildPlan(local, inc)
-    expect(Object.fromEntries(plan.tabsPut.map((t) => [t.id, t.order]))).toEqual({ t2: 5, n1: 6, n2: 7 })
+    // Then every order is renumbered 0..n-1 (t1 already sits at 0, so it is not written).
+    expect(Object.fromEntries(plan.tabsPut.map((t) => [t.id, t.order]))).toEqual({ t2: 1, n1: 2, n2: 3 })
     // c2 loses the merge (older): untouched; the new k1 goes after the local max.
     expect(plan.categoriesPut.map((c) => [c.id, c.order])).toEqual([['k1', 2]])
+  })
+
+  it('an incoming order that collides with a local one is resolved: the newer record goes first', () => {
+    const local = {
+      tabs: [tab('t1', { order: 0 }), tab('t2', { order: 1 }), tab('t3', { order: 2 })],
+      items: [],
+      categories: [cat('c1', { order: 0 }), cat('c2', { order: 1 })],
+    }
+    // On the other phone t3 was moved to the top and renamed: it arrives newer, with order 0.
+    const inc = withCats(incoming([], [], [tab('t3', { name: 'Materna', order: 0, updatedAt: d(4) })]), [cat('c2', { name: 'Calze', order: 0, updatedAt: d(4) })])
+    const plan = buildPlan(local, inc)
+    const final = (list, puts) => list.map((r) => puts.find((p) => p.id === r.id) ?? r).sort((a, b) => a.order - b.order).map((r) => [r.id, r.order])
+    expect(final(local.tabs, plan.tabsPut)).toEqual([['t3', 0], ['t1', 1], ['t2', 2]])
+    expect(final(local.categories, plan.categoriesPut)).toEqual([['c2', 0], ['c1', 1]])
+    // A record only renumbered keeps its own updatedAt: it was not edited.
+    expect(plan.tabsPut.find((t) => t.id === 't1').updatedAt).toBe(d(1))
   })
 
   it('into a device without tabs or categories, imported orders are kept as they are', () => {

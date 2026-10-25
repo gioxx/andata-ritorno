@@ -79,7 +79,7 @@ export default {
   'ios.banner': 'Su iPhone Safari può cancellare i dati dei siti dopo circa 7 giorni senza aprirli. Installa A/R sulla schermata Home per tenerli al sicuro e fai un backup ogni tanto.',
   'ios.bannerLabel': 'Avviso sui dati',
   'ios.gotIt': 'Ho capito',
-  'menu.fileSavedIos': 'File salvato: lo trovi in Download (app File): {name}',
+  'menu.fileSavedIos': 'Il backup dovrebbe essere in Download (app File): {name}\n\nLo trovi? OK per segnarlo come fatto, Annulla se non c\'è.',
   'desktop.continue': 'Continua dal computer',
 
   'about.version': 'Andata e Ritorno · versione {version}',
@@ -183,7 +183,7 @@ export default {
   'wipe.failed': 'Non sono riuscito a eliminare i dati: chiudi le altre schede di A/R e riprova.',
   'menu.langAuto': 'Auto',
   'menu.exportFailed': 'Esportazione non riuscita: {message}',
-  'menu.fileSaved': 'File salvato in Download: {name}',
+  'menu.fileSaved': 'Il backup dovrebbe essere in Download: {name}\n\nLo trovi? OK per segnarlo come fatto, Annulla se non c\'è.',
 
   'info.backup': { one: '1 capo · ultimo backup: {when}', other: '{n} capi · ultimo backup: {when}' },
   'info.protected': 'Memoria protetta ✓',

@@ -78,7 +78,7 @@ export default {
   'ios.banner': "On iPhone, Safari may delete a website's data after about 7 days without opening it. Install A/R on the Home screen to keep it safe, and back up now and then.",
   'ios.bannerLabel': 'Data notice',
   'ios.gotIt': 'Got it',
-  'menu.fileSavedIos': 'File saved: find it in Downloads (Files app): {name}',
+  'menu.fileSavedIos': 'The backup should be in Downloads (Files app): {name}\n\nCan you see it? OK to mark it as done, Cancel if it is not there.',
   'desktop.continue': 'Continue on the computer',
 
   'about.version': 'Andata e Ritorno · version {version}',
@@ -182,7 +182,7 @@ export default {
   'wipe.failed': "Couldn't delete the data: close other A/R tabs and try again.",
   'menu.langAuto': 'Auto',
   'menu.exportFailed': 'Export failed: {message}',
-  'menu.fileSaved': 'File saved to Downloads: {name}',
+  'menu.fileSaved': 'The backup should be in Downloads: {name}\n\nCan you see it? OK to mark it as done, Cancel if it is not there.',
 
   'info.backup': { one: '1 item · last backup: {when}', other: '{n} items · last backup: {when}' },
   'info.protected': 'Storage protected ✓',
