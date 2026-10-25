@@ -53,4 +53,12 @@ describe('bottom bar on phones with a home indicator', () => {
   it('uses the safe area instead of adding 14px on top of it', () => {
     expect(css).toMatch(/\.bar \{[^}]*max\(14px, env\(safe-area-inset-bottom\)\)/)
   })
+  it('the viewer buttons and the menu drawer do the same', () => {
+    expect(css).toMatch(/#viewer \.vbot \{[^}]*max\(18px, env\(safe-area-inset-bottom\)\)/)
+    expect(css).toMatch(/#menu \{[^}]*max\(16px, env\(safe-area-inset-bottom\)\)/)
+    expect(css).not.toMatch(/calc\(\d+px \+ env\(safe-area-inset-bottom\)\)/)
+  })
+  it('the update notice keeps sitting just above the bar', () => {
+    expect(css).toMatch(/\.update-toast \{[^}]*bottom: calc\(40px \+ 2rem \+ max\(14px, env\(safe-area-inset-bottom\)\)\)/)
+  })
 })

@@ -126,7 +126,7 @@ dialog #editRotate, dialog #editPhoto { display: block; width: 100%; margin-bott
 #viewer .vlabel { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #viewer .vx { flex: none; width: 44px; height: 44px; border-radius: 50%; background: #fff; color: #111; display: flex; align-items: center; justify-content: center; }
 #viewer .vhint { margin: 0; padding: 10px max(14px, env(safe-area-inset-right)) 4px max(14px, env(safe-area-inset-left)); text-align: center; font-size: 0.75rem; color: #ddd; }
-#viewer .vbot { display: flex; gap: 8px; padding: 6px max(14px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+#viewer .vbot { display: flex; gap: 8px; padding: 6px max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 #viewer .vbot button { flex: 1; min-height: 44px; padding: 13px; border-radius: var(--r-pill); background: rgba(255,255,255,.15); color: #fff; font-weight: 700; font-size: 0.875rem; }
 #viewer .vbot .vclose { background: #fff; color: #111; }
 #viewer .stage { flex: 1; min-height: 0; margin: 0 max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); border-radius: 16px; touch-action: none; overflow: hidden; user-select: none; -webkit-user-select: none; }
@@ -138,7 +138,7 @@ dialog .edit-preview[hidden] { display: none; }
 
 /* ---- Menu drawer, import flow ---- */
 #menu { margin: 0; inset: 0 0 0 auto; width: min(82vw, 320px); height: 100dvh; max-height: 100dvh; max-width: none;
-  border-radius: 16px 0 0 16px; padding: calc(16px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) 16px;
+  border-radius: 16px 0 0 16px; padding: calc(16px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 16px;
   transform: translateX(100%); transition: transform .25s ease, display .25s allow-discrete, overlay .25s allow-discrete; }
 #menu[open] { transform: none; display: flex; flex-direction: column; }
 @starting-style { #menu[open] { transform: translateX(100%); } }
@@ -187,12 +187,14 @@ dialog .catpick .chip { flex: none; width: auto; padding: 7px 14px; }
 dialog .catpick .hint { flex: none; font-size: 0.8125rem; color: var(--muted); }
 dialog .catpick .linkbtn { flex: none; width: auto; padding: 10px 12px; background: none; color: var(--accent-strong); text-decoration: underline; }
 /* The list scrolls, which clips anything drawn outside it: 5px of room (3px outline + 2px offset) keeps the focus ring whole. */
+/* Names need the room: on narrow phones this dialog takes a little more width and less side padding. */
+@media (max-width: 400px) { #catMgr { width: min(96vw, 360px); padding-left: 12px; padding-right: 12px; } }
 dialog .catlist { list-style: none; margin: -5px -5px 7px; padding: 5px; max-height: 45dvh; overflow-y: auto; }
-dialog .catlist li { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+dialog .catlist li { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
 /* How many items use the category, inside the name field on the right (all tabs). */
 dialog .catlist .catname { flex: 1; min-width: 0; position: relative; }
-dialog .catlist input[type="text"] { margin: 0; padding-right: 48px; }
-dialog .catlist .catcount { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); min-width: 28px; padding: 3px 8px; border-radius: var(--r-pill); background: var(--badge); color: var(--muted); font-size: 0.8125rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
+dialog .catlist input[type="text"] { margin: 0; padding-left: 10px; padding-right: 36px; }
+dialog .catlist .catcount { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-width: 24px; padding: 3px 5px; border-radius: var(--r-pill); background: var(--badge); color: var(--muted); font-size: 0.8125rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
 dialog .catlist button { flex: none; width: 44px; height: 44px; padding: 0; background: var(--chip); }
 dialog .catlist button.danger { width: 44px; border: 0; color: var(--danger); }
 dialog .catnew { margin-bottom: 8px; }
@@ -249,7 +251,7 @@ dialog p.plain { margin: 0 0 12px; font-size: 0.875rem; line-height: 1.5; }
 dialog .wipe-actions { display: flex; flex-direction: column; gap: 8px; }
 
 /* ---- Update notice ---- */
-.update-toast { position: fixed; left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom)); z-index: 5; max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--fg); color: var(--bg); font-size: 0.8125rem; line-height: 1.4; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+.update-toast { position: fixed; left: 0; right: 0; bottom: calc(40px + 2rem + max(14px, env(safe-area-inset-bottom))); z-index: 5; max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--fg); color: var(--bg); font-size: 0.8125rem; line-height: 1.4; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
 .update-toast[hidden] { display: none; }
 .update-toast .msg { flex: 1; }
 .update-toast .hint { display: block; opacity: .8; font-size: 0.75rem; }
