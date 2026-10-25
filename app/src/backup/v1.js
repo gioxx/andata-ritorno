@@ -11,6 +11,9 @@ const EPOCH = '1970-01-01T00:00:00.000Z'
 const PLACES = ['school', 'home']
 const tabNameFor = (child) => (child === 'nido' ? 'Nido' : child === 'materna' ? 'Materna' : child)
 const str = (v) => (typeof v === 'string' ? v : '')
+// New tabs: Nido, Materna, then any other child alphabetically (not file order).
+const RANK = { nido: 0, materna: 1 }
+const byChild = ([a], [b]) => (RANK[a] ?? 2) - (RANK[b] ?? 2) || a.localeCompare(b)
 
 /** Read the first bytes to tell a v2 ZIP from a v1 JSON. */
 export async function detectFormat(file) {
@@ -77,7 +80,7 @@ export async function parseV1(json, { childMap, now, tabs = [] }) {
 
   const newTabs = []
   const resolved = {}
-  for (const [child, { tab, isNew }] of target) {
+  for (const [child, { tab, isNew }] of [...target].sort(byChild)) {
     if (!used.has(child)) continue
     if (isNew) newTabs.push({ ...tab, order: nextOrder++ })
     resolved[child] = tab.id

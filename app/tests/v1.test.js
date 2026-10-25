@@ -76,6 +76,19 @@ describe('parseV1', () => {
     expect(inc.failures[0]).toMatchObject({ tabName: 'Materna', label: 'Felpa blu' })
   })
 
+  it('new tabs: Nido, then Materna, then other children alphabetically, whatever the file order', async () => {
+    const data = clone()
+    const good = data.items[0]
+    data.items = [
+      { ...good, id: 'z', child: 'zeta' },
+      { ...data.items[2] },
+      { ...good, id: 'a', child: 'alfa' },
+      { ...good },
+    ]
+    const inc = await parseV1(data, { childMap: {}, now: NOW, tabs: [{ id: 'L', name: 'L', order: 2, createdAt: NOW, updatedAt: NOW }] })
+    expect(inc.tabs.map((t) => [t.name, t.order])).toEqual([['Nido', 3], ['Materna', 4], ['alfa', 5], ['zeta', 6]])
+  })
+
   it('rejects a file without an items array', async () => {
     await expect(parseV1({ app: 'andata-ritorno', version: 1 }, { childMap: {}, now: NOW })).rejects.toThrow('bad-file')
   })
