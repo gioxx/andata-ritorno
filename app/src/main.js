@@ -19,7 +19,6 @@ import { t, onLangChange } from './i18n.js';
 
 const root = document.getElementById('app');
 await desktopGate(root);
-initIosBanner();
 
 // Ask the browser not to evict our data; never throws, the answer is not needed.
 function persist() {
@@ -53,6 +52,8 @@ if (db) {
   subscribe(() => draw());
   onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
   await load(db);
+  // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
+  initIosBanner({ onDismiss: () => draw(true) });
   watchClipboard(draw);
   initAddFlow();
   initTabs();

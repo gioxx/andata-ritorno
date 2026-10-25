@@ -13,8 +13,8 @@ export function dismissIosBanner() {
   try { sessionStorage.setItem(KEY, '1') } catch { /* shown again next load */ }
 }
 
-/** Mounts the banner above #app; no-op when not needed. */
-export function initIosBanner() {
+/** Mounts the banner above #app; no-op when not needed. `onDismiss` lets the app redraw (the welcome screen then shows the steps). */
+export function initIosBanner({ onDismiss } = {}) {
   if (!shouldShowIosBanner(currentPlatform(), isStandalone())) return
   const el = document.createElement('aside')
   el.className = 'ios-banner'
@@ -31,6 +31,7 @@ export function initIosBanner() {
     dismissIosBanner()
     off()
     el.remove()
+    onDismiss?.()
   })
   document.body.prepend(el)
 }

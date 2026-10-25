@@ -105,3 +105,19 @@ describe('welcome install block', () => {
     setEnv(MAC, false, 0); expect(draw().querySelector('.install')).toBeNull()
   })
 })
+
+describe('banner dismissal redraws the welcome screen', () => {
+  it('shows the steps after "Ho capito" and keeps the typed name', () => {
+    sessionStorage.clear(); document.body.innerHTML = ''; setLang('it'); setEnv(IPHONE)
+    const root = document.createElement('div'); document.body.append(root)
+    // Same wiring as main.js: onDismiss forces a welcome redraw.
+    const draw = () => renderWelcome(root, { onCreate() {}, onImport() {} })
+    draw()
+    initIosBanner({ onDismiss: draw })
+    expect(root.querySelector('.install')).toBeNull()
+    root.querySelector('#firstTab').value = 'Nido'
+    document.querySelector('.ios-ok').click()
+    expect(root.querySelector('.install').textContent).toMatch(/Condividi/)
+    expect(root.querySelector('#firstTab').value).toBe('Nido')
+  })
+})
