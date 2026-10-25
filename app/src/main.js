@@ -12,8 +12,10 @@ import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
 import { initMenu } from './ui/menu.js';
+import { desktopGate } from './ui/desktop.js';
 
 const root = document.getElementById('app');
+await desktopGate(root);
 
 // Ask the browser not to evict our data; never throws, the answer is not needed.
 function persist() {
