@@ -29,9 +29,9 @@ describe('installSteps', () => {
   it('ios steps mention Condividi / Share in both languages', () => {
     const steps = installSteps('ios')
     expect(steps.length).toBe(3)
-    expect(steps.map((k) => t(k)).join(' ')).toMatch(/Condividi.*Aggiungi alla schermata Home/s)
+    expect(steps.map((k) => t(k)).join(' ')).toMatch(/tre lineette.*Condividi.*Visualizza altro.*Aggiungi alla schermata Home/s)
     setLang('en')
-    expect(steps.map((k) => t(k)).join(' ')).toMatch(/Share.*Add to Home Screen/s)
+    expect(steps.map((k) => t(k)).join(' ')).toMatch(/three lines.*Share.*View More.*Add to Home Screen/s)
   })
   it('android steps mention Installa app', () => {
     expect(installSteps('android').map((k) => t(k)).join(' ')).toMatch(/Installa app/)
