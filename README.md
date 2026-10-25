@@ -12,7 +12,7 @@ Take a photo of each item once; from then on every item is either *a scuola* or 
 - **Photos** from the camera, the gallery or the clipboard, resized to 1600 px; full-screen viewer with pinch-to-zoom.
 - **Rotate photos** with a single button; the rotation is saved when you confirm.
 - **Edit** an item's description, tab, category or photo.
-- **Categories**: optionally give each item one category (body, pants, spare outfit…); defaults are offered on request and can be edited. Filter with tags (OR logic, "All ✕" clears them).
+- **Categories**: optionally give each item one category (defaults: Bodysuits, Tops, Trousers, Dresses, Sweatshirts & jackets, Pyjamas, Underwear, Socks, Accessories); defaults are offered on request and can be edited. Filter with tags (OR logic, "All ✕" clears them).
 - **Italian and English**, chosen automatically, switchable from the menu.
 - **Accessible**: keyboard navigation, screen reader labels and good contrast.
 - **iPhone support** and a readable navigation bar on Android.
@@ -94,7 +94,7 @@ npm run deploy
 **Usala:** <https://ar.gioxx.org>
 
 - **Android**: apri il sito in Chrome e scegli "Installa app" / "Aggiungi a schermata Home".
-- **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi a Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
+- **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
 - **Privacy**: tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server.
 - **Backup**: esporta un file `.zip` con le foto; ogni backup viene riletto e controllato prima del salvataggio. I backup sono una tua responsabilità.
 

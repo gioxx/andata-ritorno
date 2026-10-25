@@ -6,7 +6,7 @@ import { hooks } from './render.js'
 import { openEditItem, reportError, openModal } from './dialogs.js'
 import { closeIcon, rotateIcon, chevronLeftIcon, chevronRightIcon } from './icons.js'
 import { viewerAction, idleRotation } from './rotation.js'
-import { pinch, swipeIntent, stepIndex, containSize, clampPan, DOUBLE_TAP_SCALE } from './gesture.js'
+import { pinch, swipeIntent, stepIndex, containSize, clampPan, refit, DOUBLE_TAP_SCALE } from './gesture.js'
 import { t as tr, onLangChange } from '../i18n.js'  // `t` is the pan/zoom state here
 
 const DOUBLE_TAP_MS = 300
@@ -66,6 +66,16 @@ function ensureDom() {
   dom.img.addEventListener('load', () => {
     content = containSize(vp.w, vp.h, dom.img.naturalWidth, dom.img.naturalHeight)
   })
+  // Rotating the phone or resizing the window changes the stage: recompute size and pan bounds.
+  const onResize = () => {
+    if (!isOpen) return
+    const r = dom.stage.getBoundingClientRect()
+    vp = { w: r.width, h: r.height }
+    content = containSize(vp.w, vp.h, dom.img.naturalWidth, dom.img.naturalHeight)
+    setT(refit(t, vp, content), true)
+  }
+  window.addEventListener('resize', onResize)
+  window.addEventListener('orientationchange', onResize)
   document.addEventListener('keydown', (e) => {
     if (!isOpen) return
     if (e.key === 'Escape') { e.preventDefault(); if (!busy) run('close') }

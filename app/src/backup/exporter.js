@@ -1,12 +1,13 @@
 // Export: build the v2 ZIP, hand it to the share sheet (Android) or download it.
 import { loadAll, getPhoto, setMeta } from '../db.js'
 import { buildZip } from './zip.js'
+import { t } from '../i18n.js'
 
 // iOS Safari 15+ shares ZIP files through the same API; if the gesture expired it throws and we download.
 /** @returns {Promise<boolean>} false when sharing files is not supported */
 async function defaultShare(file) {
   if (!navigator.canShare?.({ files: [file] })) return false
-  await navigator.share({ files: [file], title: 'Backup Andata e Ritorno' })
+  await navigator.share({ files: [file], title: t('export.shareTitle') })
   return true
 }
 

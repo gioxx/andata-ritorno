@@ -60,6 +60,8 @@ const ERROR_KEY = {
   'empty-name': 'error.emptyName',
   'bad-data-url': 'error.badDataUrl',
   'rotate-missing': 'rotate.missingPhoto',
+  'encode-failed': 'rotate.failed',
+  'not-an-image': 'rotate.unreadable',
   'backup-verify-failed': 'error.backupFailed',
   'backup-too-large': 'error.backupTooLarge',
 }

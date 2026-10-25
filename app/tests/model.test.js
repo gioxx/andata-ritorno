@@ -84,3 +84,10 @@ describe('exportErrorMessage', () => {
     expect(exportErrorMessage(new Error('boom'))).toBe('Esportazione non riuscita: boom')
   })
 })
+
+describe('rotate photo errors', () => {
+  it('maps encode-failed and not-an-image to friendly text', () => {
+    expect(errorMessage(new Error('encode-failed'))).not.toMatch(/encode-failed/)
+    expect(errorMessage(new Error('not-an-image'))).not.toMatch(/not-an-image/)
+  })
+})

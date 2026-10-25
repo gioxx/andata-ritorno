@@ -51,3 +51,12 @@ describe('gesture math', () => {
     expect(stepIndex(2, 'next', 3)).toBe(null)
   })
 })
+
+describe('refit', () => {
+  it('re-clamps pan to the new bounds and keeps the scale in range', async () => {
+    const { refit } = await import('../src/ui/gesture.js')
+    const vp = { w: 100, h: 100 }
+    expect(refit({ s: 2, x: 500, y: 500 }, vp, { w: 100, h: 50 })).toEqual({ s: 2, x: 50, y: 0 })
+    expect(refit({ s: 9, x: 0, y: 0 }, vp, { w: 100, h: 100 }).s).toBe(5)
+  })
+})

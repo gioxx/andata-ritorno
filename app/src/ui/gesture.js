@@ -23,6 +23,12 @@ export function clampPan(x, y, scale, vp, content) {
   return { x: Math.min(mx, Math.max(-mx, x)), y: Math.min(my, Math.max(-my, y)) }
 }
 
+/** Re-fit a transform after the stage or image size changed: scale stays in range, pan stays covered. */
+export function refit(tf, vp, content) {
+  const s = clampScale(tf.s)
+  return { s, ...clampPan(tf.x, tf.y, s, vp, content) }
+}
+
 /**
  * New transform when the gesture midpoint moves `from` -> `to` and the pinch distance is
  * multiplied by `ratio`; the content point under `from` ends up under `to`.
