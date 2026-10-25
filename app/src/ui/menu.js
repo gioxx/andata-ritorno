@@ -1,5 +1,5 @@
 // Side drawer (slides from the right): backup info, export/import, tabs, "Da rifare", theme, language.
-import { store, load } from '../store.js'
+import { store, load, runExclusive } from '../store.js'
 import { getMeta, setMeta } from '../db.js'
 import { exportBackup, backupFileName } from '../backup/exporter.js'
 import { hooks } from './render.js'
@@ -116,7 +116,8 @@ export async function runExport() {
   const now = new Date()
   let result
   try {
-    result = await withBusy(() => exportBackup(db, { now }))
+    // Exclusive: a move during the export would be counted, then zeroed with the counter.
+    result = await withBusy(() => runExclusive(() => exportBackup(db, { now })))
   } catch (e) {
     alert(missingPhotoMessage(e, store) ?? t('menu.exportFailed', { message: e?.message ?? e }))
     return

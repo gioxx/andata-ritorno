@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, markChanged, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -60,17 +60,6 @@ describe('store', () => {
     expect(store.unsaved).toBe(2)
   })
 
-  it('markChanged increments the persisted counter and notifies', async () => {
-    let calls = 0
-    const off = subscribe(() => calls++)
-    await markChanged(1)
-    await markChanged(2)
-    off()
-    expect(store.unsaved).toBe(3)
-    expect(await getMeta(db, 'unsavedCount')).toBe(3)
-    expect(calls).toBe(2)
-  })
-
   it('clearSelection empties the selection', () => {
     selectToggle('a1')
     clearSelection()
@@ -82,12 +71,6 @@ describe('store', () => {
     await Promise.all([move('home'), move('home')])
     expect(store.unsaved).toBe(2)
     expect(await getMeta(db, 'unsavedCount')).toBe(2)
-  })
-
-  it('concurrent markChanged calls do not lose increments', async () => {
-    await Promise.all([markChanged(1), markChanged(1), markChanged(1)])
-    expect(store.unsaved).toBe(3)
-    expect(await getMeta(db, 'unsavedCount')).toBe(3)
   })
 
   it('addPhotos adds items to the current tab, persists them and counts changes', async () => {
@@ -108,6 +91,48 @@ describe('store', () => {
     db.transaction = real
     expect(store.items.length).toBe(4)
     expect(store.unsaved).toBe(0)
+  })
+})
+
+describe('runExclusive', () => {
+  it('waits for a pending move() and blocks later mutations until done', async () => {
+    const log = []
+    selectToggle('a1')
+    const m1 = move('home').then(() => log.push('move1'))
+    const ex = runExclusive(async () => {
+      // The earlier move is already written when the exclusive section starts.
+      log.push('ex:' + (await loadAll(db)).items.find((i) => i.id === 'a1').location)
+      await new Promise((r) => setTimeout(r, 20))
+      log.push('ex-end')
+      return 42
+    })
+    selectToggle('a2')
+    const m2 = move('home').then(() => log.push('move2'))
+    expect(await ex).toBe(42)
+    await Promise.all([m1, m2])
+    expect(log).toEqual(['move1', 'ex:home', 'ex-end', 'move2'])
+  })
+
+  it('a failing section rejects and does not block the next mutation', async () => {
+    await expect(runExclusive(async () => { throw new Error('boom') })).rejects.toThrow('boom')
+    selectToggle('a1')
+    await move('home')
+    expect(store.items.find((i) => i.id === 'a1').location).toBe('home')
+  })
+
+  it('does not deadlock when the section reloads the store with load()', async () => {
+    const r = await Promise.race([
+      runExclusive(async () => { await load(db); return 'done' }),
+      new Promise((r) => setTimeout(() => r('deadlock'), 500)),
+    ])
+    expect(r).toBe('done')
+  })
+
+  it('a store action started (not awaited) inside the section runs right after it', async () => {
+    let added
+    await runExclusive(async () => { added = addTab('Dopo') })
+    await added
+    expect(store.tabs.map((t) => t.name)).toContain('Dopo')
   })
 })
 

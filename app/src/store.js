@@ -106,18 +106,21 @@ function queue(fn) {
   return run
 }
 
+/**
+ * Run `fn` alone in the mutation queue: it starts after every pending mutation and later
+ * ones wait for it (an import plans from a DB snapshot that must not change under it).
+ * `fn` must use db.js functions and load() only: awaiting a store action from inside
+ * would wait for its own slot and never finish. Not awaited, such an action simply runs after.
+ * @template T @param {() => Promise<T>} fn @returns {Promise<T>}
+ */
+export function runExclusive(fn) {
+  return queue(fn)
+}
+
 async function bump(n) {
   const next = store.unsaved + n
   await setMeta(store.db, 'unsavedCount', next)
   store.unsaved = next
-}
-
-/** @param {number} n changes since the last export */
-export function markChanged(n) {
-  return queue(async () => {
-    await bump(n)
-    notify()
-  })
 }
 
 /** Take the current selection and clear it right away, so a fast second tap finds nothing. */

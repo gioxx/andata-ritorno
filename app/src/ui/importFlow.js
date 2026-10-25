@@ -1,8 +1,8 @@
 // Import flow UI: pick a file, map v1 children to tabs, confirm partial imports, show the result.
 // All parsing/writing lives in backup/importer.js; this file only asks questions.
-import { store, load } from '../store.js'
+import { store, load, runExclusive } from '../store.js'
 import { prepareImport, commitImport, formatSummary, ImportBlocked } from '../backup/importer.js'
-import { esc } from './render.js'
+import { esc } from './esc.js'
 import { reportError, openModal } from './dialogs.js'
 import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice, importDoneText } from './model.js'
 import { getMeta } from '../db.js'
@@ -64,40 +64,52 @@ const showMessage = (text) => ask(`<h3>${t('import.title')}</h3><p>${esc(text)}<
 
 /** Whole import, from a picked file to the summary. Never throws: errors are reported. */
 export async function importFile(db, file) {
+  // The import is planned from a DB snapshot and verified after: no store mutation may run in
+  // between, so it holds the mutation queue (pending ones finish first, under the overlay).
   let summary
+  let reloadError = null
   try {
-    summary = await withBusy(async () => {
-      let prepared = await prepareImport(db, file)
-      if (prepared.needsMapping.length) {
-        const answer = await hideBusyWhile(() => askMapping(prepared.needsMapping))
-        if (!answer) return null
-        prepared = await prepareImport(db, file, { childMap: answer.value })
-      }
+    summary = await withBusy(() => runExclusive(async () => {
       try {
-        return await commitImport(db, prepared, { partial: false })
+        const s = await prepareAndCommit(db, file)
+        // The import is committed: a reload problem must not be reported as a failed import.
+        if (s) await load(db).catch((e) => { reloadError = e })
+        return s
       } catch (e) {
-        if (!(e instanceof ImportBlocked)) throw e
-        const choice = await hideBusyWhile(() => askBlocked(e.failures, prepared.incoming.items.length))
-        if (choice !== 'secondary') return null
-        return commitImport(db, prepared, { partial: true })
+        // The failure may be past the write (verify-failed): make the UI match the DB anyway.
+        await load(db).catch(() => {})
+        throw e
       }
-    })
+    }))
   } catch (e) {
-    // The failure may be past the write (verify-failed): make the UI match the DB anyway.
-    await load(db).catch(() => {})
     const msg = importErrorMessage(e)
     if (msg) alert(msg)
     else reportError(e)
     return
   }
   if (!summary) return
-  // The import is committed: a reload problem must not be reported as a failed import.
-  let reloadError = null
-  try { await load(db) } catch (e) { reloadError = e }
   // A failed read only costs an extra reminder.
   const lastBackupAt = await getMeta(db, 'lastBackupAt').catch(() => null)
   await showMessage(importDoneText(formatSummary(summary), lastBackupAt))
   if (reloadError) alert(t('import.reloadFailed', { message: reloadError?.message ?? reloadError }))
+}
+
+/** Runs inside runExclusive: db-level calls and dialogs only, never a queued store action. */
+async function prepareAndCommit(db, file) {
+  let prepared = await prepareImport(db, file)
+  if (prepared.needsMapping.length) {
+    const answer = await hideBusyWhile(() => askMapping(prepared.needsMapping))
+    if (!answer) return null
+    prepared = await prepareImport(db, file, { childMap: answer.value })
+  }
+  try {
+    return await commitImport(db, prepared, { partial: false })
+  } catch (e) {
+    if (!(e instanceof ImportBlocked)) throw e
+    const choice = await hideBusyWhile(() => askBlocked(e.failures, prepared.incoming.items.length))
+    if (choice !== 'secondary') return null
+    return commitImport(db, prepared, { partial: true })
+  }
 }
 
 // Questions need the user's hands, so drop the overlay for them and bring it back after.
