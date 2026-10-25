@@ -132,6 +132,7 @@ const LONG_PRESS = [
   { sel: '.item[data-id]', run: (el) => hooks.onOpenViewer(sectionIds(el), el.dataset.id) }, // full-screen viewer
 ]
 const pressable = (target) => {
+  if (target.closest('.open')) return null // the open button acts on tap only
   for (const p of LONG_PRESS) { const el = target.closest(p.sel); if (el) return { el, run: p.run } }
   return null
 }

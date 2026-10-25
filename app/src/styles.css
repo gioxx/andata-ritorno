@@ -3,7 +3,7 @@
   --bg: #fbf7f1; --fg: #2b2620; --muted: #9a8f80;
   --school: #fde9d9; --home: #e3eedd;
   --tile: #fff; --chip: #efe7db; --surface: #fbf7f1;
-  --accent: #d96f4f;
+  --accent: #d96f4f; --holder: #fff;
   --school-stripe: transparent; --home-stripe: transparent;
   --r-section: 22px; --r-tile: 16px; --r-pill: 999px;
   --font: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -14,14 +14,14 @@
     color-scheme: dark;
     --bg: #0d0f15; --surface: #151821; --school: #151821; --home: #151821;
     --tile: #1f232e; --chip: #1f232e; --fg: #eceef5; --muted: #7c8296;
-    --accent: #e88563; --school-stripe: #f0a531; --home-stripe: #3bb273;
+    --accent: #e88563; --holder: #0d0f15; --school-stripe: #f0a531; --home-stripe: #3bb273;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0d0f15; --surface: #151821; --school: #151821; --home: #151821;
   --tile: #1f232e; --chip: #1f232e; --fg: #eceef5; --muted: #7c8296;
-  --accent: #e88563; --school-stripe: #f0a531; --home-stripe: #3bb273;
+  --accent: #e88563; --holder: #0d0f15; --school-stripe: #f0a531; --home-stripe: #3bb273;
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: var(--font); font-weight: 500; background: var(--bg); color: var(--fg); }
@@ -106,7 +106,7 @@ dialog .note { margin: 8px 0 0; font-size: 12px; color: var(--muted); text-align
 /* ---- Edit dialog & viewer ---- */
 dialog select { width: 100%; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
 dialog #editPhoto { display: block; width: 100%; margin-bottom: 12px; }
-#viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.92); color: #fff; display: flex; flex-direction: column; }
+#viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; flex-direction: column; }
 #viewer[hidden] { display: none; }
 #viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 14px 12px; }
 #viewer .vlabel { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -137,8 +137,8 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .info { font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
 #menu h4 { margin: 14px 0 8px; text-align: left; font-size: 14px; }
 #menu h3 + h4 { margin-top: 4px; }
-#menu .menuItem { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px; margin-bottom: 8px; border-radius: 14px; background: var(--chip); font-size: 15px; font-weight: 600; }
-#menu .menuItem .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--tile); color: var(--accent); }
+#menu .menuItem { flex: none; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px; margin-bottom: 8px; border-radius: 14px; background: var(--chip); font-size: 15px; font-weight: 600; }
+#menu .menuItem .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--holder); color: var(--accent); }
 #menu .menuItem .badge { margin-left: auto; padding: 2px 9px; border-radius: var(--r-pill); background: var(--accent); color: var(--bg); font-size: 12px; font-weight: 700; }
 #menu .menuItem[hidden] { display: none; }
 .seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); }

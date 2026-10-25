@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderApp, hooks } from '../src/ui/render.js'
 import { store } from '../src/store.js'
 
@@ -17,6 +17,8 @@ describe('render safety net', () => {
 })
 
 describe('open-photo button on selected tiles', () => {
+  const savedHook = hooks.onOpenViewer
+  afterEach(() => { store.selected.clear(); hooks.onOpenViewer = savedHook })
   it('opens the viewer on the selected ids in display order without changing the selection', () => {
     const root = document.createElement('div')
     const mk = (id, location) => ({ id, tabId: 'A', location, label: id, photoId: 'p' + id })
@@ -32,6 +34,5 @@ describe('open-photo button on selected tiles', () => {
     root.querySelector('.item[data-id="h1"] .open').click()
     expect(open).toHaveBeenCalledWith(['s2', 'h1'], 'h1')
     expect([...selected]).toEqual(['h1', 's2'])
-    selected.clear()
   })
 })
