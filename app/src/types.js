@@ -11,3 +11,5 @@
 /* Failure.location is a raw string: unknown v1 places (e.g. 'nonna') are reported as-is. */
 /** @typedef {{ tabsPut:Tab[], categoriesPut:Category[], itemsPut:Item[], photosPut:Map<string,Blob>, photosDelete:string[],
  *   added:number, updated:number, metaPut?:Array<[string, any]> }} ImportPlan */
+/** Deletion marker kept while syncing so a delete wins over an older edit on other devices.
+ * @typedef {{ kind:'item'|'tab'|'category', id:string, deletedAt:string }} Tombstone */

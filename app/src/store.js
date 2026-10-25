@@ -211,7 +211,7 @@ export function deleteSelected() {
   if (!ids.length) return Promise.resolve()
   return queue(async () => {
     try {
-      await deleteItems(store.db, ids)
+      await deleteItems(store.db, ids, new Date().toISOString())
       const set = new Set(ids)
       store.items = store.items.filter((i) => !set.has(i.id))
       await bump(ids.length)
@@ -373,7 +373,7 @@ export function reorderTabs(ids) {
 export function removeTab(id) {
   return queue(async () => {
     const n = store.items.filter((i) => i.tabId === id).length
-    await deleteTab(store.db, id)
+    await deleteTab(store.db, id, new Date().toISOString())
     const { tabs, items } = await loadAll(store.db)
     store.tabs = tabs
     store.items = items
