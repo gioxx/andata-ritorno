@@ -75,6 +75,7 @@ Backups exported from the old prototype (`andata-ritorno-AAAA-MM-GG.json`) can s
 - [x] Photo rotation, Italian/English, iPhone support
 - [ ] Per-item movement history
 - [ ] Family sharing between phones
+- [ ] Privacy policy (public app, premium data on the server)
 
 ## Unused API Worker
 
