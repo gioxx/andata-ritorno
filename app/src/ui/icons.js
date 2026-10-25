@@ -1,5 +1,5 @@
 // Lucide icon nodes -> inline SVG strings (no DOM needed, so templates stay plain strings).
-import { Menu, Trash2, Check, Pencil, X, Camera, ClipboardPaste, Image, Download, Upload, Layers, ListChecks, Monitor, Sun, Moon, ZoomIn, ExternalLink, Tags, RotateCw } from 'lucide'
+import { Menu, Trash2, Check, Pencil, X, Camera, ClipboardPaste, Image, Download, Upload, Layers, ListChecks, Monitor, Sun, Moon, ZoomIn, ExternalLink, Tags, RotateCw, ChevronLeft, ChevronRight } from 'lucide'
 
 const svg = (node, size = 20) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${
@@ -25,3 +25,5 @@ export const moonIcon = svg(Moon, 16)
 export const linkIcon = svg(ExternalLink, 13) // lucide ships no brand icons (no github)
 export const tagsIcon = svg(Tags, 18)
 export const rotateIcon = svg(RotateCw, 18)
+export const chevronLeftIcon = svg(ChevronLeft, 24)
+export const chevronRightIcon = svg(ChevronRight, 24)

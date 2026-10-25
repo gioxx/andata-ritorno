@@ -2,7 +2,7 @@
 // DOM is built once and appended to <body>, like dialogs.js, so main-screen re-renders never touch it.
 import { store, addTab, renameTab, reorderTabs, removeTab } from '../store.js'
 import { hooks } from './render.js'
-import { reportError } from './dialogs.js'
+import { reportError, openModal } from './dialogs.js'
 import { t, onLangChange } from '../i18n.js'
 
 let dom = null
@@ -111,7 +111,7 @@ export function openTabManager(tabId = store.currentTabId) {
   mgrTabId = tab.id
   d.name.value = tab.name
   refreshManager()
-  d.mgr.showModal()
+  openModal(d.mgr)
 }
 
 export function openNewTab() {
@@ -119,7 +119,7 @@ export function openNewTab() {
   d.newName.value = ''
   d.newOk.disabled = true
   d.newTab.returnValue = ''
-  d.newTab.showModal()
+  openModal(d.newTab)
 }
 
 export function initTabs() {

@@ -5,7 +5,8 @@ import { exportBackup, backupFileName } from '../backup/exporter.js'
 import { hooks } from './render.js'
 import { openTabManager } from './tabs.js'
 import { openCategoryManager } from './categories.js'
-import { reportError } from './dialogs.js'
+import { reportError, openModal, labelDialog } from './dialogs.js'
+import { keepFocus } from './focus.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
 import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
@@ -31,12 +32,14 @@ async function persistence() {
 
 function renderThemeSeg() {
   const cur = getTheme()
-  dlg.querySelector('#themeSeg').innerHTML = themes().map(([v, icon, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}">${icon}${l}</button>`).join('')
+  const seg = dlg.querySelector('#themeSeg')
+  keepFocus(seg, () => { seg.innerHTML = themes().map(([v, icon, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}" aria-pressed="${v === cur}">${icon}${l}</button>`).join('') })
 }
 
 function renderLangSeg() {
   const cur = getLangChoice()
-  dlg.querySelector('#langSeg').innerHTML = langs().map(([v, l]) => `<button type="button" data-lang-choice="${v}" class="${v === cur ? 'active' : ''}">${l}</button>`).join('')
+  const seg = dlg.querySelector('#langSeg')
+  keepFocus(seg, () => { seg.innerHTML = langs().map(([v, l]) => `<button type="button" data-lang-choice="${v}" class="${v === cur ? 'active' : ''}" aria-pressed="${v === cur}">${l}</button>`).join('') })
 }
 
 /** Fill the dynamic parts (info lines, todo badge, segmented controls). */
@@ -57,7 +60,7 @@ async function openMenu() {
   if (!dlg) build()
   if (dlg.open) return // double tap on the menu button
   await refresh()
-  if (!dlg.open) dlg.showModal()
+  if (!dlg.open) openModal(dlg)
 }
 
 const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="close" data-menu="close" aria-label="${t('common.close')}">✕</button></h3>
@@ -81,7 +84,7 @@ function build() {
   dlg.innerHTML = menuHtml()
   document.body.append(dlg)
   // Relabel in place (the drawer stays open while the language is switched from it).
-  onLangChange(() => { dlg.innerHTML = menuHtml(); if (todoDlg?.open) renderTodo(); refresh() })
+  onLangChange(() => { keepFocus(dlg, () => { dlg.innerHTML = menuHtml(); labelDialog(dlg) }); if (todoDlg?.open) renderTodo(); refresh() })
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) { // the dialog itself is the target for both its padding and the backdrop
       const r = dlg.getBoundingClientRect()
@@ -139,15 +142,15 @@ async function openTodo() {
     })
   }
   await renderTodo()
-  if (!todoDlg.open) todoDlg.showModal()
+  if (!todoDlg.open) openModal(todoDlg)
 }
 
 async function renderTodo() {
   const list = (await getMeta(db, 'todo')) ?? []
   if (!list.length) { todoDlg.close(); return }
-  todoDlg.innerHTML = `<form method="dialog"><h3>${t('menu.todoTitle', { n: list.length })}</h3>
+  keepFocus(todoDlg, () => { todoDlg.innerHTML = `<form method="dialog"><h3>${t('menu.todoTitle', { n: list.length })}</h3>
     <ul class="failures">${list.map((f, i) => failureRow(f, `<button type="button" data-done="${i}">${t('menu.done')}</button>`)).join('')}</ul>
-    <button value="" class="cancel">${t('common.close')}</button></form>`
+    <button value="" class="cancel">${t('common.close')}</button></form>`; labelDialog(todoDlg) })
 }
 
 export function initMenu(database) {

@@ -34,6 +34,9 @@ export default {
   'render.addTab': 'Aggiungi scheda',
   'render.confirmDelete': 'Eliminare i capi selezionati?',
   'render.tags': 'Filtra per categoria',
+  'render.tabs': 'Schede',
+  'item.aria': '{label}, {place}, {category}',
+  'item.noCategory': 'senza categoria',
   'render.tagsAll': 'Tutti ✕',
 
   'welcome.title': 'Benvenuto in Andata e Ritorno',
@@ -110,6 +113,10 @@ export default {
 
   'viewer.hintOne': 'Due dita per ingrandire',
   'viewer.hintMany': 'Due dita per ingrandire · scorri per gli altri capi',
+  'viewer.prev': 'Foto precedente',
+  'viewer.next': 'Foto successiva',
+  'viewer.position': '{label}, {n} di {total}',
+  'viewer.pending': 'Rotazione in sospeso: Salva o Annulla',
 
   'menu.title': 'Menu',
   'menu.backup': 'Backup',

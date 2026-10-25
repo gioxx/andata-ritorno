@@ -8,6 +8,72 @@ import { getPhoto } from '../db.js'
 import { normTurns } from '../rotate.js'
 import { esc } from './render.js'
 import { t, onLangChange } from '../i18n.js'
+import { resolve, lastActivator, locator, keepFocus } from './focus.js'
+
+
+// ---- Shared modal behaviour -------------------------------------------------------------
+const FOCUSABLE = 'input:not([type="hidden"]), select, textarea, button, a[href], [tabindex]:not([tabindex="-1"])'
+const usable = (el) => !el.disabled && !el.hidden && !el.closest('[hidden], [inert]') && el.getAttribute('tabindex') !== '-1'
+/** Modals (and the viewer) that are open, or closed with their `close` event still pending. */
+const stack = []
+let titleSeq = 0
+
+/** Name a dialog after its heading unless it already has a name. */
+export function labelDialog(el) {
+  if (el.getAttribute('aria-label')) return
+  const h = el.querySelector('h3')
+  if (!h) return
+  if (!h.id) h.id = `dlgTitle${++titleSeq}`
+  el.setAttribute('aria-labelledby', h.id)
+}
+
+/**
+ * Open a modal the accessible way: name it, move focus to its first control, let Escape close it
+ * and give focus back to whatever opened it. Used by every dialog and the viewer.
+ * A <dialog> is shown with showModal() and releases itself on `close`; any other element (the
+ * viewer) is shown by its caller, which calls the returned release() when it hides.
+ * @param {HTMLElement} el
+ * @param {{returnFocus?: Element|string|null}} [opts] opener to refocus on close; defaults to the focused control
+ * @returns {() => void} release()
+ */
+export function openModal(el, { returnFocus = null } = {}) {
+  const isDialog = el instanceof HTMLDialogElement
+  // A modal that was just closed (its close event not yet fired) hands its opener on: the menu
+  // drawer closes right before the dialog it launches opens.
+  const handed = stack.find((m) => !m.done && !m.isOpen())
+  const active = document.activeElement
+  const own = active && active !== document.body && !active.closest('dialog:not([open])') ? active : null
+  const opener = resolve(returnFocus) ?? handed?.opener?.el ?? own ?? lastActivator()
+  const entry = { opener: opener ? { el: opener, loc: locator(opener) } : null, done: false, handedOff: false, isOpen: () => (isDialog ? el.open : true) }
+  if (handed) handed.handedOff = true
+  stack.push(entry)
+  labelDialog(el)
+  const inerted = []
+  if (isDialog) el.showModal()
+  else {
+    // A plain element has no native modality: make the rest of the page inert while it is up.
+    for (const n of document.body.children) if (n !== el && !n.inert) { n.inert = true; inerted.push(n) }
+  }
+  ;[...el.querySelectorAll(FOCUSABLE)].find(usable)?.focus({ preventScroll: true })
+  const onKey = (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || !isDialog) return
+    e.preventDefault() // closed here, through the same path as the native Escape (honours `cancel`)
+    if (el.dispatchEvent(new Event('cancel', { cancelable: true }))) el.close()
+  }
+  if (isDialog) el.addEventListener('keydown', onKey)
+  const release = () => {
+    if (entry.done) return
+    entry.done = true
+    stack.splice(stack.indexOf(entry), 1)
+    for (const n of inerted) n.inert = false
+    if (isDialog) el.removeEventListener('keydown', onKey)
+    if (entry.handedOff) return // the modal that replaced this one owns focus now
+    const back = entry.opener && (resolve(entry.opener.el) ?? resolve(entry.opener.loc))
+    back?.focus({ preventScroll: true })
+  }
+  if (isDialog) el.addEventListener('close', release, { once: true })
+  return release
+}
 
 let filesHandler = () => {}
 /** One-shot handler for the next picked files (change photo); null = the add flow. */
@@ -26,7 +92,8 @@ export function setManageCategories(fn) { manageCategories = fn }
  */
 function categoryPicker(box, initial = '') {
   let chosen = initial
-  const draw = () => {
+  const draw = () => keepFocus(box, redraw)
+  const redraw = () => {
     if (chosen && !store.categories.some((c) => c.id === chosen)) chosen = ''
     if (!store.categories.length) {
       box.innerHTML = `<span class="hint">${t('dialogs.categoryHint')}</span><button type="button" class="linkbtn" data-managecat>${t('dialogs.categoryManage')}</button>`
@@ -127,7 +194,7 @@ export function openSourcePicker(override = null) {
   pickOverride = override
   d.sourceTitle.textContent = override ? t('dialogs.changePhotoTitle') : t('dialogs.addTitle')
   d.gallery.multiple = !override
-  d.source.showModal()
+  openModal(d.source)
 }
 
 /**
@@ -147,7 +214,7 @@ export function askNewItem(previewUrls, tabName) {
   label.hidden = n > 1
   const picker = categoryPicker(d.newCat) // none preselected
   dlg.returnValue = ''
-  dlg.showModal()
+  openModal(dlg)
   return new Promise((resolve) => dlg.addEventListener('close', () => {
     const category = picker.get()
     picker.stop()
@@ -206,7 +273,7 @@ export function openEditItem(id) {
     // Reading, rotating and saving happen inside the store's queue, so quick saves can't race.
     rotateAndEdit(id, patch, turns, pending).then((rotationError) => { if (rotationError) reportError(rotationError) }).catch(reportError)
   }, { once: true })
-  d.edit.showModal()
+  openModal(d.edit)
 }
 
 /** Single place where a failed action reaches the user. */

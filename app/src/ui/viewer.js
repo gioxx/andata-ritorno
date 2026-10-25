@@ -1,11 +1,10 @@
 // Full-screen photo viewer. Lives on <body> (like dialogs) so main-screen re-renders never touch it.
 // Gestures use Pointer Events on one surface with touch-action:none; the math is in gesture.js.
 import { getPhoto } from '../db.js'
-import { store, editItem } from '../store.js'
+import { store, rotateAndEdit } from '../store.js'
 import { hooks } from './render.js'
-import { openEditItem, reportError } from './dialogs.js'
-import { closeIcon, rotateIcon } from './icons.js'
-import { rotatePhoto } from '../rotate.js'
+import { openEditItem, reportError, openModal } from './dialogs.js'
+import { closeIcon, rotateIcon, chevronLeftIcon, chevronRightIcon } from './icons.js'
 import { viewerAction, idleRotation } from './rotation.js'
 import { pinch, swipeIntent, stepIndex, containSize, clampPan, DOUBLE_TAP_SCALE } from './gesture.js'
 import { t as tr, onLangChange } from '../i18n.js'  // `t` is the pan/zoom state here
@@ -29,6 +28,7 @@ let drag = null, base = null, lastTap = null
 let rot = idleRotation() // pending rotation (see rotation.js); nothing is saved until Salva
 let angle = 0 // degrees shown, keeps growing so a turn never spins back
 let busy = false // encoding + saving a rotation
+let release = () => {} // gives focus back and un-inerts the page (see openModal)
 
 function ensureDom() {
   if (dom) return dom
@@ -37,18 +37,23 @@ function ensureDom() {
   el.hidden = true
   el.setAttribute('role', 'dialog')
   el.setAttribute('aria-modal', 'true')
+  el.setAttribute('aria-label', tr('render.openPhoto'))
   el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="${tr('common.close')}">${closeIcon}</button></div>
     <div class="stage"><img alt="" draggable="false"></div>
+    <button type="button" class="vnav prev" data-v="prev" aria-label="${tr('viewer.prev')}">${chevronLeftIcon}</button>
+    <button type="button" class="vnav next" data-v="next" aria-label="${tr('viewer.next')}">${chevronRightIcon}</button>
     <p class="vhint"></p>
+    <p class="sr" data-live="pos" aria-live="polite"></p><p class="sr" data-live="state" aria-live="polite"></p>
     <div class="vbot"><button type="button" data-v="rotate">${rotateIcon}<span>${tr('common.rotate')}</span></button><button type="button" class="n" data-v="edit">${tr('common.edit')}</button><button type="button" class="n vclose" data-v="close">${tr('common.close')}</button><button type="button" class="p" data-v="cancel">${tr('common.cancel')}</button><button type="button" class="p vclose" data-v="save">${tr('common.save')}</button></div>`
   document.body.append(el)
-  dom = { el, label: el.querySelector('.vlabel'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
+  dom = { el, prev: el.querySelector('.prev'), next: el.querySelector('.next'), pos: el.querySelector('[data-live="pos"]'), state: el.querySelector('[data-live="state"]'), label: el.querySelector('.vlabel'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-v]')
     if (!b) return
     if (busy) return
     const v = b.dataset.v
     if (v === 'close' || v === 'rotate' || v === 'save' || v === 'cancel') return run(v)
+    if (v === 'prev' || v === 'next') return step(v)
     const id = ids[index]
     close() // hide first: the edit dialog replaces the viewer
     openEditItem(id)
@@ -61,13 +66,20 @@ function ensureDom() {
   dom.img.addEventListener('load', () => {
     content = containSize(vp.w, vp.h, dom.img.naturalWidth, dom.img.naturalHeight)
   })
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) { e.preventDefault(); if (!busy) run('close') } })
+  document.addEventListener('keydown', (e) => {
+    if (!isOpen) return
+    if (e.key === 'Escape') { e.preventDefault(); if (!busy) run('close') }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); step(e.key === 'ArrowLeft' ? 'prev' : 'next') }
+  })
   window.addEventListener('popstate', () => {
     if (expectPop) { expectPop = false; return }
     if (isOpen) { pushed = false; teardown() } // Android back
   })
   // The viewer is built once (it owns window listeners): relabel in place on a language change.
   onLangChange(() => {
+    el.setAttribute('aria-label', tr('render.openPhoto'))
+    dom.prev.setAttribute('aria-label', tr('viewer.prev'))
+    dom.next.setAttribute('aria-label', tr('viewer.next'))
     el.querySelector('.vx').setAttribute('aria-label', tr('common.close'))
     el.querySelector('[data-v="edit"]').textContent = tr('common.edit')
     el.querySelector('[data-v="rotate"] span').textContent = tr('common.rotate')
@@ -92,6 +104,8 @@ function exitPending(snap = true) {
   rot = idleRotation()
   angle = 0
   dom.el.classList.remove('pending')
+  dom.state.textContent = ''
+  refreshNav()
   setT({ s: 1, x: 0, y: 0 }, snap)
 }
 
@@ -106,6 +120,8 @@ function run(event) {
       vp = { w: b.width, h: b.height }
       t = { s: 1, x: 0, y: 0 }
       dom.el.classList.add('pending')
+      dom.state.textContent = tr('viewer.pending')
+      refreshNav()
     } else if (fx === 'turn') {
       angle += 90
       dom.img.classList.add('snap')
@@ -124,14 +140,14 @@ async function commitRotation() {
   busy = true
   dom.el.classList.add('busy')
   try {
-    const blob = await getPhoto(store.db, it.photoId)
-    if (!blob) throw new Error('not-found')
-    const photo = await rotatePhoto(blob, rot.turns)
     const oldId = it.photoId
-    await editItem(id, {}, photo)
+    // Read, rotate and save inside the store's queue (serialised with other edits); a gone source
+    // comes back as an error ("rotate-missing" -> rotate.missingPhoto) and the rotation stays pending.
+    const failure = await rotateAndEdit(id, {}, rot.turns)
+    if (failure) throw failure
     const old = urls.get(oldId)
     if (old) { URL.revokeObjectURL(old); urls.delete(oldId) }
-    if (isOpen && ids[index] === id) { exitPending(false); show(index) } // no snap: the old image must not spin back // stay on the item, show the new photo
+    if (isOpen && ids[index] === id) { exitPending(false); show(index) } // no snap: the old image must not spin back; stay on the item, show the new photo
   } catch (e) { reportError(e) } // stay pending so the user can retry or cancel
   finally { busy = false; dom.el.classList.remove('busy') }
 }
@@ -151,6 +167,8 @@ async function show(i) {
   const my = ++token
   const it = store.items.find((x) => x.id === ids[i])
   d.label.textContent = it?.label || ''
+  d.pos.textContent = tr('viewer.position', { label: it?.label || tr('common.unnamed'), n: i + 1, total: ids.length })
+  refreshNav()
   setT({ s: 1, x: 0, y: 0 })
   content = vp
   d.img.removeAttribute('src')
@@ -168,6 +186,24 @@ async function show(i) {
   } catch (e) { reportError(e) }
 }
 
+/** Previous / next buttons: shown for several items, off at the ends and while a rotation is pending. */
+function refreshNav() {
+  const many = ids.length > 1
+  for (const [b, dir] of [[dom.prev, 'prev'], [dom.next, 'next']]) {
+    b.hidden = !many
+    const off = rot.active || stepIndex(index, dir, ids.length) === null
+    if (off && !b.disabled && document.activeElement === b) (dir === 'prev' ? dom.next : dom.prev).focus() // never strand the focus
+    b.disabled = off
+  }
+}
+
+/** Go to the previous / next item (buttons, arrow keys, swipes). */
+function step(dir) {
+  if (busy || !allowed('swipe')) return
+  const j = stepIndex(index, dir, ids.length)
+  if (j !== null) show(j)
+}
+
 /** @param {string[]} itemIds the swipe list in display order (selected items, or one section) @param {string} startId */
 export function openViewer(itemIds, startId) {
   if (isOpen || !itemIds.length) return
@@ -176,6 +212,7 @@ export function openViewer(itemIds, startId) {
   isOpen = true
   d.hint.textContent = hintText()
   d.el.hidden = false
+  release = openModal(d.el)
   const r = d.stage.getBoundingClientRect()
   vp = { w: r.width, h: r.height }
   history.pushState({ arViewer: true }, '')
@@ -187,6 +224,7 @@ function teardown() {
   if (!isOpen) return
   isOpen = false
   token++
+  dom.state.textContent = ''
   dom.el.hidden = true
   dom.img.removeAttribute('src')
   for (const u of urls.values()) URL.revokeObjectURL(u)
@@ -196,6 +234,7 @@ function teardown() {
   rot = idleRotation()
   angle = 0
   dom.el.classList.remove('pending', 'busy')
+  release()
 }
 
 /** Close from the UI; popping our history entry keeps no stray entry behind. */
@@ -256,8 +295,7 @@ function onUp(e, ok) {
   const intent = ok ? swipeIntent(dx, dy, t.s) : null
   if (intent === 'close') return run('close')
   if ((intent === 'next' || intent === 'prev') && allowed('swipe')) {
-    const j = stepIndex(index, intent, ids.length)
-    if (j !== null) return void show(j)
+    if (stepIndex(index, intent, ids.length) !== null) return step(intent)
   }
   if (ok && !d.moved) return allowed('zoom') ? tap(e) : undefined
   setT({ ...t }, true) // snap back from the follow offset

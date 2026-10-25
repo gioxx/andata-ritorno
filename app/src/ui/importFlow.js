@@ -3,7 +3,7 @@
 import { store, load } from '../store.js'
 import { prepareImport, commitImport, formatSummary, ImportBlocked } from '../backup/importer.js'
 import { esc } from './render.js'
-import { reportError } from './dialogs.js'
+import { reportError, openModal } from './dialogs.js'
 import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice, importDoneText } from './model.js'
 import { getMeta } from '../db.js'
 import { t } from '../i18n.js'
@@ -40,7 +40,7 @@ function ask(html, { collect } = {}) {
       d.close()
     })
     d.addEventListener('close', () => { d.remove(); resolve(result) })
-    d.showModal()
+    openModal(d)
   })
 }
 

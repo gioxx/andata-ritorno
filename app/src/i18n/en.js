@@ -33,6 +33,9 @@ export default {
   'render.addTab': 'Add tab',
   'render.confirmDelete': 'Delete the selected items?',
   'render.tags': 'Filter by category',
+  'render.tabs': 'Tabs',
+  'item.aria': '{label}, {place}, {category}',
+  'item.noCategory': 'no category',
   'render.tagsAll': 'All ✕',
 
   'welcome.title': 'Welcome to Andata e Ritorno',
@@ -109,6 +112,10 @@ export default {
 
   'viewer.hintOne': 'Pinch to zoom',
   'viewer.hintMany': 'Pinch to zoom · swipe for the other items',
+  'viewer.prev': 'Previous photo',
+  'viewer.next': 'Next photo',
+  'viewer.position': '{label}, {n} of {total}',
+  'viewer.pending': 'Rotation pending: Save or Cancel',
 
   'menu.title': 'Menu',
   'menu.backup': 'Backup',

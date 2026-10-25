@@ -3,7 +3,8 @@
 import { store, addCategory, renameCategory, reorderCategories, removeCategory, addDefaultCategories } from '../store.js'
 import { categoryName, missingDefaults } from '../categories.js'
 import { hooks, esc } from './render.js'
-import { reportError, setManageCategories } from './dialogs.js'
+import { reportError, setManageCategories, openModal } from './dialogs.js'
+import { keepFocus } from './focus.js'
 import { t, onLangChange } from '../i18n.js'
 
 let dom = null
@@ -48,7 +49,8 @@ function ensureDom() {
   return dom
 }
 
-function draw() {
+function draw() { keepFocus(ensureDom().list, drawList) }
+function drawList() {
   const d = ensureDom()
   const cats = store.categories
   d.empty.hidden = cats.length > 0
@@ -102,7 +104,7 @@ export function openCategoryManager() {
   if (d.dlg.open) return
   d.input.value = ''
   draw()
-  d.dlg.showModal()
+  openModal(d.dlg)
 }
 
 export function initCategories() {

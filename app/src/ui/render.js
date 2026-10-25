@@ -8,6 +8,7 @@ import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pas
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
 import { t } from '../i18n.js'
+import { keepFocus, noteActivator } from './focus.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
@@ -43,17 +44,25 @@ function revokeGone() {
   for (const [id, url] of urls) if (!alive.has(id)) { URL.revokeObjectURL(url); urls.delete(id) }
 }
 
-function tile(i, moved) {
+/** Spoken name of a tile: description, place and category. */
+function tileLabel(i, label, categories) {
+  const cat = categories.find((c) => c.id === i.category)
+  return t('item.aria', { label: label.trim() || t('common.unnamed'), place: t(i.location === 'home' ? 'loc.home' : 'loc.school'), category: cat ? categoryName(cat) : t('item.noCategory') })
+}
+
+// The tile is a wrapper (a button cannot hold another button): `.pick` covers it and carries the
+// selection state, `.open` (selected tiles only) is its sibling. Long-press targets the wrapper.
+function tile(i, moved, categories) {
   const sel = store.selected.has(i.id)
   const label = String(i.label ?? '') // safety net: never trust the type of stored data
   return `<div class="item${label.trim() ? ' labeled' : ''}${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
-    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(label)}</span>${sel ? `<i class="check">${checkIcon}</i><button class="open" data-view="${esc(i.id)}" aria-label="${t('render.openPhoto')}">${zoomInIcon}</button>` : ''}</div>`
+    <img data-photo="${esc(i.photoId)}" alt=""><span aria-hidden="true">${esc(label)}</span><button type="button" class="pick" aria-pressed="${sel}" aria-label="${esc(tileLabel(i, label, categories))}"></button>${sel ? `<i class="check" aria-hidden="true">${checkIcon}</i><button type="button" class="open" data-view="${esc(i.id)}" aria-label="${t('render.openPhoto')}">${zoomInIcon}</button>` : ''}</div>`
 }
 
-function section(loc, title, cls, list) {
+function section(loc, title, cls, list, categories) {
   return `<section class="${cls}"><h2><span>${title}</span><button class="count" data-section="${loc}" aria-label="${t('render.selectAll', { n: list.length })}">${list.length}</button></h2>
     <div class="grid">${list.length
-      ? list.map((i) => tile(i, lastLocation.has(i.id) && lastLocation.get(i.id) !== i.location)).join('')
+      ? list.map((i) => tile(i, lastLocation.has(i.id) && lastLocation.get(i.id) !== i.location, categories)).join('')
       : `<div class="empty">${t('render.empty')}</div>`}</div></section>`
 }
 
@@ -90,15 +99,16 @@ export function renderApp(root, s = store) {
   const items = visibleItems(tabItems, s.filter)
   const sel = [...s.selected].map((id) => s.items.find((i) => i.id === id)).filter(Boolean)
   const n = s.unsaved
+  const cats = s.categories ?? []
   const banner = n
     ? `<div class="unsaved"><span>⚠ ${t('render.unsaved', { n })}</span><button data-act="export">${t('render.export')}</button></div>`
     : ''
-  root.innerHTML = `<header>
+  keepFocus(root, () => { root.innerHTML = `<header>
       <div class="row1"><h1>${t('app.name')}</h1><button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
-      <nav class="chips">${s.tabs.map((t) => `<button class="chip${t.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(t.id)}">${esc(t.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
+      <nav class="chips" aria-label="${t('render.tabs')}">${s.tabs.map((tb) => `<button class="chip${tb.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(tb.id)}"${tb.id === s.currentTabId ? ' aria-current="true"' : ''}>${esc(tb.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
     </header>
-    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'))}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'))}</main>
-    <footer class="bar">${bar(sel)}</footer>`
+    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}</main>
+    <footer class="bar">${bar(sel)}</footer>` })
   root.querySelector('.chips').scrollLeft = chipsScroll
   const tags = root.querySelector('.tags')
   if (tags) tags.scrollLeft = tagsScroll
@@ -115,15 +125,16 @@ function wire(root) {
   wired.add(root)
   wireLongPress(root)
   root.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-tab],[data-tag],[data-tagclear],[data-view],[data-id],[data-section],[data-act]')
-    if (!t) return
-    if (t.dataset.tab) return setCurrentTab(t.dataset.tab)
-    if (t.dataset.tag) return toggleFilter(t.dataset.tag)
-    if (t.dataset.tagclear) return clearFilter()
-    if (t.dataset.view) return act(() => hooks.onOpenViewer(selectedIds(root), t.dataset.view))
-    if (t.dataset.section) return selectSection(t.dataset.section)
-    if (t.dataset.id) return selectToggle(t.dataset.id)
-    switch (t.dataset.act) {
+    const el = e.target.closest('[data-tab],[data-tag],[data-tagclear],[data-view],[data-id],[data-section],[data-act]')
+    if (!el) return
+    noteActivator(el)
+    if (el.dataset.tab) return setCurrentTab(el.dataset.tab)
+    if (el.dataset.tag) return toggleFilter(el.dataset.tag)
+    if (el.dataset.tagclear) return clearFilter()
+    if (el.dataset.view) return act(() => hooks.onOpenViewer(selectedIds(root), el.dataset.view))
+    if (el.dataset.section) return selectSection(el.dataset.section)
+    if (el.dataset.id) return selectToggle(el.dataset.id)
+    switch (el.dataset.act) {
       case 'addTab': return act(hooks.onAddTab)
       case 'add': return act(hooks.onAdd)
       case 'paste': return act(hooks.onPaste)
@@ -165,6 +176,7 @@ function wireLongPress(root) {
     const hit = pressable(e.target)
     if (!hit) return
     fired = false; x = e.clientX; y = e.clientY
+    noteActivator(hit.el.querySelector('.pick') ?? hit.el) // the viewer / manager returns focus here
     cancel()
     timer = setTimeout(() => { fired = true; act(() => hit.run(hit.el)) }, LONG_PRESS_MS)
   })
