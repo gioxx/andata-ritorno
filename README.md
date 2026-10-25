@@ -3,17 +3,27 @@
 A small installable web app to keep track of kids' clothes between **home** and **school** (nursery, kindergarten…).
 Take a photo of each item once; from then on every item is either *a scuola* or *a casa* and moves with a tap — no more copying photos between notes to remember what is where.
 
-**Use it:** <https://ar.gioxx.org> — open it on your phone and add it to the home screen. The UI is in Italian.
+**Use it:** <https://ar.gioxx.org> — open it on your phone and add it to the home screen. The UI is available in Italian and English (automatic, with a switch in the menu).
 
 ## Features
 
 - **Your own tabs**: one per child or per school (e.g. "Nido", "Materna"); add, rename, reorder or delete them.
 - **Two places only**, school and home: tap items to select them (or tap a section's counter to select all), then move them in one go.
 - **Photos** from the camera, the gallery or the clipboard, resized to 1600 px; full-screen viewer with pinch-to-zoom.
-- **Edit** an item's description, tab or photo.
-- **Backup / restore** as a single `.zip` file (photos included, with integrity checks). Importing merges by item, so restoring the same backup twice creates no duplicates.
+- **Rotate photos** with a single button; the rotation is saved when you confirm.
+- **Edit** an item's description, tab, category or photo.
+- **Categories**: optionally give each item one category (body, pants, spare outfit…); defaults are offered on request and can be edited. Filter with tags (OR logic, "All ✕" clears them).
+- **Italian and English**, chosen automatically, switchable from the menu.
+- **Accessible**: keyboard navigation, screen reader labels and good contrast.
+- **iPhone support** and a readable navigation bar on Android.
+- **Backup / restore** as a single `.zip` file (photos included, with integrity checks). Every backup is read back and verified before it is saved. Importing merges by item, so restoring the same backup twice creates no duplicates.
 - **Works offline** and installs like an app (PWA).
 - Light, dark or automatic theme.
+- Security headers on the served app.
+
+## Installing on iPhone
+
+Open <https://ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**. Install it: if you only use it in a Safari tab, Safari may delete the site's data after about 7 days without use. Export backups regularly anyway.
 
 ## Privacy
 
@@ -29,7 +39,7 @@ npm test         # unit tests (Vitest)
 npm run build    # production build in app/dist
 ```
 
-Plain JavaScript (ES modules) with Vite, [idb](https://github.com/jakearchibald/idb), [fflate](https://github.com/101arrowz/fflate), [Lucide](https://lucide.dev) icons and the Plus Jakarta Sans font (self-hosted). Target device: Android (Chrome); iOS comes later.
+Plain JavaScript (ES modules) with Vite, [idb](https://github.com/jakearchibald/idb), [fflate](https://github.com/101arrowz/fflate), [Lucide](https://lucide.dev) icons and the Plus Jakarta Sans font (self-hosted). Target devices: Android (Chrome) and iPhone (Safari).
 
 ## Deploy
 
@@ -60,7 +70,8 @@ Backups exported from the old prototype (`andata-ritorno-AAAA-MM-GG.json`) can s
 - [x] Local storage in IndexedDB, ZIP backups
 - [x] Full-screen photo viewer, item editing
 - [x] Offline, installable PWA
-- [ ] Optional categories (body, pants, spare outfit…) and a quick filter
+- [x] Optional categories and a quick filter
+- [x] Photo rotation, Italian/English, iPhone support
 - [ ] Per-item movement history
 - [ ] Family sharing between phones
 
@@ -75,6 +86,17 @@ npx wrangler r2 bucket create andata-ritorno-photos
 npm run db:init
 npm run deploy
 ```
+
+## In italiano
+
+**Andata e Ritorno (A/R)** è una piccola app installabile per tenere traccia dei vestiti dei bambini tra **casa** e **scuola**: fotografi ogni capo una volta, poi con un tocco lo sposti *a scuola* o *a casa*. Novità della 2.2: rotazione foto, categorie con filtri, italiano/inglese, accessibilità, supporto iPhone, backup verificati.
+
+**Usala:** <https://ar.gioxx.org>
+
+- **Android**: apri il sito in Chrome e scegli "Installa app" / "Aggiungi a schermata Home".
+- **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi a Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
+- **Privacy**: tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server.
+- **Backup**: esporta un file `.zip` con le foto; ogni backup viene riletto e controllato prima del salvataggio. I backup sono una tua responsabilità.
 
 ## License
 
