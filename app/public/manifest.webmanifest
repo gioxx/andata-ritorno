@@ -1,7 +1,9 @@
 {
   "name": "Andata e Ritorno",
   "short_name": "A/R",
+  "id": "/",
   "start_url": "./",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#fbf7f1",
   "theme_color": "#fbf7f1",

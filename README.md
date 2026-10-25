@@ -18,6 +18,8 @@ cd app && npm install && npm run dev
 npm test
 ```
 
+Target device: Android (Chrome). iOS comes later.
+
 ## Deploy (Cloudflare Workers, static assets)
 
 ```bash
@@ -55,12 +57,16 @@ npx serve legacy     # or: python3 -m http.server -d legacy
 - [ ] Family sharing
 - [ ] Payments
 
-## API
+## Old API Worker (not deployed in v2 — reference for project 2)
 
-| Method | Path | Body |
-|---|---|---|
-| GET | `/api/items?child=nido` | — |
-| POST | `/api/items` | multipart: `photo`, `child`, `label` |
-| POST | `/api/move` | `{ ids: [], location: "school" \| "home" }` |
-| DELETE | `/api/items/:id` | — |
-| GET | `/api/photo/:key` | — |
+`worker/src` + `worker/schema.sql` (D1 + R2). v2 does not use it. If it is ever deployed, set it up in this order:
+
+```bash
+cd worker && npm install
+npx wrangler d1 create andata-ritorno          # paste the id into wrangler.toml
+npx wrangler r2 bucket create andata-ritorno-photos
+npm run db:init
+npm run deploy
+```
+
+**Protect it with Cloudflare Access before any deploy** (Zero Trust → Applications, only your email addresses): `/api/*` has no auth of its own.
