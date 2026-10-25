@@ -1,5 +1,6 @@
 // First-run screen, shown while there are no tabs. Importing a backup must not create a tab first.
 import { esc } from './render.js'
+import { t } from '../i18n.js'
 
 /**
  * @param {HTMLElement} root
@@ -9,13 +10,13 @@ export function renderWelcome(root, { onCreate, onImport }) {
   // Keep the typed name if the screen is redrawn (e.g. store notifications) while typing.
   const prev = root.querySelector('#firstTab')?.value ?? ''
   root.innerHTML = `<div class="welcome">
-    <h1>Benvenuto in Andata e Ritorno</h1>
-    <input type="text" id="firstTab" placeholder="Es. Nido di Sofia" aria-label="Come si chiama la prima scheda?" autocomplete="off" value="${esc(prev)}">
-    <label for="firstTab" class="hint">Come si chiama la prima scheda?</label>
-    <button class="primary" id="start" ${prev.trim() ? '' : 'disabled'}>Inizia</button>
-    <button class="ghost" id="importBtn">Importa un backup</button>
+    <h1>${t('welcome.title')}</h1>
+    <input type="text" id="firstTab" placeholder="${esc(t('welcome.placeholder'))}" aria-label="${esc(t('welcome.hint'))}" autocomplete="off" value="${esc(prev)}">
+    <label for="firstTab" class="hint">${t('welcome.hint')}</label>
+    <button class="primary" id="start" ${prev.trim() ? '' : 'disabled'}>${t('welcome.start')}</button>
+    <button class="ghost" id="importBtn">${t('welcome.import')}</button>
     <input type="file" id="importFile" accept=".zip,application/zip,application/json,.json" hidden>
-    <p class="note">I dati restano su questo telefono. Ricordati di fare un backup ogni tanto.</p>
+    <p class="note">${t('welcome.note')}</p>
   </div>`
   const $ = (id) => root.querySelector('#' + id)
   const input = $('firstTab'), start = $('start'), file = $('importFile')

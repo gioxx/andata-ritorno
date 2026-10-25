@@ -3,6 +3,7 @@
 import { store, editItem, prepareReplacement } from '../store.js'
 import { errorMessage } from './model.js'
 import { cameraIcon, imageIcon } from './icons.js'
+import { t, onLangChange } from '../i18n.js'
 
 let filesHandler = () => {}
 /** One-shot handler for the next picked files (change photo); null = the add flow. */
@@ -11,42 +12,46 @@ let pickOverride = null
 export function setFilesHandler(fn) { filesHandler = fn }
 
 let dom = null
+let nodes = []
+// Dialog text is baked in at build time: drop the (closed) dialogs so the next use rebuilds them.
+onLangChange(() => { for (const n of nodes) n.remove(); nodes = []; dom = null })
 function ensureDom() {
   if (dom) return dom
   const wrap = document.createElement('div')
   wrap.innerHTML = `
     <dialog id="source"><form method="dialog">
-      <h3 id="sourceTitle">Aggiungi capi</h3>
+      <h3 id="sourceTitle">${t('dialogs.addTitle')}</h3>
       <div class="row">
-        <button type="button" data-source="camera" class="primary">${cameraIcon}Scatta</button>
-        <button type="button" data-source="gallery">${imageIcon}Galleria</button>
+        <button type="button" data-source="camera" class="primary">${cameraIcon}${t('dialogs.camera')}</button>
+        <button type="button" data-source="gallery">${imageIcon}${t('dialogs.gallery')}</button>
       </div>
-      <button value="" class="cancel">Annulla</button>
+      <button value="" class="cancel">${t('common.cancel')}</button>
     </form></dialog>
     <dialog id="newItem"><form method="dialog">
       <h3 id="newTitle"></h3>
       <div class="preview" id="newPreview"></div>
-      <input type="text" id="newLabel" placeholder="Descrizione (opzionale)" autocomplete="off">
+      <input type="text" id="newLabel" placeholder="${t('dialogs.labelPlaceholder')}" autocomplete="off">
       <div class="row">
-        <button value="school" class="primary">🏫 A scuola</button>
-        <button value="home">🏠 A casa</button>
+        <button value="school" class="primary">🏫 ${t('loc.school')}</button>
+        <button value="home">🏠 ${t('loc.home')}</button>
       </div>
-      <button value="" class="cancel">Annulla</button>
+      <button value="" class="cancel">${t('common.cancel')}</button>
     </form></dialog>
     <dialog id="editItem"><form method="dialog">
-      <h3>Modifica capo</h3>
-      <input type="text" id="editLabel" placeholder="Descrizione" aria-label="Descrizione" autocomplete="off">
-      <select id="editTab" aria-label="Scheda"></select>
+      <h3>${t('dialogs.editTitle')}</h3>
+      <input type="text" id="editLabel" placeholder="${t('dialogs.label')}" aria-label="${t('dialogs.label')}" autocomplete="off">
+      <select id="editTab" aria-label="${t('dialogs.tab')}"></select>
       <img id="editPreview" class="edit-preview" alt="" hidden>
-      <button type="button" id="editPhoto">Cambia foto</button>
+      <button type="button" id="editPhoto">${t('dialogs.changePhotoTitle')}</button>
       <div class="row">
-        <button value="" class="cancel-inline">Annulla</button>
-        <button value="ok" class="primary" id="editSave">Salva</button>
+        <button value="" class="cancel-inline">${t('common.cancel')}</button>
+        <button value="ok" class="primary" id="editSave">${t('common.save')}</button>
       </div>
     </form></dialog>
     <input type="file" id="camera" accept="image/*" capture="environment" hidden>
     <input type="file" id="gallery" accept="image/*" multiple hidden>`
-  document.body.append(...wrap.children)
+  nodes = [...wrap.children]
+  document.body.append(...nodes)
   const $ = (id) => document.getElementById(id)
   dom = { source: $('source'), newItem: $('newItem'), title: $('newTitle'), preview: $('newPreview'), label: $('newLabel'),
     sourceTitle: $('sourceTitle'), gallery: $('gallery'),
@@ -81,7 +86,7 @@ export function initDialogs() { ensureDom() }
 export function openSourcePicker(override = null) {
   const d = ensureDom()
   pickOverride = override
-  d.sourceTitle.textContent = override ? 'Cambia foto' : 'Aggiungi capi'
+  d.sourceTitle.textContent = override ? t('dialogs.changePhotoTitle') : t('dialogs.addTitle')
   d.gallery.multiple = !override
   d.source.showModal()
 }
@@ -95,7 +100,7 @@ export function openSourcePicker(override = null) {
 export function askNewItem(previewUrls, tabName) {
   const { newItem: dlg, title, preview, label } = ensureDom()
   const n = previewUrls.length
-  title.textContent = n === 1 ? `Nuovo capo · ${tabName}` : `${n} nuovi capi · ${tabName}`
+  title.textContent = n === 1 ? t('dialogs.newItem', { tab: tabName }) : t('dialogs.newItems', { n, tab: tabName })
   preview.replaceChildren(...previewUrls.map((src) => Object.assign(document.createElement('img'), { src, alt: '' })))
   label.value = ''
   // Several photos: one description would be wrong for all of them, so skip it.
@@ -118,7 +123,7 @@ export function openEditItem(id) {
   let previewUrl = ''
   const clearPreview = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = ''; d.editPreview.hidden = true; d.editPreview.removeAttribute('src') }
   clearPreview()
-  d.editPhoto.textContent = 'Cambia foto'
+  d.editPhoto.textContent = t('dialogs.changePhotoTitle')
   d.editPhoto.onclick = () => openSourcePicker(async (files) => {
     if (!files[0]) return
     try {
@@ -127,9 +132,9 @@ export function openEditItem(id) {
       previewUrl = URL.createObjectURL(pending.blob)
       d.editPreview.src = previewUrl
       d.editPreview.hidden = false
-      d.editPhoto.textContent = 'Cambia di nuovo'
+      d.editPhoto.textContent = t('dialogs.changeAgain')
     } catch (e) {
-      if (e?.message === 'not-an-image') alert("1 file non è un'immagine leggibile ed è stato saltato")
+      if (e?.message === 'not-an-image') alert(t('add.skipped', { n: 1 }))
       else reportError(e)
     }
   })
@@ -144,6 +149,6 @@ export function openEditItem(id) {
 
 /** Single place where a failed action reaches the user. */
 export function reportError(e) {
-  if (e?.name === 'QuotaExceededError') alert('Memoria del telefono piena: esporta un backup ed elimina qualche capo.')
+  if (e?.name === 'QuotaExceededError') alert(t('dialogs.quota'))
   else alert(errorMessage(e, store))
 }

@@ -6,12 +6,12 @@ import { hooks } from './render.js'
 import { openEditItem, reportError } from './dialogs.js'
 import { closeIcon } from './icons.js'
 import { pinch, swipeIntent, stepIndex, containSize, clampPan, DOUBLE_TAP_SCALE } from './gesture.js'
+import { t as tr, onLangChange } from '../i18n.js'  // `t` is the pan/zoom state here
 
 const DOUBLE_TAP_MS = 300
 const TAP_SLOP = 10
 
-const HINT_ONE = 'Due dita per ingrandire'
-const HINT_MANY = 'Due dita per ingrandire · scorri per gli altri capi'
+const hintText = () => tr(ids.length > 1 ? 'viewer.hintMany' : 'viewer.hintOne')
 
 let dom = null
 let ids = [], index = 0
@@ -32,10 +32,10 @@ function ensureDom() {
   el.hidden = true
   el.setAttribute('role', 'dialog')
   el.setAttribute('aria-modal', 'true')
-  el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="Chiudi">${closeIcon}</button></div>
+  el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="${tr('common.close')}">${closeIcon}</button></div>
     <div class="stage"><img alt="" draggable="false"></div>
     <p class="vhint"></p>
-    <div class="vbot"><button type="button" data-v="edit">Modifica</button><button type="button" class="vclose" data-v="close">Chiudi</button></div>`
+    <div class="vbot"><button type="button" data-v="edit">${tr('common.edit')}</button><button type="button" class="vclose" data-v="close">${tr('common.close')}</button></div>`
   document.body.append(el)
   dom = { el, label: el.querySelector('.vlabel'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
   el.addEventListener('click', (e) => {
@@ -57,6 +57,13 @@ function ensureDom() {
   window.addEventListener('popstate', () => {
     if (expectPop) { expectPop = false; return }
     if (isOpen) { pushed = false; teardown() } // Android back
+  })
+  // The viewer is built once (it owns window listeners): relabel in place on a language change.
+  onLangChange(() => {
+    el.querySelector('.vx').setAttribute('aria-label', tr('common.close'))
+    el.querySelector('[data-v="edit"]').textContent = tr('common.edit')
+    el.querySelector('.vclose').textContent = tr('common.close')
+    if (isOpen) dom.hint.textContent = hintText()
   })
   return dom
 }
@@ -101,7 +108,7 @@ export function openViewer(itemIds, startId) {
   const d = ensureDom()
   ids = itemIds
   isOpen = true
-  d.hint.textContent = ids.length > 1 ? HINT_MANY : HINT_ONE
+  d.hint.textContent = hintText()
   d.el.hidden = false
   const r = d.stage.getBoundingClientRect()
   vp = { w: r.width, h: r.height }

@@ -9,10 +9,7 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f15">
-<script>
-  // Apply the saved theme before first paint to avoid a flash. 'auto' (no attribute) follows the system.
-  try { const t = localStorage.getItem('ar-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
-</script>
+<script src="/prepaint.js"></script>
 </head>
 <body>
 <div id="app"></div>

@@ -2,6 +2,7 @@
 // invite the visitor to open it on the phone, but let them carry on if they really want to.
 
 import { inviteFooter } from './about.js'
+import { t, onLangChange } from '../i18n.js'
 
 const KEY = 'ar-desktop-ok'
 
@@ -37,23 +38,31 @@ function dismissed() {
  */
 export function desktopGate(root) {
   if (!shouldShowDesktopGate(readEnv(), dismissed())) return Promise.resolve()
-  root.innerHTML = `<div class="welcome desktop-gate">
-    <h1>A/R è fatta per il telefono</h1>
-    <p>Serve a fotografare i capi e spostarli tra casa e scuola con un tocco: usala sul telefono e aggiungila alla schermata Home.</p>
-    <img class="qr" src="/qr-ar.svg" width="200" height="200" alt="QR code per aprire ar.gioxx.org sul telefono">
+  // Redrawn on a language change; the button is re-wired each time.
+  const draw = () => {
+    root.innerHTML = `<div class="welcome desktop-gate">
+    <h1>${t('desktop.title')}</h1>
+    <p>${t('desktop.lead')}</p>
+    <img class="qr" src="/qr-ar.svg" width="200" height="200" alt="${t('desktop.qrAlt')}">
     <ol>
-      <li>Inquadra il codice con la fotocamera del telefono, oppure apri <b>ar.gioxx.org</b>.</li>
-      <li>In Chrome tocca il menu <b>⋮</b>.</li>
-      <li>Scegli <b>Installa app</b> (o <b>Aggiungi a schermata Home</b>).</li>
+      <li>${t('desktop.step1')}</li>
+      <li>${t('desktop.step2')}</li>
+      <li>${t('desktop.step3')}</li>
     </ol>
-    <button class="ghost" id="desktopContinue">Continua dal computer</button>
+    <button class="ghost" id="desktopContinue">${t('desktop.continue')}</button>
     ${inviteFooter()}
   </div>`
+  }
+  draw()
   return new Promise((resolve) => {
-    root.querySelector('#desktopContinue').addEventListener('click', () => {
+    const off = onLangChange(draw)
+    root.addEventListener('click', function onClick(e) {
+      if (!e.target.closest('#desktopContinue')) return
+      root.removeEventListener('click', onClick)
+      off()
       try { localStorage.setItem(KEY, '1') } catch { /* private mode: ask again next time */ }
       root.innerHTML = ''
       resolve()
-    }, { once: true })
+    })
   })
 }

@@ -7,3 +7,7 @@ globalThis.createImageBitmap = async (blob) => {
   }
   throw new Error('not-an-image');
 };
+
+// Tests assert Italian copy; the default would follow the (English) test runtime.
+import { setLang } from '../src/i18n.js';
+setLang('it');

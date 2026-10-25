@@ -6,6 +6,7 @@ import { esc } from './render.js'
 import { reportError } from './dialogs.js'
 import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice, importDoneText } from './model.js'
 import { getMeta } from '../db.js'
+import { t } from '../i18n.js'
 
 let busyDlg = null
 
@@ -14,7 +15,7 @@ export async function withBusy(fn) {
   if (busyDlg) return fn() // nested: the outer call owns the overlay
   const d = busyDlg = document.createElement('dialog')
   d.className = 'busy'
-  d.textContent = 'Attendere…'
+  d.textContent = t('import.busy')
   d.addEventListener('cancel', (e) => e.preventDefault())
   document.body.append(d)
   d.showModal()
@@ -33,7 +34,7 @@ function ask(html, { collect } = {}) {
     d.addEventListener('click', (e) => {
       const b = e.target.closest('[data-result]')
       if (!b) return
-      const choice = confirmedChoice(b.dataset.result, () => confirm('I capi elencati non verranno importati e finiranno nella lista "Da rifare". Continuare?'))
+      const choice = confirmedChoice(b.dataset.result, () => confirm(t('import.confirmPartial')))
       if (choice === undefined) return // declined: later dismissal must resolve null, not this button
       result = collect && choice ? { result: choice, value: collect(d) } : choice
       d.close()
@@ -44,22 +45,22 @@ function ask(html, { collect } = {}) {
 }
 
 const askMapping = (children) => ask(`
-  <h3>Dove metto i capi del backup?</h3>
+  <h3>${t('import.mappingTitle')}</h3>
   ${mappingRows(children, store.tabs).map((r, i) => `<label class="maprow">${esc(r.label)}
     <select data-child="${esc(r.child)}" aria-label="${esc(r.child)}">${r.options.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select></label>`).join('')}
-  <div class="row"><button type="button" class="primary" data-result="ok">Continua</button></div>
-  <button type="button" class="cancel" data-result="">Annulla</button>`, {
+  <div class="row"><button type="button" class="primary" data-result="ok">${t('import.continue')}</button></div>
+  <button type="button" class="cancel" data-result="">${t('common.cancel')}</button>`, {
   collect: (d) => Object.fromEntries([...d.querySelectorAll('select[data-child]')].map((s) => [s.dataset.child, s.value])),
 })
 
 const askBlocked = (failures, others) => ask(`
   <h3>${blockedTitle(failures.length)}</h3>
   <ul class="failures">${failures.map((f) => failureRow(f)).join('')}</ul>
-  <p class="note">Consiglio: rifai la foto di questi capi nella vecchia app, esporta di nuovo e riprova.</p>
-  <div class="row"><button type="button" class="primary" data-result="">Annulla</button>
-  ${others ? `<button type="button" data-result="secondary">Importa gli altri ${others}</button>` : ''}</div>`)
+  <p class="note">${t('import.blockedTip')}</p>
+  <div class="row"><button type="button" class="primary" data-result="">${t('common.cancel')}</button>
+  ${others ? `<button type="button" data-result="secondary">${t('import.others', { n: others })}</button>` : ''}</div>`)
 
-const showMessage = (text) => ask(`<h3>Importazione</h3><p>${esc(text)}</p><div class="row"><button type="button" class="primary" data-result="ok">OK</button></div>`)
+const showMessage = (text) => ask(`<h3>${t('import.title')}</h3><p>${esc(text)}</p><div class="row"><button type="button" class="primary" data-result="ok">${t('common.ok')}</button></div>`)
 
 /** Whole import, from a picked file to the summary. Never throws: errors are reported. */
 export async function importFile(db, file) {
@@ -96,7 +97,7 @@ export async function importFile(db, file) {
   // A failed read only costs an extra reminder.
   const lastBackupAt = await getMeta(db, 'lastBackupAt').catch(() => null)
   await showMessage(importDoneText(formatSummary(summary), lastBackupAt))
-  if (reloadError) alert("Import completato, ma l'elenco non si è aggiornato: riapri l'app. " + (reloadError?.message ?? reloadError))
+  if (reloadError) alert(t('import.reloadFailed', { message: reloadError?.message ?? reloadError }))
 }
 
 // Questions need the user's hands, so drop the overlay for them and bring it back after.

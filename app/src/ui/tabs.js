@@ -3,33 +3,38 @@
 import { store, addTab, renameTab, reorderTabs, removeTab } from '../store.js'
 import { hooks } from './render.js'
 import { reportError } from './dialogs.js'
+import { t, onLangChange } from '../i18n.js'
 
 let dom = null
+let nodes = []
+// Dialog text is baked in at build time: drop the (closed) dialogs so the next use rebuilds them.
+onLangChange(() => { for (const n of nodes) n.remove(); nodes = []; dom = null })
 function ensureDom() {
   if (dom) return dom
   const wrap = document.createElement('div')
   wrap.innerHTML = `
     <dialog id="newTab"><form method="dialog">
-      <h3>Nuova scheda</h3>
-      <input type="text" id="newTabName" placeholder="Es. Nido di Sofia" autocomplete="off">
+      <h3>${t('tabs.newTitle')}</h3>
+      <input type="text" id="newTabName" placeholder="${t('tabs.placeholder')}" autocomplete="off">
       <div class="row">
-        <button value="" class="cancel-inline">Annulla</button>
-        <button value="ok" class="primary" id="newTabOk" disabled>Crea</button>
+        <button value="" class="cancel-inline">${t('common.cancel')}</button>
+        <button value="ok" class="primary" id="newTabOk" disabled>${t('tabs.create')}</button>
       </div>
     </form></dialog>
     <dialog id="tabMgr"><form method="dialog">
-      <h3>Gestisci scheda</h3>
-      <input type="text" id="mgrName" autocomplete="off" aria-label="Nome scheda">
-      <button type="button" class="primary" id="mgrSave">Salva nome</button>
+      <h3>${t('tabs.manageTitle')}</h3>
+      <input type="text" id="mgrName" autocomplete="off" aria-label="${t('tabs.nameLabel')}">
+      <button type="button" class="primary" id="mgrSave">${t('tabs.saveName')}</button>
       <div class="row mgr-row">
-        <button type="button" id="mgrLeft">Sposta a sinistra</button>
-        <button type="button" id="mgrRight">Sposta a destra</button>
+        <button type="button" id="mgrLeft">${t('tabs.moveLeft')}</button>
+        <button type="button" id="mgrRight">${t('tabs.moveRight')}</button>
       </div>
-      <button type="button" class="danger" id="mgrDel">Elimina scheda</button>
-      <p class="note" id="mgrNote" hidden>Serve almeno una scheda</p>
-      <button value="" class="cancel">Chiudi</button>
+      <button type="button" class="danger" id="mgrDel">${t('tabs.delete')}</button>
+      <p class="note" id="mgrNote" hidden>${t('tabs.needOne')}</p>
+      <button value="" class="cancel">${t('common.close')}</button>
     </form></dialog>`
-  document.body.append(...wrap.children)
+  nodes = [...wrap.children]
+  document.body.append(...nodes)
   const $ = (id) => document.getElementById(id)
   dom = {
     newTab: $('newTab'), newName: $('newTabName'), newOk: $('newTabOk'),
@@ -87,7 +92,7 @@ async function manage(which) {
     } else if (which === 'mgrDel') {
       const tab = store.tabs[tabIndex()]
       const n = store.items.filter((it) => it.tabId === mgrTabId).length
-      if (n && !confirm(`Eliminare la scheda "${tab.name}" e i suoi ${n} capi? Non si può annullare.`)) return
+      if (n && !confirm(t('tabs.confirmDelete', { name: tab.name, n }))) return
       await removeTab(mgrTabId)
       d.mgr.close()
       return

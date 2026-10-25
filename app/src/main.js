@@ -13,6 +13,7 @@ import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
 import { initMenu } from './ui/menu.js';
 import { desktopGate } from './ui/desktop.js';
+import { t, onLangChange } from './i18n.js';
 
 const root = document.getElementById('app');
 await desktopGate(root);
@@ -22,9 +23,10 @@ function persist() {
   try { navigator.storage?.persist?.().catch(() => {}) } catch { /* unsupported */ }
 }
 
-function draw() {
+// `force` = redraw even the welcome screen (language change); it keeps the typed name.
+function draw(force = false) {
   if (store.tabs.length) renderApp(root, store);
-  else if (!root.querySelector('.welcome')) { // draw once: a redraw would drop focus while typing
+  else if (force || !root.querySelector('.welcome')) { // draw once: a redraw would drop focus while typing
     renderWelcome(root, {
       onCreate: (name) => { persist(); addTab(name).catch(reportError) },
       onImport: (file) => { persist(); Promise.resolve(hooks.onImportFile(file)).catch(reportError) },
@@ -38,12 +40,13 @@ try {
   db = await openDb();
 } catch {
   root.innerHTML = `<div class="welcome">
-    <h1>Impossibile accedere alla memoria del browser</h1>
-    <p>Controlla di non essere in navigazione anonima e che il sito possa salvare dati, poi ricarica la pagina.</p>
+    <h1>${t('main.storageFailed.title')}</h1>
+    <p>${t('main.storageFailed.body')}</p>
   </div>`;
 }
 if (db) {
-  subscribe(draw);
+  subscribe(() => draw());
+  onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
   await load(db);
   watchClipboard(draw);
   initAddFlow();

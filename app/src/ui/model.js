@@ -1,16 +1,16 @@
 // Pure helpers behind the menu and the import flow (no DOM, unit-tested).
+import { t, getLang } from '../i18n.js'
 
 /** "N capi · ultimo backup: <date>|mai" */
 export function backupInfoLine(count, lastBackupAt) {
-  const n = count === 1 ? '1 capo' : `${count} capi`
-  const when = lastBackupAt ? new Date(lastBackupAt).toLocaleString('it-IT') : 'mai'
-  return `${n} · ultimo backup: ${when}`
+  const when = lastBackupAt ? new Date(lastBackupAt).toLocaleString(getLang() === 'it' ? 'it-IT' : 'en-GB') : t('common.never')
+  return t('info.backup', { n: count, when })
 }
 
 /** @param {boolean|null} persisted null = the browser cannot say (no line) */
 export function persistLine(persisted) {
   if (persisted === null) return ''
-  return persisted ? 'Memoria protetta ✓' : 'Memoria non protetta: fai backup spesso'
+  return t(persisted ? 'info.protected' : 'info.unprotected')
 }
 
 export const childLabel = (c) => c.charAt(0).toUpperCase() + c.slice(1)
@@ -21,23 +21,23 @@ export function mappingRows(children, tabs) {
   return children.map((child) => ({
     child,
     label: childLabel(child),
-    options: [{ value: 'new', label: `Nuova scheda "${childLabel(child)}"` }, ...tabs.map((t) => ({ value: t.id, label: t.name }))],
+    options: [{ value: 'new', label: t('import.newTabOption', { name: childLabel(child) }) }, ...tabs.map((t) => ({ value: t.id, label: t.name }))],
   }))
 }
 
 /** User-facing text for an import error; null = not an import error (use the generic handler). */
 export function importErrorMessage(e) {
   switch (e?.message) {
-    case 'quota': return 'Memoria del telefono piena: impossibile importare. Libera spazio e riprova.'
-    case 'verify-failed': return "Verifica non riuscita dopo l'import: non cancellare nulla dalla vecchia app e riprova l'import."
-    case 'bad-file': return 'File non valido'
+    case 'quota': return t('import.quota')
+    case 'verify-failed': return t('import.verifyFailed')
+    case 'bad-file': return t('import.badFile')
   }
   // Corrupt JSON/ZIP surfaces as parser errors: all mean "not a backup we can read".
-  if (e instanceof SyntaxError || e?.name === 'SyntaxError') return 'File non valido'
+  if (e instanceof SyntaxError || e?.name === 'SyntaxError') return t('import.badFile')
   return null
 }
 
-const PLACE = { school: 'a scuola', home: 'a casa' }
+const place = (loc) => (loc === 'school' || loc === 'home' ? t('place.' + loc) : loc)
 
 /**
  * Export stops at the first item without a readable photo ('missing-photo:<itemId>'):
@@ -48,27 +48,27 @@ export function missingPhotoMessage(e, { items = [], tabs = [] } = {}) {
   const id = /^missing-photo:(.*)$/.exec(e?.message ?? '')?.[1]
   if (id === undefined) return null
   const it = items.find((i) => i.id === id)
-  const name = String(it?.label ?? '').trim() || 'senza nome'
-  const where = [tabs.find((t) => t.id === it?.tabId)?.name, PLACE[it?.location]].filter(Boolean).join(', ')
-  return `La foto di «${name}»${where ? ` (${where})` : ''} non si trova: cambiala o elimina il capo, poi riprova.`
+  const name = String(it?.label ?? '').trim() || t('common.unnamed')
+  const where = [tabs.find((tab) => tab.id === it?.tabId)?.name, place(it?.location)].filter(Boolean).join(', ')
+  return t('error.missingPhoto', { name, where: where ? ` (${where})` : '' })
 }
 
 // Error codes thrown by db.js / store.js / photos.js, as the user should read them.
-const ERROR_TEXT = {
-  'not-found': 'Elemento non trovato: ricarica la pagina',
-  'last-tab': 'Serve almeno una scheda',
-  'empty-name': 'Il nome non può essere vuoto',
-  'bad-data-url': 'Immagine non valida',
+const ERROR_KEY = {
+  'not-found': 'error.notFound',
+  'last-tab': 'error.lastTab',
+  'empty-name': 'error.emptyName',
+  'bad-data-url': 'error.badDataUrl',
 }
 
 /** User-facing text for any failed action (see reportError). */
 export function errorMessage(e, ctx) {
-  return missingPhotoMessage(e, ctx) ?? ERROR_TEXT[e?.message] ?? 'Operazione non riuscita: ' + (e?.message ?? e)
+  return missingPhotoMessage(e, ctx) ?? (ERROR_KEY[e?.message] ? t(ERROR_KEY[e.message]) : t('error.generic', { message: e?.message ?? e }))
 }
 
 /** Import summary; before the first v2 backup, remind the user to make one. */
 export function importDoneText(summary, lastBackupAt) {
-  return lastBackupAt ? summary : summary + ' · Ora fai un backup della nuova app dal menu.'
+  return lastBackupAt ? summary : summary + t('import.backupReminder')
 }
 
 /** Drop the tapped "Da rifare" entry by position (id-less entries can look identical). */
@@ -77,11 +77,15 @@ export function removeTodo(list, index) {
 }
 
 
+const REASONS = ['incomplete', 'unknown-place', 'unreadable-photo', 'missing-tab', 'missing-photo']
+// Stored codes are translated; legacy entries (old Italian text) and unknown codes show as-is.
+const reasonText = (r) => (REASONS.includes(r) ? t('import.reason.' + r) : r)
+
 /** Readable parts of a failure; empty parts are skipped. */
 export function failureParts(f) {
   return {
-    title: f.label || 'senza nome',
-    detail: [f.tabName, PLACE[f.location] ?? f.location, f.reason].filter(Boolean).join(' · '),
+    title: f.label || t('common.unnamed'),
+    detail: [f.tabName, place(f.location), reasonText(f.reason)].filter(Boolean).join(' · '),
   }
 }
 
@@ -101,4 +105,4 @@ export function confirmedChoice(choice, confirmFn) {
 }
 
 /** "N capi non si possono importare" */
-export const blockedTitle = (n) => (n === 1 ? '1 capo non si può importare' : `${n} capi non si possono importare`)
+export const blockedTitle = (n) => t('import.blockedTitle', { n })

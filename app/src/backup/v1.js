@@ -59,14 +59,14 @@ export async function parseV1(json, { childMap, now, tabs = [] }) {
       itemId: str(raw?.id), label: str(raw?.label), tabName: child ? tabFor(child).name : '',
       location: str(raw?.location), reason,
     })
-    if (!str(raw?.id) || !child) { fail('Dati incompleti'); continue }
-    if (!PLACES.includes(raw.location)) { fail('Posto sconosciuto'); continue }
+    if (!str(raw?.id) || !child) { fail('incomplete'); continue }
+    if (!PLACES.includes(raw.location)) { fail('unknown-place'); continue }
     let blob
     try {
       blob = dataUrlToBlob(raw.photo)
       await decodeImage(blob)
     } catch {
-      fail('Foto non leggibile'); continue
+      fail('unreadable-photo'); continue
     }
     const photoId = crypto.randomUUID()
     const movedAt = str(raw.movedAt) || EPOCH

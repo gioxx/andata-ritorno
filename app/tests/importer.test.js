@@ -68,7 +68,7 @@ describe('importer', () => {
     const err = await commitImport(db, prepared, { partial: false }).catch((e) => e)
     expect(err).toBeInstanceOf(ImportBlocked)
     expect(err.failures).toEqual([{
-      itemId: sample.items[2].id, label: 'Felpa blu', tabName: 'Materna', location: 'school', reason: 'Foto non leggibile',
+      itemId: sample.items[2].id, label: 'Felpa blu', tabName: 'Materna', location: 'school', reason: 'unreadable-photo',
     }])
     expect(await counts(db)).toEqual({ tabs: 0, items: 0, photos: 0, meta: 0 })
   })
@@ -83,7 +83,7 @@ describe('importer', () => {
     expect(tabs.map((t) => t.name)).toEqual(['Nido'])
     const todo = await getMeta(db, 'todo')
     expect(todo).toHaveLength(1)
-    expect(todo[0]).toMatchObject({ label: 'Felpa blu', tabName: 'Materna', reason: 'Foto non leggibile' })
+    expect(todo[0]).toMatchObject({ label: 'Felpa blu', tabName: 'Materna', reason: 'unreadable-photo' })
     // Same file again: the todo entry is not duplicated.
     await run(db, withPhoto(2, 'data:image/webp;base64,AAAA'), { partial: true })
     expect(await getMeta(db, 'todo')).toHaveLength(1)

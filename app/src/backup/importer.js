@@ -3,6 +3,7 @@ import { loadAll, applyPlan, getMeta, getPhoto } from '../db.js'
 import { buildPlan } from './merge.js'
 import { parseV1, detectFormat } from './v1.js'
 import { parseZip } from './zip.js'
+import { t } from '../i18n.js'
 
 /** @typedef {import('../types.js').Failure} Failure */
 /** @typedef {import('../types.js').Incoming} Incoming */
@@ -102,9 +103,9 @@ export async function commitImport(db, { incoming, plan }, { partial }) {
 
 /** @param {Summary} s */
 export function formatSummary(s) {
-  const parts = [s.added === 1 ? 'Importato 1 capo' : `Importati ${s.added} capi`]
-  for (const t of s.perTab) parts.push(`${t.tabName} ${t.school + t.home} (${t.school} a scuola, ${t.home} a casa)`)
-  if (s.updated > 0) parts.push(`${s.updated} ${s.updated === 1 ? 'aggiornato' : 'aggiornati'}`)
-  if (s.failed > 0) parts.push(`${s.failed} da rifare`)
+  const parts = [t('import.summary.added', { n: s.added })]
+  for (const x of s.perTab) parts.push(t('import.summary.tab', { tab: x.tabName, total: x.school + x.home, school: x.school, home: x.home }))
+  if (s.updated > 0) parts.push(t('import.summary.updated', { n: s.updated }))
+  if (s.failed > 0) parts.push(t('import.summary.failed', { n: s.failed }))
   return parts.join(' · ')
 }

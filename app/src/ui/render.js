@@ -5,6 +5,7 @@ import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move
 import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
+import { t } from '../i18n.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
@@ -44,27 +45,27 @@ function tile(i, moved) {
   const sel = store.selected.has(i.id)
   const label = String(i.label ?? '') // safety net: never trust the type of stored data
   return `<div class="item${label.trim() ? ' labeled' : ''}${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
-    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(label)}</span>${sel ? `<i class="check">${checkIcon}</i><button class="open" data-view="${esc(i.id)}" aria-label="Apri foto">${zoomInIcon}</button>` : ''}</div>`
+    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(label)}</span>${sel ? `<i class="check">${checkIcon}</i><button class="open" data-view="${esc(i.id)}" aria-label="${t('render.openPhoto')}">${zoomInIcon}</button>` : ''}</div>`
 }
 
 function section(loc, title, cls, list) {
-  return `<section class="${cls}"><h2><span>${title}</span><button class="count" data-section="${loc}" aria-label="Seleziona tutti: ${list.length}">${list.length}</button></h2>
+  return `<section class="${cls}"><h2><span>${title}</span><button class="count" data-section="${loc}" aria-label="${t('render.selectAll', { n: list.length })}">${list.length}</button></h2>
     <div class="grid">${list.length
       ? list.map((i) => tile(i, lastLocation.has(i.id) && lastLocation.get(i.id) !== i.location)).join('')
-      : '<div class="empty">Nessun capo</div>'}</div></section>`
+      : `<div class="empty">${t('render.empty')}</div>`}</div></section>`
 }
 
 function bar(sel) {
   if (!sel.length) {
-    return `<button class="primary" data-act="add">${cameraIcon}Aggiungi capi</button>${canShowPaste() ? `<button class="ghost" data-act="paste">${pasteIcon}Incolla</button>` : ''}`
+    return `<button class="primary" data-act="add">${cameraIcon}${t('render.add')}</button>${canShowPaste() ? `<button class="ghost" data-act="paste">${pasteIcon}${t('render.paste')}</button>` : ''}`
   }
   const allSchool = sel.every((i) => i.location === 'school')
   const allHome = sel.every((i) => i.location === 'home')
-  return `<button class="ghost" data-act="clear">Annulla (${sel.length})</button>
-    ${allSchool ? '' : '<button class="primary" data-act="toSchool">→ Scuola</button>'}
-    ${allHome ? '' : '<button class="primary" data-act="toHome">→ Casa</button>'}
-    ${sel.length === 1 ? `<button class="ghost icon" data-act="edit" aria-label="Modifica">${pencilIcon}</button>` : ''}
-    <button class="ghost icon" data-act="del" aria-label="Elimina">${trashIcon}</button>`
+  return `<button class="ghost" data-act="clear">${t('render.clear', { n: sel.length })}</button>
+    ${allSchool ? '' : `<button class="primary" data-act="toSchool">${t('render.toSchool')}</button>`}
+    ${allHome ? '' : `<button class="primary" data-act="toHome">${t('render.toHome')}</button>`}
+    ${sel.length === 1 ? `<button class="ghost icon" data-act="edit" aria-label="${t('common.edit')}">${pencilIcon}</button>` : ''}
+    <button class="ghost icon" data-act="del" aria-label="${t('common.delete')}">${trashIcon}</button>`
 }
 
 export function renderApp(root, s = store) {
@@ -75,13 +76,13 @@ export function renderApp(root, s = store) {
   const sel = [...s.selected].map((id) => s.items.find((i) => i.id === id)).filter(Boolean)
   const n = s.unsaved
   const banner = n
-    ? `<div class="unsaved"><span>⚠ ${n === 1 ? '1 modifica non salvata' : `${n} modifiche non salvate`}</span><button data-act="export">Esporta</button></div>`
+    ? `<div class="unsaved"><span>⚠ ${t('render.unsaved', { n })}</span><button data-act="export">${t('render.export')}</button></div>`
     : ''
   root.innerHTML = `<header>
-      <div class="row1"><h1>Andata e Ritorno</h1><button class="menu" data-act="menu" aria-label="Menu">${menuIcon}</button></div>
-      <nav class="chips">${s.tabs.map((t) => `<button class="chip${t.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(t.id)}">${esc(t.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="Aggiungi scheda">+</button></nav>
+      <div class="row1"><h1>${t('app.name')}</h1><button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
+      <nav class="chips">${s.tabs.map((t) => `<button class="chip${t.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(t.id)}">${esc(t.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>
     </header>
-    <main>${banner}${section('school', '🏫 A scuola', 'school', items.filter((i) => i.location === 'school'))}${section('home', '🏠 A casa', 'home', items.filter((i) => i.location === 'home'))}</main>
+    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'))}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'))}</main>
     <footer class="bar">${bar(sel)}</footer>`
   root.querySelector('.chips').scrollLeft = chipsScroll
 
@@ -113,7 +114,7 @@ function wire(root) {
       case 'clear': return clearSelection()
       case 'toSchool': return act(() => move('school'))
       case 'toHome': return act(() => move('home'))
-      case 'del': if (confirm('Eliminare i capi selezionati?')) return act(deleteSelected)
+      case 'del': if (confirm(t('render.confirmDelete'))) return act(deleteSelected)
     }
   })
 }

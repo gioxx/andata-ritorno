@@ -33,7 +33,7 @@ const str = (v) => (typeof v === 'string' ? v : '')
 const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v))
 const iso = (v) => (isIso(v) ? v : EPOCH)
 
-/** Exact Tab shape, or null when the id is unusable (its items then fail as 'Scheda mancante'). */
+/** Exact Tab shape, or null when the id is unusable (its items then fail as 'missing-tab'). */
 function normTab(t, index) {
   if (!str(t?.id)) return null
   return {
@@ -47,8 +47,8 @@ function normTab(t, index) {
 
 /** Exact Item shape (unknown keys dropped), or the Failure reason. */
 function normItem(raw) {
-  if (!str(raw?.id) || !str(raw.tabId) || !str(raw.photoId)) return 'Dati incompleti'
-  if (!PLACES.includes(raw.location)) return 'Posto sconosciuto'
+  if (!str(raw?.id) || !str(raw.tabId) || !str(raw.photoId)) return 'incomplete'
+  if (!PLACES.includes(raw.location)) return 'unknown-place'
   const movedAt = iso(raw.movedAt)
   const item = {
     id: raw.id, tabId: raw.tabId, location: raw.location, label: String(raw.label ?? ''),
@@ -126,16 +126,16 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     })
     const item = normItem(raw)
     if (typeof item === 'string') { fail(item); continue }
-    if (!known.has(item.tabId)) { fail('Scheda mancante'); continue }
+    if (!known.has(item.tabId)) { fail('missing-tab'); continue }
     const file = photoFiles.get(item.photoId)
-    if (!file) { fail('Foto mancante nel backup'); continue }
+    if (!file) { fail('missing-photo'); continue }
     const photo = new Blob([file.bytes], { type: file.type })
     const want = integrity[item.photoId]
     try {
       if (want && (want.size !== file.bytes.length || want.crc32 !== crc32(file.bytes))) throw new Error('corrupt')
       await decodeImage(photo)
     } catch {
-      fail('Foto non leggibile'); continue
+      fail('unreadable-photo'); continue
     }
     photos.set(item.photoId, photo)
     items.push(item)

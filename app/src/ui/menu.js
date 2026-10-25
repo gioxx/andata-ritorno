@@ -1,4 +1,4 @@
-// Side drawer (slides from the right): backup info, export/import, tabs, "Da rifare", theme.
+// Side drawer (slides from the right): backup info, export/import, tabs, "Da rifare", theme, language.
 import { store, load } from '../store.js'
 import { getMeta, setMeta } from '../db.js'
 import { exportBackup, backupFileName } from '../backup/exporter.js'
@@ -7,6 +7,7 @@ import { openTabManager } from './tabs.js'
 import { reportError } from './dialogs.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
+import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
 import { menuFooter } from './about.js'
 import { downloadIcon, uploadIcon, layersIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessage } from './model.js'
@@ -14,7 +15,9 @@ import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessag
 let dlg = null
 let db = null
 
-const THEMES = [['auto', monitorIcon, 'Auto'], ['light', sunIcon, 'Chiaro'], ['dark', moonIcon, 'Scuro']]
+const themes = () => [['auto', monitorIcon, t('menu.themeAuto')], ['light', sunIcon, t('menu.themeLight')], ['dark', moonIcon, t('menu.themeDark')]]
+// Language names stay in their own language so they are findable from the wrong one.
+const langs = () => [['auto', t('menu.langAuto')], ['it', 'Italiano'], ['en', 'English']]
 
 /** Menu row: icon holder + label (+ optional right-hand pill). */
 const menuItem = (act, icon, label, extra = '') => `<button type="button" class="menuItem" data-menu="${act}"${act === 'todo' ? ' id="todoBtn" hidden' : ''}><span class="ic">${icon}</span>${label}${extra}</button>`
@@ -27,11 +30,16 @@ async function persistence() {
 
 function renderThemeSeg() {
   const cur = getTheme()
-  dlg.querySelector('#themeSeg').innerHTML = THEMES.map(([v, icon, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}">${icon}${l}</button>`).join('')
+  dlg.querySelector('#themeSeg').innerHTML = themes().map(([v, icon, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}">${icon}${l}</button>`).join('')
 }
 
-async function openMenu() {
-  if (!dlg) build()
+function renderLangSeg() {
+  const cur = getLangChoice()
+  dlg.querySelector('#langSeg').innerHTML = langs().map(([v, l]) => `<button type="button" data-lang-choice="${v}" class="${v === cur ? 'active' : ''}">${l}</button>`).join('')
+}
+
+/** Fill the dynamic parts (info lines, todo badge, segmented controls). */
+async function refresh() {
   const todo = (await getMeta(db, 'todo')) ?? []
   const last = await getMeta(db, 'lastBackupAt')
   dlg.querySelector('#backupInfo').textContent = backupInfoLine(store.items.length, last)
@@ -40,26 +48,38 @@ async function openMenu() {
   todoBtn.hidden = !todo.length
   todoBtn.querySelector('.badge').textContent = todo.length
   renderThemeSeg()
-  if (dlg.open) return // double tap on the menu button
-  dlg.showModal()
+  renderLangSeg()
   persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p) })
 }
+
+async function openMenu() {
+  if (!dlg) build()
+  if (dlg.open) return // double tap on the menu button
+  await refresh()
+  if (!dlg.open) dlg.showModal()
+}
+
+const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="close" data-menu="close" aria-label="${t('common.close')}">✕</button></h3>
+    <h4>${t('menu.backup')}</h4>
+    <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
+    ${menuItem('export', downloadIcon, t('menu.export'))}
+    ${menuItem('import', uploadIcon, t('menu.import'))}
+    <h4>${t('menu.tabsSection')}</h4>
+    ${menuItem('tabs', layersIcon, t('menu.manageTabs'))}
+    ${menuItem('todo', todoIcon, t('menu.todo'), '<span class="badge"></span>')}
+    <h4>${t('menu.theme')}</h4>
+    <div class="seg" id="themeSeg"></div>
+    <h4>${t('menu.language')}</h4>
+    <div class="seg" id="langSeg"></div>
+    ${menuFooter()}`
 
 function build() {
   dlg = document.createElement('dialog')
   dlg.id = 'menu'
-  dlg.innerHTML = `<h3>Menu <button type="button" class="close" data-menu="close" aria-label="Chiudi">✕</button></h3>
-    <h4>Backup</h4>
-    <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
-    ${menuItem('export', downloadIcon, 'Esporta backup')}
-    ${menuItem('import', uploadIcon, 'Importa backup')}
-    <h4>Schede</h4>
-    ${menuItem('tabs', layersIcon, 'Gestisci schede')}
-    ${menuItem('todo', todoIcon, 'Da rifare', '<span class="badge"></span>')}
-    <h4>Tema</h4>
-    <div class="seg" id="themeSeg"></div>
-    ${menuFooter()}`
+  dlg.innerHTML = menuHtml()
   document.body.append(dlg)
+  // Relabel in place (the drawer stays open while the language is switched from it).
+  onLangChange(() => { dlg.innerHTML = menuHtml(); if (todoDlg?.open) renderTodo(); refresh() })
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) { // the dialog itself is the target for both its padding and the backdrop
       const r = dlg.getBoundingClientRect()
@@ -68,6 +88,8 @@ function build() {
     }
     const theme = e.target.closest('[data-theme-choice]')
     if (theme) { setTheme(theme.dataset.themeChoice); renderThemeSeg(); return } // stay open to see the result
+    const lang = e.target.closest('[data-lang-choice]')
+    if (lang) { setLang(lang.dataset.langChoice); return } // onLangChange redraws the drawer
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
@@ -90,11 +112,11 @@ export async function runExport() {
   try {
     result = await withBusy(() => exportBackup(db, { now }))
   } catch (e) {
-    alert(missingPhotoMessage(e, store) ?? 'Esportazione non riuscita: ' + (e?.message ?? e))
+    alert(missingPhotoMessage(e, store) ?? t('menu.exportFailed', { message: e?.message ?? e }))
     return
   }
   if (result === 'cancelled') return
-  if (result === 'downloaded') alert('File salvato in Download: ' + backupFileName(now))
+  if (result === 'downloaded') alert(t('menu.fileSaved', { name: backupFileName(now) }))
   await load(db) // refreshes the unsaved-changes banner
 }
 
@@ -121,9 +143,9 @@ async function openTodo() {
 async function renderTodo() {
   const list = (await getMeta(db, 'todo')) ?? []
   if (!list.length) { todoDlg.close(); return }
-  todoDlg.innerHTML = `<form method="dialog"><h3>Da rifare (${list.length})</h3>
-    <ul class="failures">${list.map((f, i) => failureRow(f, `<button type="button" data-done="${i}">Fatto</button>`)).join('')}</ul>
-    <button value="" class="cancel">Chiudi</button></form>`
+  todoDlg.innerHTML = `<form method="dialog"><h3>${t('menu.todoTitle', { n: list.length })}</h3>
+    <ul class="failures">${list.map((f, i) => failureRow(f, `<button type="button" data-done="${i}">${t('menu.done')}</button>`)).join('')}</ul>
+    <button value="" class="cancel">${t('common.close')}</button></form>`
 }
 
 export function initMenu(database) {

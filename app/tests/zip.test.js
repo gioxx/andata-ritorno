@@ -62,20 +62,20 @@ describe('v2 zip', () => {
     const prepared = await prepareImport(dst, asFile(new Blob([zipSync(entries)])))
     await expect(commitImport(dst, prepared, { partial: false })).rejects.toBeInstanceOf(ImportBlocked)
     expect(prepared.incoming.failures).toEqual([
-      { itemId: 'i2', label: 'capo 2', tabName: 'Nido', location: 'home', reason: 'Foto mancante nel backup' },
+      { itemId: 'i2', label: 'capo 2', tabName: 'Nido', location: 'home', reason: 'missing-photo' },
     ])
     expect(await dst.count('items')).toBe(0)
     expect(await dst.count('photos')).toBe(0)
   })
 
-  it("unknown tabId → failure 'Scheda mancante'", async () => {
+  it("unknown tabId → failure 'missing-tab'", async () => {
     const entries = unzipSync(await bytesOf(await zipOf(await seeded())))
     const json = JSON.parse(new TextDecoder().decode(entries['backup.json']))
     json.items[0].tabId = 'ghost'
     entries['backup.json'] = new TextEncoder().encode(JSON.stringify(json))
     const dst = await fresh()
     const prepared = await prepareImport(dst, asFile(new Blob([zipSync(entries)])))
-    expect(prepared.incoming.failures.map((f) => f.reason)).toEqual(['Scheda mancante'])
+    expect(prepared.incoming.failures.map((f) => f.reason)).toEqual(['missing-tab'])
     await expect(commitImport(dst, prepared, { partial: false })).rejects.toBeInstanceOf(ImportBlocked)
     const s = await commitImport(dst, prepared, { partial: true })
     expect(s.added).toBe(2)
@@ -113,21 +113,21 @@ describe('v2 zip', () => {
     await expect(prepareImport(dst, await edit(mutate))).rejects.toThrow('bad-file')
   })
 
-  it('photo that fails decode → Foto non leggibile', async () => {
+  it('photo that fails decode → unreadable-photo', async () => {
     const orig = globalThis.createImageBitmap
     globalThis.createImageBitmap = async () => { throw new Error('nope') }
     try {
       const dst = await fresh()
       const prepared = await prepareImport(dst, asFile(await zipOf(await seeded())))
-      expect(prepared.incoming.failures.map((f) => f.reason)).toEqual(Array(3).fill('Foto non leggibile'))
+      expect(prepared.incoming.failures.map((f) => f.reason)).toEqual(Array(3).fill('unreadable-photo'))
     } finally { globalThis.createImageBitmap = orig }
   })
 
-  it('flipped byte in a photo → Foto non leggibile (integrity check)', async () => {
+  it('flipped byte in a photo → unreadable-photo (integrity check)', async () => {
     const file = await edit((e) => { e['photos/p1.webp'] = e['photos/p1.webp'].map((b, i) => (i === 2 ? b ^ 1 : b)) })
     const dst = await fresh()
     const prepared = await prepareImport(dst, file)
-    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'Foto non leggibile']])
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'unreadable-photo']])
   })
 
   it('v2 file without the photos map still imports', async () => {
@@ -185,15 +185,15 @@ describe('v2 zip', () => {
     expect(b.updatedAt).toBe(EPOCH)
   })
 
-  it("non-string tabId → 'Dati incompleti'", async () => {
+  it("non-string tabId → 'incomplete'", async () => {
     const { prepared } = await incomingOf((j) => { j.items[0].tabId = 1 })
-    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'Dati incompleti']])
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'incomplete']])
   })
 
-  it("tab without id is dropped: its items fail 'Scheda mancante', no DataError", async () => {
+  it("tab without id is dropped: its items fail 'missing-tab', no DataError", async () => {
     const { dst, prepared } = await incomingOf((j) => { delete j.tabs[0].id })
     expect(prepared.incoming.tabs.map((t) => t.id)).toEqual(['tab-b'])
-    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'Scheda mancante'], ['i2', 'Scheda mancante']])
+    expect(prepared.incoming.failures.map((f) => [f.itemId, f.reason])).toEqual([['i1', 'missing-tab'], ['i2', 'missing-tab']])
     const s = await commitImport(dst, prepared, { partial: true })
     expect(s.added).toBe(1)
     expect((await loadAll(dst)).tabs.map((t) => t.id)).toEqual(['tab-b'])

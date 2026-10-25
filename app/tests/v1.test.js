@@ -54,16 +54,16 @@ describe('parseV1', () => {
     const inc = await parseV1(data, { childMap: {}, now: NOW })
     expect(inc.items).toHaveLength(3)
     expect(inc.failures.map((f) => [f.itemId, f.reason])).toEqual([
-      ['x1', 'Foto non leggibile'],
-      ['x2', 'Foto non leggibile'],
-      ['x3', 'Foto non leggibile'],
-      ['x4', 'Posto sconosciuto'],
-      ['', 'Dati incompleti'],
-      ['x6', 'Dati incompleti'],
-      ['', 'Dati incompleti'],
+      ['x1', 'unreadable-photo'],
+      ['x2', 'unreadable-photo'],
+      ['x3', 'unreadable-photo'],
+      ['x4', 'unknown-place'],
+      ['', 'incomplete'],
+      ['x6', 'incomplete'],
+      ['', 'incomplete'],
     ])
     expect(inc.failures[0]).toEqual({
-      itemId: 'x1', label: good.label, tabName: 'Nido', location: 'school', reason: 'Foto non leggibile',
+      itemId: 'x1', label: good.label, tabName: 'Nido', location: 'school', reason: 'unreadable-photo',
     })
   })
 
