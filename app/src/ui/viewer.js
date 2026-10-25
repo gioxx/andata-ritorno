@@ -324,6 +324,9 @@ function tap(e) {
 }
 
 export function initViewer() {
+  // A reload while the viewer was open leaves its entry as the current one: neutralise it,
+  // so a later popstate is not mistaken for ours.
+  if (history.state?.arViewer) history.replaceState(null, '')
   hooks.onOpenViewer = openViewer
   hooks.onEdit = (id) => openEditItem(id)
 }

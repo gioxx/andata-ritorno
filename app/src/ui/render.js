@@ -8,6 +8,7 @@ import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pas
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
 import { t } from '../i18n.js'
+import { esc } from './esc.js'
 import { keepFocus, noteActivator } from './focus.js'
 
 /** Later tasks assign their actions here. */
@@ -15,8 +16,6 @@ export const hooks = {
   onAddTab() {}, onTabLongPress(_id) {}, onImportFile(_file) {}, onAdd() {}, onPaste() {}, onMenu() {}, onExport() {},
   onEdit(_id) {}, onOpenViewer(_ids, _startId) {}, onManageCategories() {},
 }
-
-export const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
 
 /** @type {Map<string,string>} photoId -> object URL */
 const urls = new Map()

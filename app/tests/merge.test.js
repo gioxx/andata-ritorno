@@ -94,6 +94,30 @@ describe('buildPlan', () => {
     expect(plan.tabsPut).toHaveLength(2)
   })
 
+  it('new tabs and categories are renumbered after the local max; existing ones keep the merge rule', () => {
+    const local = {
+      tabs: [tab('t1', { order: 0 }), tab('t2', { order: 1, updatedAt: d(2) })],
+      items: [],
+      categories: [cat('c1', { order: 0 }), cat('c2', { order: 1, updatedAt: d(5) })],
+    }
+    // n1/n2 collide with t1/t2 (orders 0, 1); t2 wins the merge and moves to 5.
+    const inc = withCats(
+      incoming([], [], [tab('t2', { order: 5, updatedAt: d(3) }), tab('n2', { order: 1 }), tab('n1', { order: 0 })]),
+      [cat('c2', { order: 9, updatedAt: d(1) }), cat('k1', { order: 0 })],
+    )
+    const plan = buildPlan(local, inc)
+    expect(Object.fromEntries(plan.tabsPut.map((t) => [t.id, t.order]))).toEqual({ t2: 5, n1: 6, n2: 7 })
+    // c2 loses the merge (older): untouched; the new k1 goes after the local max.
+    expect(plan.categoriesPut.map((c) => [c.id, c.order])).toEqual([['k1', 2]])
+  })
+
+  it('into a device without tabs or categories, imported orders are kept as they are', () => {
+    const inc = withCats(incoming([], [], [tab('a', { order: 0 }), tab('b', { order: 3 })]), [cat('k', { order: 4 })])
+    const plan = buildPlan(empty, inc)
+    expect(plan.tabsPut.map((t) => [t.id, t.order])).toEqual([['a', 0], ['b', 3]])
+    expect(plan.categoriesPut.map((c) => [c.id, c.order])).toEqual([['k', 4]])
+  })
+
   it('two devices with defaults merge without duplicates', () => {
     const ids = ['default-body', 'default-tops', 'default-socks']
     const local = { tabs: [], items: [], categories: ids.map((id, i) => cat(id, { order: i })) }

@@ -19,6 +19,7 @@ export default {
 
   'main.storageFailed.title': 'Impossibile accedere alla memoria del browser',
   'main.storageFailed.body': 'Controlla di non essere in navigazione anonima e che il sito possa salvare dati, poi ricarica la pagina.',
+  'main.blocked.body': 'Chiudi le altre schede di A/R e ricarica la pagina.',
 
   'render.openPhoto': 'Apri foto',
   'render.selectAll': 'Seleziona tutti: {n}',

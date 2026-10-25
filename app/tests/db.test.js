@@ -189,6 +189,24 @@ describe('db', () => {
     db2.close()
     setVersionChangeHandler(null)
   })
+  it('an older connection that does not close calls onBlocked, then the open completes once it does', async () => {
+    const name = 'ar-test-' + crypto.randomUUID()
+    // An old tab still holding a v1 connection and ignoring versionchange.
+    const old = await openDB(name, 1, {
+      upgrade(db) {
+        db.createObjectStore('tabs', { keyPath: 'id' })
+        db.createObjectStore('items', { keyPath: 'id' }).createIndex('tabId', 'tabId')
+        db.createObjectStore('photos', { keyPath: 'id' })
+        db.createObjectStore('meta')
+      },
+    })
+    let blocked = 0
+    const opening = openDb(name, { onBlocked: () => { blocked++; old.close() } })
+    const db = await opening
+    expect(blocked).toBe(1)
+    expect(db.objectStoreNames.contains('categories')).toBe(true)
+    db.close()
+  })
   it('upgrade from v1 keeps everything', async () => {
     const name = 'ar-test-' + crypto.randomUUID()
     // Exact v1 schema, as shipped.

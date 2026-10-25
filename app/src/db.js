@@ -15,9 +15,14 @@ export function setVersionChangeHandler(fn) {
   versionChangeHandler = fn
 }
 
-/** @param {string} [name] */
-export async function openDb(name = 'ar') {
+/**
+ * @param {string} [name]
+ * @param {{ onBlocked?: () => void }} [opts] called when an older open tab keeps the upgrade
+ *   waiting; the returned promise still resolves once that tab closes its connection.
+ */
+export async function openDb(name = 'ar', { onBlocked } = {}) {
   return openDB(name, 2, {
+    blocked() { onBlocked?.() },
     // Additive steps only: existing v1 records (real user data) are never touched.
     upgrade(db, oldVersion, _newVersion, tx) {
       if (oldVersion < 1) {

@@ -37,16 +37,23 @@ function draw(force = false) {
 }
 
 // IndexedDB can be blocked (private mode, site data disabled): say so instead of a blank page.
+const storageScreen = (body) => {
+  root.innerHTML = `<div class="welcome">
+    <h1>${t('main.storageFailed.title')}</h1>
+    <p>${body}</p>
+  </div>`;
+};
 let db = null;
+let blocked = false;
 try {
-  db = await openDb();
+  // An older A/R tab holding the DB open keeps the upgrade waiting: ask the user to close it.
+  db = await openDb(undefined, { onBlocked: () => { blocked = true; storageScreen(t('main.blocked.body')) } });
+  // The other tab closed after all: drop the message (the welcome screen draws only into an empty root).
+  if (blocked) root.textContent = '';
   // A newer tab wants to upgrade the DB: our connection is closed, so reload onto the new code.
   setVersionChangeHandler(() => location.reload());
 } catch {
-  root.innerHTML = `<div class="welcome">
-    <h1>${t('main.storageFailed.title')}</h1>
-    <p>${t('main.storageFailed.body')}</p>
-  </div>`;
+  storageScreen(t('main.storageFailed.body'));
 }
 if (db) {
   subscribe(() => draw());

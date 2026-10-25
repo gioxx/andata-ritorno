@@ -18,6 +18,7 @@ export default {
 
   'main.storageFailed.title': "Can't access the browser storage",
   'main.storageFailed.body': 'Make sure you are not in private browsing and that the site is allowed to save data, then reload the page.',
+  'main.blocked.body': 'Close other A/R tabs and reload the page.',
 
   'render.openPhoto': 'Open photo',
   'render.selectAll': 'Select all: {n}',

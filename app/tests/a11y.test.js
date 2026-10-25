@@ -7,7 +7,7 @@ vi.mock('../src/store.js', async (orig) => ({ ...(await orig()), rotateAndEdit: 
 const { renderApp } = await import('../src/ui/render.js')
 const { store, rotateAndEdit, deleteSelected } = await import('../src/store.js')
 const { openEditItem, openModal } = await import('../src/ui/dialogs.js')
-const { openViewer } = await import('../src/ui/viewer.js')
+const { openViewer, initViewer } = await import('../src/ui/viewer.js')
 const { errorMessage } = await import('../src/ui/model.js')
 const { t } = await import('../src/i18n.js')
 
@@ -139,6 +139,14 @@ describe('delete confirmation', () => {
     root.querySelector('[data-act="del"]').click()
     expect(confirmSpy).toHaveBeenCalledWith(t('render.confirmDelete'))
     expect(deleteSelected).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('viewer history', () => {
+  it('a viewer entry left over from before a reload is neutralised on start', () => {
+    history.replaceState({ arViewer: true }, '')
+    initViewer()
+    expect(history.state).toBe(null)
   })
 })
 

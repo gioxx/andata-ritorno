@@ -21,6 +21,19 @@ function mergeItem(a, b) {
 const FIELDS = ['tabId', 'location', 'label', 'category', 'photoId', 'movedAt', 'updatedAt']
 const same = (a, b) => FIELDS.every((f) => a[f] === b[f])
 
+/**
+ * New records (not on this device) go after every local one, in their file order, so tabs
+ * or categories from another device never share an `order` with local ones. Existing records
+ * keep the order the merge gave them. An empty device keeps the file's orders as they are.
+ */
+function placeAfterLocal(puts, local) {
+  if (!local.size) return
+  let max = Math.max(...[...local.values()].map((r) => r.order), ...puts.filter((r) => local.has(r.id)).map((r) => r.order))
+  const fresh = puts.map((r, i) => [r, i]).filter(([r]) => !local.has(r.id)).sort(([a], [b]) => a.order - b.order)
+  // Copies: the incoming records stay untouched (buildPlan is pure).
+  for (const [r, i] of fresh) puts[i] = { ...r, order: ++max }
+}
+
 function collapse(list, merge) {
   const map = new Map()
   for (const x of list) map.set(x.id, map.has(x.id) ? merge(map.get(x.id), x) : x)
@@ -56,6 +69,8 @@ export function buildPlan(local, incoming) {
       plan.categoriesPut.push({ ...rest, ...(c.nameKey ? { nameKey: c.nameKey } : {}), name: c.name, order: c.order, updatedAt: c.updatedAt })
     }
   }
+  placeAfterLocal(plan.tabsPut, localTabs)
+  placeAfterLocal(plan.categoriesPut, localCats)
   const knownCats = new Set([...localCats.keys(), ...(incoming.categories ?? []).map((c) => c.id)])
   // A category that exists nowhere (old backup, dangling id) must not survive on an item.
   const strip = (it) => {

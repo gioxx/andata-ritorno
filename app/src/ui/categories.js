@@ -2,7 +2,8 @@
 // <body> like tabs.js; the list is redrawn after each action, never while typing.
 import { store, addCategory, renameCategory, reorderCategories, removeCategory, addDefaultCategories } from '../store.js'
 import { categoryName, missingDefaults } from '../categories.js'
-import { hooks, esc } from './render.js'
+import { hooks } from './render.js'
+import { esc } from './esc.js'
 import { reportError, setManageCategories, openModal } from './dialogs.js'
 import { keepFocus } from './focus.js'
 import { t, onLangChange } from '../i18n.js'

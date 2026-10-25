@@ -6,7 +6,7 @@ import { errorMessage } from './model.js'
 import { cameraIcon, imageIcon, rotateIcon } from './icons.js'
 import { getPhoto } from '../db.js'
 import { normTurns } from '../rotate.js'
-import { esc } from './render.js'
+import { esc } from './esc.js'
 import { t, onLangChange } from '../i18n.js'
 import { resolve, lastActivator, locator, keepFocus } from './focus.js'
 

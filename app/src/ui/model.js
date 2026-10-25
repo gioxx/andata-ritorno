@@ -1,5 +1,6 @@
 // Pure helpers behind the menu and the import flow (no DOM, unit-tested).
 import { t, getLang } from '../i18n.js'
+import { esc } from './esc.js'
 
 /** "N capi · ultimo backup: <date>|mai" */
 export function backupInfoLine(count, lastBackupAt) {
@@ -14,7 +15,6 @@ export function persistLine(persisted) {
 }
 
 export const childLabel = (c) => c.charAt(0).toUpperCase() + c.slice(1)
-const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
 
 /** One mapping row per v1 child: default "new tab", then every existing tab. */
 export function mappingRows(children, tabs) {

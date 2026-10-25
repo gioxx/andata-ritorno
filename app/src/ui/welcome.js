@@ -1,5 +1,5 @@
 // First-run screen, shown while there are no tabs. Importing a backup must not create a tab first.
-import { esc } from './render.js'
+import { esc } from './esc.js'
 import { t } from '../i18n.js'
 import { installSteps, currentPlatform, isStandalone } from '../platform.js'
 import { shouldShowIosBanner } from './iosBanner.js'
