@@ -173,6 +173,7 @@ export default {
   'wipe.confirmText': 'To confirm, type <b>{word}</b> below.',
   'wipe.word': 'DELETE',
   'wipe.confirm': 'Delete everything',
+  'wipe.blocked': "Close the other A/R tabs to finish deleting.",
   'wipe.failed': "Couldn't delete the data: close other A/R tabs and try again.",
   'menu.langAuto': 'Auto',
   'menu.exportFailed': 'Export failed: {message}',

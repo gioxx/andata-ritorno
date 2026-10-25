@@ -22,16 +22,16 @@ function clearOwnKeys(storage) {
  * Close our connection, delete the 'ar' database, then clear ar-* preferences.
  * Cache Storage and the service worker stay, so the app still works offline afterwards.
  * Storage is cleared only once the database is really gone.
- * @param {{ db: any, deleteDatabase?: (name: string) => IDBOpenDBRequest, storages?: Storage[] }} opts
+ * @param {{ onBlocked?: () => void, db: any, deleteDatabase?: (name: string) => IDBOpenDBRequest, storages?: Storage[] }} opts
  */
-export async function wipeAll({ db, deleteDatabase = (name) => indexedDB.deleteDatabase(name), storages = defaultStorages() }) {
+export async function wipeAll({ db, deleteDatabase = (name) => indexedDB.deleteDatabase(name), storages = defaultStorages(), onBlocked = () => {} }) {
   db.close() // an open connection would block the delete forever
   await new Promise((resolve, reject) => {
     const req = deleteDatabase('ar')
     req.onsuccess = () => resolve()
     req.onerror = () => reject(req.error)
     // Other tabs are asked to close (they reload on versionchange); the request completes then.
-    req.onblocked = () => {}
+    req.onblocked = () => onBlocked()
   })
   for (const s of storages) clearOwnKeys(s)
 }

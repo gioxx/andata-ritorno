@@ -53,3 +53,28 @@ describe('update toast', () => {
     expect(updateSW).toHaveBeenCalledWith(true)
   })
 })
+
+describe('onNeedReload', () => {
+  beforeEach(() => { document.body.innerHTML = '' })
+  const setup = () => {
+    const reload = vi.fn()
+    let handlers
+    initUpdateToast((h) => { handlers = h; return vi.fn() }, { poll: 5, reload })
+    return { reload, handlers }
+  }
+  it('reloads at once when idle', () => {
+    const { reload, handlers } = setup()
+    handlers.onNeedReload()
+    expect(reload).toHaveBeenCalledOnce()
+  })
+  it('waits while a dialog is open, even with no toast', async () => {
+    const { reload, handlers } = setup()
+    const d = document.createElement('dialog'); d.setAttribute('open', ''); document.body.append(d)
+    handlers.onNeedReload()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(reload).not.toHaveBeenCalled()
+    d.remove()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(reload).toHaveBeenCalledOnce()
+  })
+})

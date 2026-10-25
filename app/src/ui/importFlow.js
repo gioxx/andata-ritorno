@@ -119,6 +119,9 @@ async function hideBusyWhile(fn) {
   try { return await fn() } finally { if (d?.isConnected) d.showModal() }
 }
 
+/** Change the text of the busy overlay (no-op when it is not shown). */
+export function setBusyMessage(text) { if (busyDlg) busyDlg.textContent = text }
+
 let input = null
 /** Open the file picker (must be called inside the tap's click handler). */
 export function pickImportFile(db) {

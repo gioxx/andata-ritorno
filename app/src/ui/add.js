@@ -7,6 +7,8 @@ import { initDialogs, setFilesHandler, openSourcePicker, askNewItem, reportError
 import { t } from '../i18n.js'
 
 let busy = false // one add dialog at a time
+/** True from picking photos until saved or cancelled (an update reload would lose them). */
+export const isAdding = () => busy
 
 /** Add image files/blobs as new items for the current tab. Resolves false if there was nothing to add. */
 async function addFiles(files) {

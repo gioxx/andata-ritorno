@@ -174,6 +174,7 @@ export default {
   'wipe.confirmText': 'Per confermare scrivi <b>{word}</b> qui sotto.',
   'wipe.word': 'ELIMINA',
   'wipe.confirm': 'Elimina tutto',
+  'wipe.blocked': "Chiudi le altre schede di A/R per completare l'eliminazione.",
   'wipe.failed': 'Non sono riuscito a eliminare i dati: chiudi le altre schede di A/R e riprova.',
   'menu.langAuto': 'Auto',
   'menu.exportFailed': 'Esportazione non riuscita: {message}',

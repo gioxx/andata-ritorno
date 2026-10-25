@@ -37,8 +37,12 @@ export async function promptInstall() {
   if (!ev) return 'unavailable'
   deferred = null // the browser allows one prompt per event
   changed()
-  await ev.prompt()
-  return (await ev.userChoice).outcome
+  try {
+    await ev.prompt()
+    return (await ev.userChoice).outcome
+  } catch {
+    return 'unavailable' // the browser refused (e.g. prompt already used)
+  }
 }
 
 export function dismissInstallStrip() {

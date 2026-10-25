@@ -4,6 +4,7 @@ import { t } from '../i18n.js'
 import { store, runExclusive } from '../store.js'
 import { wipeAll } from '../wipe.js'
 import { reportError, openModal } from './dialogs.js'
+import { withBusy, setBusyMessage } from './importFlow.js'
 
 const unsavedHtml = () => (store.unsaved > 0 ? `<p class="plain warn">${t('wipe.unsaved', { n: store.unsaved })}</p>` : '')
 
@@ -18,7 +19,8 @@ function show(html) {
 /** Erase for real, alone in the mutation queue; on failure the app reloads onto what is left. */
 export async function eraseEverything({ db, reload = () => location.reload() }) {
   try {
-    await runExclusive(() => wipeAll({ db }))
+    // Overlay while waiting: a delete blocked by another tab finishes once that tab has reloaded.
+    await withBusy(() => runExclusive(() => wipeAll({ db, onBlocked: () => setBusyMessage(t('wipe.blocked')) })))
   } catch {
     reportError(new Error('wipe-failed'))
   }
@@ -38,7 +40,7 @@ export function openWipeFlow({ db, onExport, erase = eraseEverything }) {
   step1.addEventListener('click', async (e) => {
     const act = e.target.closest('[data-wipe]')?.dataset.wipe
     if (act === 'export') {
-      await onExport()
+      try { await onExport() } catch (err) { reportError(err) }
       step1.querySelector('#wipeUnsaved').innerHTML = unsavedHtml() // the backup zeroed the counter
     } else if (act === 'continue') {
       step1.close()

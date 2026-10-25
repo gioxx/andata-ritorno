@@ -2,19 +2,34 @@
 import { t, onLangChange } from '../i18n.js'
 import { isBusy } from '../store.js'
 import { canApplyUpdate } from '../update.js'
+import { isAdding } from './add.js'
 
 /** Read the live app state. The busy overlay is a dialog too, so it counts as a modal. */
 const readState = () => ({
   modalOpen: !!document.querySelector('dialog[open]'),
   viewerOpen: !!document.querySelector('#viewer:not([hidden])'), // also covers a pending rotation
-  busy: isBusy(),
+  busy: isBusy() || isAdding(),
 })
 
 /** @param {(h: {onNeedRefresh: () => void, onOfflineReady: () => void}) => (reload?: boolean) => Promise<void>} register */
-export function initUpdateToast(register, { poll = 500 } = {}) {
+export function initUpdateToast(register, { poll = 500, reload = () => location.reload() } = {}) {
   let timer = null
   let el = null
-  const updateSW = register({ onNeedRefresh: show, onOfflineReady() {} })
+  const updateSW = register({ onNeedRefresh: show, onOfflineReady() {}, onNeedReload })
+
+  // The new worker took control (here or in another tab): the plugin would reload at once and
+  // drop dialogs or photos in progress. Wait for idle instead, even if the toast was dismissed.
+  let reloadTimer = null
+  function onNeedReload() {
+    if (reloadTimer) return
+    const tryReload = () => {
+      if (!canApplyUpdate(readState())) return
+      clearInterval(reloadTimer)
+      reload()
+    }
+    reloadTimer = setInterval(tryReload, poll)
+    tryReload()
+  }
 
   function sync() {
     const idle = canApplyUpdate(readState())
