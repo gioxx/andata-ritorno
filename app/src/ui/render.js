@@ -1,10 +1,10 @@
 // Main screen. Whole-screen innerHTML re-render on every store change (small data set),
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
-import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, categorizeSelected, toggleFilter, clearFilter } from '../store.js'
-import { visibleItems } from './filter.js'
+import { store, setShowTags, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, categorizeSelected, toggleFilter, clearFilter } from '../store.js'
+import { visibleItems, usableFilters, UNCATEGORISED } from './filter.js'
 import { categoryName } from '../categories.js'
-import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon, tagIcon } from './icons.js'
+import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon, tagIcon, filterIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError, askCategory } from './dialogs.js'
 import { t } from '../i18n.js'
@@ -65,14 +65,22 @@ function section(loc, title, cls, list, categories) {
       : `<div class="empty">${t('render.empty')}</div>`}</div></section>`
 }
 
-/** Pills for the categories used in this tab (category order); none when nothing is categorised. */
+/** Pills for the categories used in this tab (category order), then "Senza categoria"; none when nothing is categorised. */
 function tagRow(tabItems, s) {
-  const used = new Set(tabItems.map((i) => i.category).filter(Boolean))
+  const used = usableFilters(tabItems)
   const cats = (s.categories ?? []).filter((c) => used.has(c.id))
   if (!cats.length) return ''
+  if (!s.showTags) return ''
   const filter = s.filter ?? new Set()
-  return `<nav class="tags" aria-label="${t('render.tags')}">${filter.size ? `<button class="chip tag clear" data-tagclear="1">${t('render.tagsAll')}</button>` : ''}${
-    cats.map((c) => `<button class="chip tag${filter.has(c.id) ? ' on' : ''}" data-tag="${esc(c.id)}" aria-pressed="${filter.has(c.id)}">${esc(categoryName(c))}</button>`).join('')}</nav>`
+  const pill = (id, label, cls = '') => `<button class="chip tag${cls}${filter.has(id) ? ' on' : ''}" data-tag="${esc(id)}" aria-pressed="${filter.has(id)}">${label}</button>`
+  return `<nav class="tags" aria-label="${t('render.tags')}"><span class="tagsicon" aria-hidden="true">${filterIcon}</span>${filter.size ? `<button class="chip tag clear" data-tagclear="1">${t('render.tagsAll')}</button>` : ''}${
+    cats.map((c) => pill(c.id, esc(categoryName(c)))).join('')}${used.has(UNCATEGORISED) ? pill(UNCATEGORISED, t('render.tagsNone'), ' none') : ''}</nav>`
+}
+
+/** Show/hide button for the category row, only when the tab has something to filter by. */
+function tagToggle(tabItems, s) {
+  if (!tabItems.some((i) => i.category)) return ''
+  return `<button class="menu tagtoggle${s.showTags ? ' on' : ''}" data-act="toggleTags" aria-pressed="${!!s.showTags}" aria-label="${t('render.tagsToggle')}">${filterIcon}</button>`
 }
 
 function bar(sel, hasCategories) {
@@ -104,7 +112,7 @@ export function renderApp(root, s = store) {
     ? `<div class="unsaved"><span>⚠ ${t('render.unsaved', { n })}</span><button data-act="export">${t('render.export')}</button></div>`
     : ''
   keepFocus(root, () => { root.innerHTML = `<header>
-      <div class="row1"><h1>${t('app.name')}</h1><button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
+      <div class="row1"><h1>${t('app.name')}</h1>${tagToggle(tabItems, s)}<button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
       <nav class="chips" aria-label="${t('render.tabs')}">${s.tabs.map((tb) => `<button class="chip${tb.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(tb.id)}"${tb.id === s.currentTabId ? ' aria-current="true"' : ''}>${esc(tb.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
     </header>
     <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}</main>
@@ -129,7 +137,7 @@ function wire(root) {
     if (!el) return
     noteActivator(el)
     if (el.dataset.tab) return setCurrentTab(el.dataset.tab)
-    if (el.dataset.tag) return toggleFilter(el.dataset.tag)
+    if (el.dataset.tag !== undefined) return toggleFilter(el.dataset.tag) // '' = uncategorised
     if (el.dataset.tagclear) return clearFilter()
     if (el.dataset.view) return act(() => hooks.onOpenViewer(selectedIds(root), el.dataset.view))
     if (el.dataset.section) return selectSection(el.dataset.section)
@@ -143,6 +151,7 @@ function wire(root) {
       case 'edit': return act(() => hooks.onEdit([...store.selected][0]))
       case 'clear': return clearSelection()
       case 'categorize': return act(categorize)
+      case 'toggleTags': return setShowTags(!store.showTags)
       case 'toSchool': return act(() => move('school'))
       case 'toHome': return act(() => move('home'))
       case 'del': if (confirm(t('render.confirmDelete'))) return act(deleteSelected)

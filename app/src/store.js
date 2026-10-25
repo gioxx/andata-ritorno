@@ -5,7 +5,7 @@ import { compress } from './photos.js'
 import { rotatePhoto } from './rotate.js'
 import { missingDefaults, categoryName } from './categories.js'
 import { t } from './i18n.js'
-import { visibleItems } from './ui/filter.js'
+import { visibleItems, usableFilters } from './ui/filter.js'
 
 /** @typedef {import('./types.js').Tab} Tab */
 /** @typedef {import('./types.js').Item} Item */
@@ -19,6 +19,7 @@ export const store = {
   /** @type {string|null} */ currentTabId: null,
   /** @type {Set<string>} */ selected: new Set(),
   /** Category ids of the active tag filter (empty = all); session only, never persisted. @type {Set<string>} */ filter: new Set(),
+  /** Category row shown under the tabs; remembered per browser in localStorage['ar-tags']. */ showTags: false,
   unsaved: 0,
 }
 
@@ -32,6 +33,24 @@ export function notify() {
   for (const fn of [...listeners]) fn()
 }
 
+const TAGS_KEY = 'ar-tags'
+// Only browsers: Node's experimental global localStorage prints a warning when touched.
+const storage = () => (typeof window === 'undefined' ? null : window.localStorage)
+function readShowTags() {
+  try { return storage()?.getItem(TAGS_KEY) === '1' } catch { return false }
+}
+
+/** Show or hide the category row. Hiding clears the filter: nothing may stay filtered out of sight. */
+export function setShowTags(on) {
+  store.showTags = !!on
+  try {
+    if (on) storage()?.setItem(TAGS_KEY, '1')
+    else storage()?.removeItem(TAGS_KEY)
+  } catch { /* storage blocked: still applies for this session */ }
+  if (!on) store.filter.clear()
+  notify()
+}
+
 export async function load(db) {
   const { tabs, items, categories } = await loadAll(db)
   store.db = db
@@ -40,6 +59,7 @@ export async function load(db) {
   store.items = items
   store.unsaved = (await getMeta(db, 'unsavedCount')) ?? 0
   store.selected = new Set()
+  store.showTags = readShowTags()
   if (!tabs.some((t) => t.id === store.currentTabId)) store.currentTabId = tabs[0]?.id ?? null
   settle()
   notify()
@@ -51,7 +71,7 @@ export async function load(db) {
  * and the selection only holds visible items.
  */
 function settle() {
-  const used = new Set(store.items.filter((i) => i.tabId === store.currentTabId && i.category).map((i) => i.category))
+  const used = usableFilters(store.items.filter((i) => i.tabId === store.currentTabId))
   for (const id of [...store.filter]) if (!used.has(id)) store.filter.delete(id)
   if (!store.filter.size) return
   const shown = new Set(visibleItems(store.items, store.filter).map((i) => i.id))

@@ -41,6 +41,8 @@ export default {
   'item.aria': '{label}, {place}, {category}',
   'item.noCategory': 'no category',
   'render.tagsAll': 'All ✕',
+  'render.tagsToggle': 'Category filters',
+  'render.tagsNone': 'No category',
   'render.categorize': 'Choose the category',
 
   'welcome.title': 'Welcome to Andata e Ritorno',

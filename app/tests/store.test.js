@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected, setShowTags } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -355,6 +355,15 @@ describe('edit item', () => {
       await editItem('b1', { category: c1 })
     })
 
+    it('hiding the category row clears the filter', () => {
+      setShowTags(true)
+      expect(store.showTags).toBe(true)
+      toggleFilter(c1)
+      setShowTags(false)
+      expect(store.showTags).toBe(false)
+      expect(store.filter.size).toBe(0)
+    })
+
     it('selectSection respects the filter', () => {
       toggleFilter(c1)
       selectSection('school')
@@ -382,6 +391,25 @@ describe('edit item', () => {
       clearFilter()
       expect(store.filter.size).toBe(0)
       expect([...store.selected]).toEqual(['a1'])
+    })
+
+    it('the uncategorised filter turns itself off once no item of the tab lacks a category', async () => {
+      const { UNCATEGORISED } = await import('../src/ui/filter.js')
+      setCurrentTab('A') // tab A mixes categorised and uncategorised items
+      toggleFilter(UNCATEGORISED)
+      expect([...store.filter]).toEqual([UNCATEGORISED])
+      await editItem('a3', { category: c2 })
+      expect(store.filter.size).toBe(0)
+    })
+
+    it('the uncategorised filter turns itself off once no item of the tab has a category', async () => {
+      const { UNCATEGORISED } = await import('../src/ui/filter.js')
+      setCurrentTab('A') // tab A mixes categorised and uncategorised items
+      toggleFilter(UNCATEGORISED)
+      await editItem('a1', { category: null })
+      expect(store.filter.size).toBe(1)
+      await editItem('a2', { category: null })
+      expect(store.filter.size).toBe(0)
     })
 
     it('a filter category that no item of the tab uses any more is dropped', async () => {

@@ -12,7 +12,7 @@ describe('category names are escaped', () => {
   it('tag row, picker and manager show the text literally', () => {
     const tab = { id: 'A', name: 'A', order: 0 }
     const item = { id: 'i1', tabId: 'A', location: 'school', label: '', photoId: 'p', category: 'c1' }
-    Object.assign(store, { tabs: [tab], items: [item], categories: [{ id: 'c1', name: NAME, order: 0 }], currentTabId: 'A' })
+    Object.assign(store, { tabs: [tab], items: [item], categories: [{ id: 'c1', name: NAME, order: 0 }], currentTabId: 'A', showTags: true })
     store.filter.clear()
 
     const root = document.createElement('div')

@@ -34,7 +34,10 @@ body { margin: 0; font-family: var(--font); font-weight: 500; background: var(--
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 #app { max-width: 640px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
 header { padding: calc(18px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background: var(--surface); }
-.row1 { display: flex; justify-content: space-between; align-items: center; }
+.row1 { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.row1 h1 { margin-right: auto; }
+.tagtoggle { border-radius: 50%; }
+.tagtoggle.on { background: var(--accent-strong); color: var(--bg); }
 h1 { margin: 0; font-size: 1.375rem; font-weight: 700; letter-spacing: -.01em; }
 .menu { min-width: 44px; min-height: 44px; padding: 6px; display: flex; align-items: center; justify-content: center; }
 .chips { display: flex; gap: 6px; margin-top: 12px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
@@ -173,7 +176,11 @@ dialog .row + .cancel { margin-top: 8px; }
 /* ---- Categories: tag row, picker, manager ---- */
 .tags { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
 .tags::-webkit-scrollbar { display: none; }
-.chip.tag.clear { background: transparent; border: 1.5px solid var(--muted); padding: 5.5px 12.5px; }
+/* Category pills are outlined, tabs are filled: the two rows must not read as the same control. */
+.tags .chip.tag { background: transparent; border: 1.5px solid var(--muted); padding: 5.5px 12.5px; }
+.tags .chip.tag.on { border-color: var(--accent-strong); color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-strong); }
+.tags .chip.tag.none:not(.on) { border-style: dashed; }
+.tags .tagsicon { flex: none; display: flex; align-items: center; padding: 0 2px; color: var(--muted); }
 /* Wraps (no scroller): every category must be visible and tappable. */
 dialog .catpick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
 dialog .catpick .chip { flex: none; width: auto; padding: 7px 14px; }
