@@ -2,7 +2,7 @@
 // one delegated click handler, photos filled in afterwards from cached object URLs.
 import { getPhoto } from '../db.js'
 import { store, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected } from '../store.js'
-import { menuIcon, trashIcon, checkIcon, pencilIcon, expandIcon, cameraIcon, pasteIcon } from './icons.js'
+import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError } from './dialogs.js'
 
@@ -44,7 +44,7 @@ function tile(i, moved) {
   const sel = store.selected.has(i.id)
   const label = String(i.label ?? '') // safety net: never trust the type of stored data
   return `<div class="item${label.trim() ? ' labeled' : ''}${sel ? ' selected' : ''}${moved ? ' moved' : ''}" data-id="${esc(i.id)}">
-    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(label)}</span>${sel ? `<i class="check">${checkIcon}</i><button class="expand" data-view="${esc(i.id)}" aria-label="Apri a schermo intero">${expandIcon}</button>` : ''}</div>`
+    <img data-photo="${esc(i.photoId)}" alt=""><span>${esc(label)}</span>${sel ? `<i class="check">${checkIcon}</i><button class="open" data-view="${esc(i.id)}" aria-label="Apri foto">${zoomInIcon}</button>` : ''}</div>`
 }
 
 function section(loc, title, cls, list) {
@@ -100,7 +100,7 @@ function wire(root) {
     const t = e.target.closest('[data-tab],[data-view],[data-id],[data-section],[data-act]')
     if (!t) return
     if (t.dataset.tab) return setCurrentTab(t.dataset.tab)
-    if (t.dataset.view) return act(() => hooks.onOpenViewer(sectionIds(t), t.dataset.view))
+    if (t.dataset.view) return act(() => hooks.onOpenViewer(selectedIds(root), t.dataset.view))
     if (t.dataset.section) return selectSection(t.dataset.section)
     if (t.dataset.id) return selectToggle(t.dataset.id)
     switch (t.dataset.act) {
@@ -122,6 +122,9 @@ const LONG_PRESS_MS = 450
 
 /** Ids of the tiles in the same section as `el`, in display order. */
 const sectionIds = (el) => [...el.closest('.grid').querySelectorAll('.item[data-id]')].map((n) => n.dataset.id)
+
+/** Selected tiles of the current tab in display order (school section, then home). */
+const selectedIds = (root) => [...root.querySelectorAll('.item.selected[data-id]')].map((n) => n.dataset.id)
 
 // What a long-press does, per pressable element.
 const LONG_PRESS = [

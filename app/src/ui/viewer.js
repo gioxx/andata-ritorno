@@ -10,6 +10,9 @@ import { pinch, swipeIntent, stepIndex, containSize, clampPan, DOUBLE_TAP_SCALE 
 const DOUBLE_TAP_MS = 300
 const TAP_SLOP = 10
 
+const HINT_ONE = 'Due dita per ingrandire'
+const HINT_MANY = 'Due dita per ingrandire · scorri per gli altri capi'
+
 let dom = null
 let ids = [], index = 0
 let isOpen = false
@@ -29,11 +32,13 @@ function ensureDom() {
   el.hidden = true
   el.setAttribute('role', 'dialog')
   el.setAttribute('aria-modal', 'true')
-  el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" data-v="edit">Modifica</button><button type="button" data-v="close" aria-label="Chiudi">${closeIcon}</button></div>
-    <div class="stage"><img alt="" draggable="false"></div>`
+  el.innerHTML = `<div class="vbar"><span class="vlabel"></span><button type="button" class="vx" data-v="close" aria-label="Chiudi">${closeIcon}</button></div>
+    <div class="stage"><img alt="" draggable="false"></div>
+    <p class="vhint"></p>
+    <div class="vbot"><button type="button" data-v="edit">Modifica</button><button type="button" class="vclose" data-v="close">Chiudi</button></div>`
   document.body.append(el)
-  dom = { el, label: el.querySelector('.vlabel'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
-  el.querySelector('.vbar').addEventListener('click', (e) => {
+  dom = { el, label: el.querySelector('.vlabel'), hint: el.querySelector('.vhint'), stage: el.querySelector('.stage'), img: el.querySelector('img') }
+  el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-v]')
     if (!b) return
     if (b.dataset.v === 'close') return close()
@@ -90,12 +95,13 @@ async function show(i) {
   } catch (e) { reportError(e) }
 }
 
-/** @param {string[]} itemIds items of one section, in display order @param {string} startId */
+/** @param {string[]} itemIds the swipe list in display order (selected items, or one section) @param {string} startId */
 export function openViewer(itemIds, startId) {
   if (isOpen || !itemIds.length) return
   const d = ensureDom()
   ids = itemIds
   isOpen = true
+  d.hint.textContent = ids.length > 1 ? HINT_MANY : HINT_ONE
   d.el.hidden = false
   const r = d.stage.getBoundingClientRect()
   vp = { w: r.width, h: r.height }

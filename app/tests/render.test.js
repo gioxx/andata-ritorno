@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { renderApp } from '../src/ui/render.js'
+import { describe, it, expect, vi } from 'vitest'
+import { renderApp, hooks } from '../src/ui/render.js'
+import { store } from '../src/store.js'
 
 const tab = { id: 'A', name: 'A', order: 0, createdAt: '', updatedAt: '' }
 
@@ -12,5 +13,25 @@ describe('render safety net', () => {
     const tile = root.querySelector('.item[data-id="i1"]')
     expect(tile.classList.contains('labeled')).toBe(true)
     expect(tile.querySelector('span').textContent).toBe('42')
+  })
+})
+
+describe('open-photo button on selected tiles', () => {
+  it('opens the viewer on the selected ids in display order without changing the selection', () => {
+    const root = document.createElement('div')
+    const mk = (id, location) => ({ id, tabId: 'A', location, label: id, photoId: 'p' + id })
+    // home item listed first in the store, yet the school section renders first
+    const items = [mk('h1', 'home'), mk('s1', 'school'), mk('s2', 'school')]
+    const selected = store.selected // tiles read the global store
+    selected.clear(); selected.add('h1'); selected.add('s2')
+    renderApp(root, { tabs: [tab], items, currentTabId: 'A', selected, unsaved: 0 })
+    expect(root.querySelectorAll('.item .open')).toHaveLength(2)
+    expect(root.querySelector('.item[data-id="s1"] .open')).toBeNull()
+    const open = vi.fn()
+    hooks.onOpenViewer = open
+    root.querySelector('.item[data-id="h1"] .open').click()
+    expect(open).toHaveBeenCalledWith(['s2', 'h1'], 'h1')
+    expect([...selected]).toEqual(['h1', 's2'])
+    selected.clear()
   })
 })

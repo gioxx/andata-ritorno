@@ -1,6 +1,8 @@
 // On a computer the app makes little sense (it's built around the phone camera and one-tap moves):
 // invite the visitor to open it on the phone, but let them carry on if they really want to.
 
+import { inviteFooter } from './about.js'
+
 const KEY = 'ar-desktop-ok'
 
 /**
@@ -45,6 +47,7 @@ export function desktopGate(root) {
       <li>Scegli <b>Installa app</b> (o <b>Aggiungi a schermata Home</b>).</li>
     </ol>
     <button class="ghost" id="desktopContinue">Continua dal computer</button>
+    ${inviteFooter()}
   </div>`
   return new Promise((resolve) => {
     root.querySelector('#desktopContinue').addEventListener('click', () => {

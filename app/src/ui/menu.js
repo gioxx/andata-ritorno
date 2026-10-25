@@ -7,12 +7,17 @@ import { openTabManager } from './tabs.js'
 import { reportError } from './dialogs.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
+import { menuFooter } from './about.js'
+import { downloadIcon, uploadIcon, layersIcon, todoIcon, monitorIcon, sunIcon, moonIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, missingPhotoMessage } from './model.js'
 
 let dlg = null
 let db = null
 
-const THEMES = [['auto', 'Auto'], ['light', '☀ Chiaro'], ['dark', '☾ Scuro']]
+const THEMES = [['auto', monitorIcon, 'Auto'], ['light', sunIcon, 'Chiaro'], ['dark', moonIcon, 'Scuro']]
+
+/** Menu row: icon holder + label (+ optional right-hand pill). */
+const menuItem = (act, icon, label, extra = '') => `<button type="button" class="menuItem" data-menu="${act}"${act === 'todo' ? ' id="todoBtn" hidden' : ''}><span class="ic">${icon}</span>${label}${extra}</button>`
 
 /** Ask the browser not to evict our data; null when unsupported. */
 async function persistence() {
@@ -22,7 +27,7 @@ async function persistence() {
 
 function renderThemeSeg() {
   const cur = getTheme()
-  dlg.querySelector('#themeSeg').innerHTML = THEMES.map(([v, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}">${l}</button>`).join('')
+  dlg.querySelector('#themeSeg').innerHTML = THEMES.map(([v, icon, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}">${icon}${l}</button>`).join('')
 }
 
 async function openMenu() {
@@ -33,7 +38,7 @@ async function openMenu() {
   dlg.querySelector('#persistInfo').textContent = ''
   const todoBtn = dlg.querySelector('#todoBtn')
   todoBtn.hidden = !todo.length
-  todoBtn.textContent = `Da rifare (${todo.length})`
+  todoBtn.querySelector('.badge').textContent = todo.length
   renderThemeSeg()
   if (dlg.open) return // double tap on the menu button
   dlg.showModal()
@@ -46,13 +51,14 @@ function build() {
   dlg.innerHTML = `<h3>Menu <button type="button" class="close" data-menu="close" aria-label="Chiudi">✕</button></h3>
     <h4>Backup</h4>
     <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
-    <button type="button" class="menuItem" data-menu="export">⬇ Esporta backup</button>
-    <button type="button" class="menuItem" data-menu="import">⬆ Importa backup</button>
+    ${menuItem('export', downloadIcon, 'Esporta backup')}
+    ${menuItem('import', uploadIcon, 'Importa backup')}
     <h4>Schede</h4>
-    <button type="button" class="menuItem" data-menu="tabs">Gestisci schede</button>
-    <button type="button" class="menuItem" id="todoBtn" data-menu="todo" hidden></button>
+    ${menuItem('tabs', layersIcon, 'Gestisci schede')}
+    ${menuItem('todo', todoIcon, 'Da rifare', '<span class="badge"></span>')}
     <h4>Tema</h4>
-    <div class="seg" id="themeSeg"></div>`
+    <div class="seg" id="themeSeg"></div>
+    ${menuFooter()}`
   document.body.append(dlg)
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg) { // the dialog itself is the target for both its padding and the backdrop
