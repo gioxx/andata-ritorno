@@ -2,7 +2,7 @@
   color-scheme: light;
   --bg: #fbf7f1; --fg: #2b2620; --muted: #6a6052;
   --school: #fde9d9; --home: #e3eedd;
-  --tile: #fff; --chip: #efe7db; --surface: #fbf7f1;
+  --tile: #fff; --chip: #efe7db; --surface: #fbf7f1; --badge: #efe7db;
   --accent: #d96f4f; --holder: #fff;
   /* --accent fails 4.5:1 with small text on cream (3.1:1): small text and its fill use the stronger one */
   --accent-strong: #b4532f; --danger: #b3261e;
@@ -15,14 +15,14 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #0d0f15; --surface: #151821; --school: #151821; --home: #151821;
-    --tile: #1f232e; --chip: #1f232e; --fg: #eceef5; --muted: #9399ad;
+    --tile: #1f232e; --chip: #1f232e; --badge: #151821; --fg: #eceef5; --muted: #9399ad;
     --accent: #e88563; --accent-strong: #e88563; --danger: #ff8a80; --holder: #0d0f15; --school-stripe: #f0a531; --home-stripe: #3bb273;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0d0f15; --surface: #151821; --school: #151821; --home: #151821;
-  --tile: #1f232e; --chip: #1f232e; --fg: #eceef5; --muted: #9399ad;
+  --tile: #1f232e; --chip: #1f232e; --badge: #151821; --fg: #eceef5; --muted: #9399ad;
   --accent: #e88563; --accent-strong: #e88563; --danger: #ff8a80; --holder: #0d0f15; --school-stripe: #f0a531; --home-stripe: #3bb273;
 }
 * { box-sizing: border-box; }
@@ -189,7 +189,10 @@ dialog .catpick .linkbtn { flex: none; width: auto; padding: 10px 12px; backgrou
 /* The list scrolls, which clips anything drawn outside it: 5px of room (3px outline + 2px offset) keeps the focus ring whole. */
 dialog .catlist { list-style: none; margin: -5px -5px 7px; padding: 5px; max-height: 45dvh; overflow-y: auto; }
 dialog .catlist li { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-dialog .catlist input[type="text"] { flex: 1; min-width: 0; margin: 0; }
+/* How many items use the category, inside the name field on the right (all tabs). */
+dialog .catlist .catname { flex: 1; min-width: 0; position: relative; }
+dialog .catlist input[type="text"] { margin: 0; padding-right: 48px; }
+dialog .catlist .catcount { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); min-width: 28px; padding: 3px 8px; border-radius: var(--r-pill); background: var(--badge); color: var(--muted); font-size: 0.8125rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
 dialog .catlist button { flex: none; width: 44px; height: 44px; padding: 0; background: var(--chip); }
 dialog .catlist button.danger { width: 44px; border: 0; color: var(--danger); }
 dialog .catnew { margin-bottom: 8px; }

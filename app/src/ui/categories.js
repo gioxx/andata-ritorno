@@ -55,8 +55,10 @@ function drawList() {
   const d = ensureDom()
   const cats = store.categories
   d.empty.hidden = cats.length > 0
+  const counts = new Map()
+  for (const it of store.items) if (it.category) counts.set(it.category, (counts.get(it.category) ?? 0) + 1)
   d.list.innerHTML = cats.map((c, i) => `<li data-id="${esc(c.id)}">
-      <input type="text" value="${esc(categoryName(c))}" aria-label="${t('category.nameLabel')}" autocomplete="off">
+      <span class="catname"><input type="text" value="${esc(categoryName(c))}" aria-label="${t('category.nameLabel')}, ${t('category.count', { n: counts.get(c.id) ?? 0 })}" autocomplete="off"><span class="catcount" aria-hidden="true">${counts.get(c.id) ?? 0}</span></span>
       <button type="button" data-cat-act="up" aria-label="${t('category.up')}"${i === 0 ? ' disabled' : ''}>↑</button>
       <button type="button" data-cat-act="down" aria-label="${t('category.down')}"${i === cats.length - 1 ? ' disabled' : ''}>↓</button>
       <button type="button" class="danger" data-cat-act="del" aria-label="${t('category.delete')}">✕</button></li>`).join('')

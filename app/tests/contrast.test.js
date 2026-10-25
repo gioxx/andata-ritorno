@@ -24,6 +24,7 @@ const PAIRS = [
   ['muted', 'bg', 4.5, 'hints, notes, ghost buttons'],
   ['muted', 'surface', 4.5, 'dialog/drawer secondary text'],
   ['muted', 'chip', 4.5, 'inactive tab and category pills, counts'],
+  ['muted', 'badge', 4.5, 'item counts in the category manager'],
   ['muted', 'school', 4.5, 'empty-section text'],
   ['muted', 'home', 4.5, 'empty-section text'],
   ['muted', 'tile', 4.5, 'input placeholders'],

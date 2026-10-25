@@ -127,6 +127,7 @@ export default {
 
   'category.manageTitle': 'Manage categories',
   'category.nameLabel': 'Category name',
+  'category.count': { one: '1 item', other: '{n} items' },
   'category.empty': 'No categories. Create one or add the default ones.',
   'category.newPlaceholder': 'New category',
   'category.add': 'Add',

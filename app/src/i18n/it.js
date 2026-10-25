@@ -128,6 +128,7 @@ export default {
 
   'category.manageTitle': 'Gestisci categorie',
   'category.nameLabel': 'Nome categoria',
+  'category.count': { one: '1 capo', other: '{n} capi' },
   'category.empty': 'Nessuna categoria. Creane una o aggiungi quelle predefinite.',
   'category.newPlaceholder': 'Nuova categoria',
   'category.add': 'Aggiungi',
