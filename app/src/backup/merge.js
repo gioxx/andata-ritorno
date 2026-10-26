@@ -10,7 +10,7 @@ export function mergeItem(a, b, { breakTies = false } = {}) {
   const move = wins((x) => x.movedAt, (x) => x.location) ? b : a // location travels with movedAt
   const edit = wins((x) => x.updatedAt, (x) => [x.label, x.tabId, x.category ?? null]) ? b : a // everything else with updatedAt
   // The photo has its own clock: a label edit must not drag an older photo along (or lose a newer one).
-  const photo = wins((x) => x.photoAt ?? x.updatedAt, (x) => x.photoId) ? b : a
+  const photo = wins((x) => x.photoAt ?? x.updatedAt, (x) => [x.photoId, x.photoAt ?? null]) ? b : a
   const out = {
     ...a,
     location: move.location,

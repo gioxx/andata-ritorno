@@ -203,6 +203,43 @@ describe('mergeRemote: remote value vs local tombstone', () => {
   })
 })
 
+describe('mergeRemote: convergence of items', () => {
+  /** Each device merges the other's item, then receives the other's result: round 2 must be empty. */
+  function converge(onX, onY) {
+    const lx = local({ items: [onX] })
+    const ly = local({ items: [onY] })
+    const ax = apply(lx, mergeRemote(lx, [val('item', onY)], opts))
+    const ay = apply(ly, mergeRemote(ly, [val('item', onX)], opts))
+    expect(ax.items[0]).toEqual(ay.items[0])
+    expectEmpty(mergeRemote(ax, [val('item', ay.items[0])], opts))
+    expectEmpty(mergeRemote(ay, [val('item', ax.items[0])], opts))
+    return ax.items[0]
+  }
+
+  it('items differing only in createdAt converge on the earlier one', () => {
+    const got = converge(item('i1', 'A', { createdAt: T1, updatedAt: T2 }), item('i1', 'A', { updatedAt: T2 }))
+    expect(got.createdAt).toBe(T0)
+  })
+
+  it('an unknown extra field (newer app version) converges: it follows the edit clock, then its JSON', () => {
+    expect(converge(item('i1', 'A', { extra: { a: 1 } }), item('i1', 'A', { extra: { a: 2 } })).extra).toEqual({ a: 2 })
+    // Tie: '{}' > '{"extra":"x"}' in JSON order, so both devices drop it; what matters is that they agree.
+    expect('extra' in converge(item('i1', 'A', { extra: 'x' }), item('i1', 'A'))).toBe(false)
+    expect(converge(item('i1', 'A', { extra: 'old' }), item('i1', 'A', { extra: 'new', updatedAt: T1 })).extra).toBe('new')
+    expect(converge(item('i1', 'A', { extra: 'mine', updatedAt: T1 }), item('i1', 'A', { extra: 'aaa', label: 'z', updatedAt: T1 }))).toMatchObject({ extra: 'mine', label: 'z' })
+  })
+
+  it('an equal extra field held in another object does not count as a difference', () => {
+    const plan = mergeRemote(local({ items: [item('i1', 'A', { extra: { a: [1] } })] }), [val('item', item('i1', 'A', { extra: { a: [1] } }))], opts)
+    expectEmpty(plan)
+  })
+
+  it('photo clock tie where only one side has photoAt converges', () => {
+    const got = converge(item('i1', 'A', { photoAt: T1, updatedAt: T1 }), item('i1', 'A', { updatedAt: T1 }))
+    expect('photoAt' in got).toBe(false) // ["p-i1",null] > ["p-i1","2026-…"]: both devices agree on that
+  })
+})
+
 describe('mergeRemote: orphan items and tabs', () => {
   it('items on a tombstoned tab move to the first remaining tab by order and are pushed back', () => {
     const l = local({ tabs: [tab('B', 2), tab('A', 1), tab('C', 0)], items: [item('i1', 'B')] })

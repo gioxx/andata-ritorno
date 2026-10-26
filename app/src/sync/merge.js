@@ -20,14 +20,38 @@ function stamp(kind, r) {
   return [r.updatedAt, r.movedAt, r.photoAt ?? ''].reduce((a, b) => (b > a ? b : a))
 }
 
-/** Shallow equality over both key sets (records hold primitives only). */
+/** Equality over both key sets; a non-primitive value (a field from a newer app version) compares as JSON. */
 function same(a, b) {
-  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (a[k] !== b[k]) return false
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (a[k] !== b[k] && JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false
+  }
   return true
 }
 
-/** Plain record as JSON with sorted keys: devices may build the same record in another key order. */
-const canon = (r) => JSON.stringify(r, Object.keys(r).sort())
+/** Record as JSON with sorted top-level keys: devices may build the same record in another key order. */
+const canon = (r) => JSON.stringify(Object.fromEntries(Object.entries(r).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))))
+
+/** Item fields mergeItem decides; anything else comes from a newer app version. */
+const ITEM_FIELDS = ['id', 'tabId', 'location', 'label', 'category', 'photoId', 'photoAt', 'createdAt', 'movedAt', 'updatedAt']
+const extras = (r) => Object.fromEntries(Object.entries(r).filter(([k]) => !ITEM_FIELDS.includes(k)))
+const earlier = (x, y) => (x === undefined ? y : y === undefined || x <= y ? x : y)
+
+/**
+ * mergeItem with every field decided the same way on every device, so the result never differs
+ * from what another device computes (a leftover difference would be pushed back forever):
+ * the earlier createdAt, unknown fields from the newer edit (on a tie, the greater JSON).
+ */
+function mergeSyncItem(a, b) {
+  const m = mergeItem(a, b, { breakTies: true })
+  const ea = extras(a)
+  const eb = extras(b)
+  const out = b.updatedAt > a.updatedAt || (b.updatedAt === a.updatedAt && canon(eb) > canon(ea)) ? { ...eb } : { ...ea }
+  for (const k of ITEM_FIELDS) if (m[k] !== undefined) out[k] = m[k]
+  const createdAt = earlier(a.createdAt, b.createdAt)
+  if (createdAt === undefined) delete out.createdAt
+  else out.createdAt = createdAt
+  return out
+}
 
 /** Tabs and categories: the newer updatedAt wins; an exact tie goes to the greater canonical JSON. */
 const newerRecord = (cur, v) =>
@@ -45,7 +69,7 @@ function applyValue(kind, recs, tombs, v) {
     recs.set(v.id, v)
     return true
   }
-  const merged = kind === 'item' ? mergeItem(cur, v, { breakTies: true }) : newerRecord(cur, v)
+  const merged = kind === 'item' ? mergeSyncItem(cur, v) : newerRecord(cur, v)
   if (same(merged, cur)) return false
   recs.set(v.id, merged)
   return true
