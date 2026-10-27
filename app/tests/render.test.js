@@ -155,3 +155,18 @@ describe('category row preference', () => {
     expect(st.showTags).toBe(false)
   })
 })
+
+describe('sync line', () => {
+  const state = { tabs: [tab], items: [], currentTabId: 'A', selected: new Set(), unsaved: 0 }
+  it('is absent without a family and the last thing in main with one', async () => {
+    const { enableSyncLine } = await import('../src/ui/syncLine.js')
+    const root = document.createElement('div')
+    enableSyncLine(false)
+    renderApp(root, state)
+    expect(root.querySelector('.syncline')).toBeNull()
+    enableSyncLine(true)
+    renderApp(root, state)
+    expect(root.querySelector('main').lastElementChild.classList.contains('syncline')).toBe(true)
+    enableSyncLine(false)
+  })
+})

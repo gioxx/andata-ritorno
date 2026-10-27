@@ -10,11 +10,12 @@ import { reportError, askCategory } from './dialogs.js'
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { keepFocus, noteActivator } from './focus.js'
+import { renderSyncLine } from './syncLine.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
   onAddTab() {}, onTabLongPress(_id) {}, onImportFile(_file) {}, onAdd() {}, onPaste() {}, onMenu() {}, onExport() {},
-  onEdit(_id) {}, onOpenViewer(_ids, _startId) {}, onManageCategories() {},
+  onEdit(_id) {}, onOpenViewer(_ids, _startId) {}, onManageCategories() {}, onSyncLine() {},
 }
 
 /** @type {Map<string,string>} photoId -> object URL */
@@ -116,7 +117,7 @@ export function renderApp(root, s = store) {
       <div class="row1"><h1>${t('app.name')}</h1>${tagToggle(tabItems, s)}<button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
       <nav class="chips" aria-label="${t('render.tabs')}">${s.tabs.map((tb) => `<button class="chip${tb.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(tb.id)}"${tb.id === s.currentTabId ? ' aria-current="true"' : ''}>${esc(tb.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
     </header>
-    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}</main>
+    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}${renderSyncLine()}</main>
     <footer class="bar">${bar(sel, cats.length > 0)}</footer>` })
   root.querySelector('.chips').scrollLeft = chipsScroll
   const tags = root.querySelector('.tags')
@@ -148,6 +149,7 @@ function wire(root) {
       case 'add': return act(hooks.onAdd)
       case 'paste': return act(hooks.onPaste)
       case 'menu': return act(hooks.onMenu)
+      case 'syncLine': return act(hooks.onSyncLine)
       case 'export': return act(hooks.onExport)
       case 'edit': return act(() => hooks.onEdit([...store.selected][0]))
       case 'clear': return clearSelection()

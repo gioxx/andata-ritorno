@@ -3,6 +3,10 @@ import '@fontsource/plus-jakarta-sans/600.css';
 import '@fontsource/plus-jakarta-sans/700.css';
 import './styles.css';
 import { openDb, setVersionChangeHandler } from './db.js';
+import { getFamily } from './sync/family.js';
+import { createApi } from './sync/api.js';
+import { initSync, syncNow, subscribeSync } from './sync/engine.js';
+import { enableSyncLine, initPullToRefresh } from './ui/syncLine.js';
 import { store, load, subscribe, addTab } from './store.js';
 import { renderApp, hooks } from './ui/render.js';
 import { renderWelcome } from './ui/welcome.js';
@@ -75,4 +79,16 @@ if (db) {
   initCategories();
   initViewer();
   initMenu(db);
+  // Only a device in a family touches the network, and only after the first render.
+  if (await getFamily(db)) {
+    enableSyncLine(true);
+    hooks.onSyncLine = () => syncNow('line');
+    const api = createApi({ getToken: async () => (await getFamily(db))?.token });
+    await initSync({ db, api });
+    subscribeSync(() => draw());
+    draw();
+    initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
+    syncNow('start');
+  }
 }
