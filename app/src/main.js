@@ -17,6 +17,7 @@ import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
 import { initMenu } from './ui/menu.js';
+import { initFamilyUi } from './ui/familyDialogs.js';
 import { desktopGate } from './ui/desktop.js';
 import { initIosBanner } from './ui/iosBanner.js';
 import { registerSW } from 'virtual:pwa-register';
@@ -80,15 +81,26 @@ if (db) {
   initViewer();
   initMenu(db);
   // Only a device in a family touches the network, and only after the first render.
-  if (await getFamily(db)) {
+  const api = createApi({ getToken: async () => (await getFamily(db))?.token });
+  let inFamily = false; // keyed on membership, not on sync state: a removed phone still is in a family
+  let wired = false;
+  // Also called from the menu right after a family is created (no reload needed).
+  const startSync = async () => {
+    inFamily = true;
     enableSyncLine(true);
     hooks.onSyncLine = () => syncNow('line');
-    const api = createApi({ getToken: async () => (await getFamily(db))?.token });
     await initSync({ db, api });
-    subscribeSync((s) => { document.documentElement.classList.toggle('in-family', s.state !== 'removed'); draw(); });
+    if (!wired) {
+      wired = true;
+      subscribeSync(() => { document.documentElement.classList.toggle('in-family', inFamily); draw(); });
+      initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
+    }
     draw();
-    initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
     syncNow('start');
-  }
+  };
+  // The engine stays up but idle: with no family its run resets the status and touches nothing.
+  const stopSync = () => { inFamily = false; hooks.onSyncLine = () => {}; syncNow('menu'); draw(); };
+  initFamilyUi({ db, api, onEntered: startSync, onLeft: stopSync });
+  if (await getFamily(db)) await startSync();
 }

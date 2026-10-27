@@ -12,7 +12,7 @@ export const enableSyncLine = (on) => {
 }
 
 /** "5 min ago" style wording; calendar days from yesterday on. */
-function ago(iso, now) {
+export function ago(iso, now) {
   const min = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60000))
   if (min < 1) return t('sync.agoNow')
   if (min < 60) return t('sync.agoMin', { n: min })

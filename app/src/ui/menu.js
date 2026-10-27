@@ -15,11 +15,26 @@ import { canPromptInstall, promptInstall } from '../install.js'
 import { openInstallSteps, openUninstallSteps } from './appDialogs.js'
 import { openWipeFlow } from './wipeFlow.js'
 import { menuFooter } from './about.js'
+import { getFamily } from '../sync/family.js'
+import { syncStatus, syncNow, subscribeSync } from '../sync/engine.js'
+import { familyMenuHtml } from './familyMenu.js'
+import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave } from './familyDialogs.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, logOutIcon, eraseIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
 let dlg = null
 let db = null
+
+const payments = import.meta.env.VITE_PAYMENTS === '1'
+/** Payment Links open in a new tab; with payments off the row falls back to typing a code. */
+const openPayment = (link) => (payments && link ? window.open(link, '_blank', 'noopener') : openCodeDialog())
+
+async function renderFamily() {
+  const section = dlg?.querySelector('#familySection')
+  if (!section) return
+  const family = await getFamily(db)
+  keepFocus(section, () => { section.innerHTML = familyMenuHtml({ family, info: syncStatus, payments }) })
+}
 
 const themes = () => [['auto', monitorIcon, t('menu.themeAuto')], ['light', sunIcon, t('menu.themeLight')], ['dark', moonIcon, t('menu.themeDark')]]
 // Language names stay in their own language so they are findable from the wrong one.
@@ -57,6 +72,7 @@ async function refresh() {
   todoBtn.querySelector('.badge').textContent = todo.length
   renderThemeSeg()
   renderLangSeg()
+  await renderFamily()
   persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p) })
 }
 
@@ -68,6 +84,8 @@ async function openMenu() {
 }
 
 const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="close" data-menu="close" aria-label="${t('common.close')}">✕</button></h3>
+    <h4>${t('menu.family')}</h4>
+    <div id="familySection"></div>
     <h4>${t('menu.backup')}</h4>
     <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
     ${menuItem('export', downloadIcon, t('menu.export'))}
@@ -91,6 +109,7 @@ function build() {
   dlg.id = 'menu'
   dlg.innerHTML = menuHtml()
   document.body.append(dlg)
+  subscribeSync(() => { if (dlg.open) renderFamily() }) // last sync time, device count, removed state
   // Relabel in place (the drawer stays open while the language is switched from it).
   onLangChange(() => { keepFocus(dlg, () => { dlg.innerHTML = menuHtml(); labelDialog(dlg) }); if (todoDlg?.open) renderTodo(); refresh() })
   dlg.addEventListener('click', (e) => {
@@ -106,8 +125,11 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), wipe: () => openWipeFlow({ db, onExport: runExport }) }[item.dataset.menu]
-    run()
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), wipe: () => openWipeFlow({ db, onExport: runExport }),
+      unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
+      restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
+      invite: openInvite, slot: () => openPayment(import.meta.env.VITE_STRIPE_LINK_SLOT), kit: () => openKit(), leave: openLeave }[item.dataset.menu]
+    Promise.resolve(run()).catch(reportError)
   })
   // Swipe right on the drawer to close it.
   let x0 = null
