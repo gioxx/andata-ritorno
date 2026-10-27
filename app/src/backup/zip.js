@@ -67,10 +67,12 @@ function normItem(raw) {
 }
 
 /**
- * @param {{ tabs:any[], items:any[], categories?:any[], getPhoto:(id:string)=>Promise<Blob|undefined> }} src
+ * familyKit: the recovery kit of the family this phone is in. Backups are not encrypted anyway,
+ * so carrying it adds no new exposure, and a lost phone's backup can bring the family back.
+ * @param {{ tabs:any[], items:any[], categories?:any[], getPhoto:(id:string)=>Promise<Blob|undefined>, familyKit?:string|null }} src
  * @returns {Promise<Blob>}
  */
-export async function buildZip({ tabs, items, categories = [], getPhoto, now = new Date() }) {
+export async function buildZip({ tabs, items, categories = [], getPhoto, now = new Date(), familyKit = null }) {
   const entries = []
   const integrity = {}
   const done = new Set()
@@ -87,6 +89,7 @@ export async function buildZip({ tabs, items, categories = [], getPhoto, now = n
     entries.push({ name: `photos/${it.photoId}.${ext}`, data: blob, ...m })
   }
   const meta = { app: 'andata-ritorno', version: 2, exportedAt: now.toISOString(), tabs, categories, items, photos: integrity }
+  if (familyKit) meta.familyKit = familyKit
   const json = strToU8(JSON.stringify(meta))
   entries.push({ name: 'backup.json', data: json, size: json.length, crc32: crc32(json) })
   const zip = writeZip(entries, now)
@@ -172,5 +175,7 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
     photos.set(item.photoId, photo)
     items.push(item)
   }
-  return { tabs, categories, items, photos, failures }
+  // Checked only when used (Ripristina famiglia validates it): a bad kit must not block an import.
+  const familyKit = typeof json.familyKit === 'string' && json.familyKit ? json.familyKit : null
+  return { tabs, categories, items, photos, failures, familyKit }
 }

@@ -6,7 +6,7 @@
 /** @typedef {{ id:string, blob:Blob, width:number, height:number }} Photo */
 /** Incoming data from any backup format, before merging.
  * @typedef {{ tabs:Tab[], categories?:Category[], items:Item[], photos:Map<string,Blob>,
- *   failures:Failure[], childMap?:Record<string,string> }} Incoming */
+ *   failures:Failure[], childMap?:Record<string,string>, familyKit?:string|null }} Incoming */
 /** @typedef {{ itemId:string, label:string, tabName:string, location:string, reason:string }} Failure  reason = stable code: incomplete | unknown-place | unreadable-photo | missing-tab | missing-photo (translated for display) */
 /* Failure.location is a raw string: unknown v1 places (e.g. 'nonna') are reported as-is. */
 /** @typedef {{ tabsPut:Tab[], categoriesPut:Category[], itemsPut:Item[], photosPut:Map<string,Blob>, photosDelete:string[],

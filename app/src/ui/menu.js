@@ -18,7 +18,7 @@ import { menuFooter } from './about.js'
 import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
-import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave } from './familyDialogs.js'
+import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, logOutIcon, eraseIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
@@ -67,6 +67,9 @@ async function refresh() {
   const last = await getMeta(db, 'lastBackupAt')
   dlg.querySelector('#backupInfo').textContent = backupInfoLine(store.items.length, last)
   dlg.querySelector('#persistInfo').textContent = ''
+  const family = await getFamily(db)
+  // Backups made in a family carry its recovery kit (backup.json is plain text).
+  dlg.querySelector('#kitInfo').textContent = family && !family.pending ? t('family.backupHasKit') : ''
   const todoBtn = dlg.querySelector('#todoBtn')
   todoBtn.hidden = !todo.length
   todoBtn.querySelector('.badge').textContent = todo.length
@@ -87,7 +90,7 @@ const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="clos
     <h4>${t('menu.family')}</h4>
     <div id="familySection"></div>
     <h4>${t('menu.backup')}</h4>
-    <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span></div>
+    <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span><span id="kitInfo" class="kitInfo"></span></div>
     ${menuItem('export', downloadIcon, t('menu.export'))}
     ${menuItem('import', uploadIcon, t('menu.import'))}
     <h4>${t('menu.tabsSection')}</h4>
@@ -125,7 +128,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), wipe: () => openWipeFlow({ db, onExport: runExport }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
       invite: openInvite, slot: () => openPayment(import.meta.env.VITE_STRIPE_LINK_SLOT), kit: () => openKit(), leave: openLeave }[item.dataset.menu]
@@ -140,7 +143,11 @@ function build() {
   })
 }
 
-/** Export with share sheet / download; tells the user only what they need to know. */
+/**
+ * Export with share sheet / download; tells the user only what they need to know.
+ * @returns {Promise<boolean>} true only once the backup surely reached the user (shared, or a
+ *   download the user confirmed finding): replacing data with the family's depends on it.
+ */
 export async function runExport() {
   const now = new Date()
   let result, saved = 0
@@ -152,16 +159,18 @@ export async function runExport() {
     }))
   } catch (e) {
     alert(exportErrorMessage(e, store))
-    return
+    return false
   }
-  if (result === 'cancelled') return
+  if (result === 'cancelled') return false
   // A download can be refused or dismissed without the page knowing: only the user can say it is there.
   if (result === 'downloaded') {
     const found = confirm(t(currentPlatform() === 'ios' ? 'menu.fileSavedIos' : 'menu.fileSaved', { name: backupFileName(now) }))
-    if (!found) return
-    try { await runExclusive(() => markBackupDone(db, now, saved)) } catch (e) { reportError(e); return }
+    if (!found) return false
+    // The file is there even if recording it failed.
+    try { await runExclusive(() => markBackupDone(db, now, saved)) } catch (e) { reportError(e); return true }
   }
   await load(db) // refreshes the unsaved-changes banner
+  return true
 }
 
 /** Native prompt when the browser offered one, else the manual steps for this platform. */

@@ -16,8 +16,11 @@ import { reportError } from './ui/dialogs.js';
 import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
-import { initMenu } from './ui/menu.js';
-import { initFamilyUi } from './ui/familyDialogs.js';
+import { initMenu, runExport } from './ui/menu.js';
+import { initFamilyUi, familyHooks } from './ui/familyDialogs.js';
+import { renderUnlockPage, renderHandoff } from './ui/pages.js';
+import { routeOf } from './routes.js';
+import { currentPlatform, isStandalone } from './platform.js';
 import { desktopGate } from './ui/desktop.js';
 import { initIosBanner } from './ui/iosBanner.js';
 import { registerSW } from 'virtual:pwa-register';
@@ -30,77 +33,96 @@ import { t, onLangChange } from './i18n.js';
 initUpdateToast((handlers) => registerSW(handlers));
 initInstall(); // the browser may fire beforeinstallprompt before the UI is ready
 const root = document.getElementById('app');
-await desktopGate(root);
-
-// Ask the browser not to evict our data; never throws, the answer is not needed.
-function persist() {
-  try { navigator.storage?.persist?.().catch(() => {}) } catch { /* unsupported */ }
+const route = routeOf(location.pathname, location.hash, location.search);
+// iOS Safari outside the installed app: its storage is not the app's.
+const inSafari = currentPlatform() === 'ios' && !isStandalone();
+if (route.page === 'unlock') {
+  // The payment success page: shows the code only, the app itself does not start here.
+  await renderUnlockPage(root, { api: createApi(), sessionId: route.sessionId, inSafari });
+} else {
+  if (route.page !== 'app' && inSafari) await renderHandoff(root, { kind: route.page, link: location.href });
+  // The fragment carries a key or a token: off the address bar (and out of a later reload).
+  if (route.page !== 'app') history.replaceState(null, '', '/');
+  await desktopGate(root);
+  await startApp();
 }
 
-// `force` = redraw even the welcome screen (language change); it keeps the typed name.
-function draw(force = false) {
-  if (store.tabs.length) renderApp(root, store);
-  else if (force || !root.querySelector('.welcome')) { // draw once: a redraw would drop focus while typing
-    renderWelcome(root, {
-      onCreate: (name) => { persist(); addTab(name).catch(reportError) },
-      onImport: (file) => { persist(); Promise.resolve(hooks.onImportFile(file)).catch(reportError) },
-    })
+async function startApp() {
+  // Ask the browser not to evict our data; never throws, the answer is not needed.
+  function persist() {
+    try { navigator.storage?.persist?.().catch(() => {}) } catch { /* unsupported */ }
   }
-}
 
-// IndexedDB can be blocked (private mode, site data disabled): say so instead of a blank page.
-const storageScreen = (body) => {
-  root.innerHTML = `<div class="welcome">
-    <h1>${t('main.storageFailed.title')}</h1>
-    <p>${body}</p>
-  </div>`;
-};
-let db = null;
-let blocked = false;
-try {
-  // An older A/R tab holding the DB open keeps the upgrade waiting: ask the user to close it.
-  db = await openDb(undefined, { onBlocked: () => { blocked = true; storageScreen(t('main.blocked.body')) } });
-  // The other tab closed after all: drop the message (the welcome screen draws only into an empty root).
-  if (blocked) root.textContent = '';
-  // A newer tab wants to upgrade the DB: our connection is closed, so reload onto the new code.
-  setVersionChangeHandler(() => location.reload());
-} catch {
-  storageScreen(t('main.storageFailed.body'));
-}
-if (db) {
-  subscribe(() => draw());
-  onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
-  await load(db);
-  // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
-  initIosBanner({ onDismiss: () => draw(true) });
-  initInstallStrip();
-  watchClipboard(draw);
-  initAddFlow();
-  initTabs();
-  initCategories();
-  initViewer();
-  initMenu(db);
-  // Only a device in a family touches the network, and only after the first render.
-  const api = createApi({ getToken: async () => (await getFamily(db))?.token });
-  let inFamily = false; // keyed on membership, not on sync state: a removed phone still is in a family
-  let wired = false;
-  // Also called from the menu right after a family is created (no reload needed).
-  const startSync = async () => {
-    inFamily = true;
-    enableSyncLine(true);
-    hooks.onSyncLine = () => syncNow('line');
-    await initSync({ db, api });
-    if (!wired) {
-      wired = true;
-      subscribeSync(() => { document.documentElement.classList.toggle('in-family', inFamily); draw(); });
-      initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
+  // `force` = redraw even the welcome screen (language change); it keeps the typed name.
+  function draw(force = false) {
+    if (store.tabs.length) renderApp(root, store);
+    else if (force || !root.querySelector('.welcome')) { // draw once: a redraw would drop focus while typing
+      renderWelcome(root, {
+        onCreate: (name) => { persist(); addTab(name).catch(reportError) },
+        onImport: (file) => { persist(); Promise.resolve(hooks.onImportFile(file)).catch(reportError) },
+        onInvite: () => { persist(); Promise.resolve(familyHooks.onJoinInvite()).catch(reportError) },
+        onRestore: () => { persist(); Promise.resolve(familyHooks.onRestore()).catch(reportError) },
+      })
     }
-    draw();
-    syncNow('start');
+  }
+
+  // IndexedDB can be blocked (private mode, site data disabled): say so instead of a blank page.
+  const storageScreen = (body) => {
+    root.innerHTML = `<div class="welcome">
+      <h1>${t('main.storageFailed.title')}</h1>
+      <p>${body}</p>
+    </div>`;
   };
-  // The engine stays up but idle: with no family its run resets the status and touches nothing.
-  const stopSync = () => { inFamily = false; hooks.onSyncLine = () => {}; syncNow('menu'); draw(); };
-  initFamilyUi({ db, api, onEntered: startSync, onLeft: stopSync });
-  if (await getFamily(db)) await startSync();
+  let db = null;
+  let blocked = false;
+  try {
+    // An older A/R tab holding the DB open keeps the upgrade waiting: ask the user to close it.
+    db = await openDb(undefined, { onBlocked: () => { blocked = true; storageScreen(t('main.blocked.body')) } });
+    // The other tab closed after all: drop the message (the welcome screen draws only into an empty root).
+    if (blocked) root.textContent = '';
+    // A newer tab wants to upgrade the DB: our connection is closed, so reload onto the new code.
+    setVersionChangeHandler(() => location.reload());
+  } catch {
+    storageScreen(t('main.storageFailed.body'));
+  }
+  if (db) {
+    subscribe(() => draw());
+    onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
+    await load(db);
+    // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
+    initIosBanner({ onDismiss: () => draw(true) });
+    initInstallStrip();
+    watchClipboard(draw);
+    initAddFlow();
+    initTabs();
+    initCategories();
+    initViewer();
+    initMenu(db);
+    // Only a device in a family touches the network, and only after the first render.
+    const api = createApi({ getToken: async () => (await getFamily(db))?.token });
+    let inFamily = false; // keyed on membership, not on sync state: a removed phone still is in a family
+    let wired = false;
+    // Also called from the menu right after a family is created (no reload needed).
+    const startSync = async () => {
+      inFamily = true;
+      enableSyncLine(true);
+      hooks.onSyncLine = () => syncNow('line');
+      await initSync({ db, api });
+      if (!wired) {
+        wired = true;
+        subscribeSync(() => { document.documentElement.classList.toggle('in-family', inFamily); draw(); });
+        initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
+      }
+      draw();
+      syncNow('start');
+    };
+    // The engine stays up but idle: with no family its run resets the status and touches nothing.
+    const stopSync = () => { inFamily = false; hooks.onSyncLine = () => {}; syncNow('menu'); draw(); };
+    initFamilyUi({ db, api, onEntered: startSync, onLeft: stopSync, onExport: runExport });
+    if (await getFamily(db)) await startSync();
+    // Opened from an invite or a licence link: its screen goes over the app (or the welcome screen).
+    if (route.page === 'join') familyHooks.onJoinInvite(route.invite).catch(reportError);
+    if (route.page === 'licence') familyHooks.onLicence(route.linkToken).catch(reportError);
+  }
 }

@@ -282,3 +282,21 @@ dialog .famDevices small { color: var(--muted); font-size: 0.75rem; }
 dialog .famDevices .tag { font-size: 0.6875rem; padding: 1px 8px; border-radius: var(--r-pill); background: var(--chip); }
 dialog .famDevices button.danger { width: auto; padding: 8px 12px; }
 dialog button.primary { display: block; width: 100%; margin-top: 8px; }
+dialog input[type="email"] { width: 100%; margin-bottom: 8px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
+dialog [data-scan], dialog [data-link] { display: block; width: 100%; margin-bottom: 12px; }
+dialog [data-link] { margin-top: -4px; }
+dialog label.choice { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 0.875rem; font-weight: 600; }
+dialog label.choice input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); }
+dialog p.note { color: var(--muted); font-size: 0.8125rem; }
+dialog .scanVideo { display: block; width: 100%; max-height: 55vh; margin-bottom: 12px; border-radius: 12px; background: #000; object-fit: cover; }
+#menu .kitInfo:not(:empty) { display: block; margin-top: 4px; }
+
+/* ---- Pages reached from outside the app (/unlock, iOS hand-off) ---- */
+.page { max-width: 460px; margin: 0 auto; text-align: center; }
+.page p { margin: 0; line-height: 1.5; }
+.page .unlockCode { padding: 16px 8px; border-radius: var(--r-tile); background: var(--tile); font: 700 1.5rem/1.2 ui-monospace, monospace; letter-spacing: .04em; word-break: break-all; user-select: all; }
+.page .pageNote:empty { display: none; }
+.page .pageNote, .page .err { font-weight: 600; }
+.page .err { color: var(--danger); }
+.page #unlockBody { display: flex; flex-direction: column; gap: 12px; }
+.page .pageLink { color: var(--accent-strong); font-weight: 700; padding: 12px; }
