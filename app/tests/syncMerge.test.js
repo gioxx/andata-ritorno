@@ -248,6 +248,7 @@ describe('mergeRemote: orphan items and tabs', () => {
     expect(plan.itemsPut).toEqual([item('i1', 'A', { updatedAt: NOW })])
     expect(plan.itemsDelete).toEqual([])
     expect(plan.movedOrphans).toBe(1)
+    expect(plan.movedOrphansTab).toBe('A')
     expect(keys(plan.pushBack)).toEqual(['item:i1'])
   })
 

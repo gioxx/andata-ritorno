@@ -2,10 +2,14 @@
 import { t } from '../i18n.js'
 import { syncStatus } from '../sync/engine.js'
 import { esc } from './esc.js'
+import { store } from '../store.js'
 
 let active = false
 /** Turn the line on (device in a family) or off. */
-export const enableSyncLine = (on) => { active = !!on }
+export const enableSyncLine = (on) => {
+  active = !!on
+  document.documentElement.classList.toggle('in-family', active) // gates the family-only CSS
+}
 
 /** "5 min ago" style wording; calendar days from yesterday on. */
 function ago(iso, now) {
@@ -32,7 +36,7 @@ export function syncLineText(status, now, deviceNames) {
   let text = t('sync.updated', { ago: ago(status.lastSyncAt, now) })
   const { count, by } = status.lastChanges
   if (count > 0) text += ` ${t('sync.changes', { n: count, name: deviceNames.get(by) || t('sync.otherDevice') })}`
-  if (status.movedOrphans > 0) text += ` · ${t('sync.moved', { n: status.movedOrphans, tab: t('sync.defaultTab') })}`
+  if (status.movedOrphans > 0) text += ` · ${t('sync.moved', { n: status.movedOrphans, tab: status.movedOrphansTab ?? t('sync.defaultTab') })}`
   return text
 }
 
@@ -45,22 +49,31 @@ export function renderSyncLine() {
 
 const THRESHOLD = 70
 
-/** Pull down from the top of `scrollEl` past 70 px, then release: `onRefresh()`. */
+/** Touches that belong to another gesture: viewer swipes, dialogs and the menu, selection mode. */
+const ignored = (e) =>
+  store.selected.size > 0 || !!e.target?.closest?.('#viewer, dialog') ||
+  !!document.querySelector('dialog[open], #viewer:not([hidden])')
+
+/** Pull down from the top of `scrollEl` past 70 px (mostly vertical), then release: `onRefresh()`. */
 export function initPullToRefresh(scrollEl, onRefresh) {
-  let startY = null
+  let start = null
+  let dx = 0
   let dy = 0
+  const reset = () => { start = null; dx = 0; dy = 0 }
   scrollEl.addEventListener('touchstart', (e) => {
-    startY = scrollEl.scrollTop <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null
-    dy = 0
+    reset()
+    if (scrollEl.scrollTop <= 0 && e.touches.length === 1 && !ignored(e)) start = { x: e.touches[0].clientX ?? 0, y: e.touches[0].clientY }
   }, { passive: true })
   scrollEl.addEventListener('touchmove', (e) => {
-    if (startY !== null) dy = e.touches[0].clientY - startY
+    if (!start) return
+    if (e.touches.length !== 1 || ignored(e)) return reset()
+    dx = (e.touches[0].clientX ?? 0) - start.x
+    dy = e.touches[0].clientY - start.y
   }, { passive: true })
   scrollEl.addEventListener('touchend', () => {
-    const go = startY !== null && dy >= THRESHOLD && scrollEl.scrollTop <= 0
-    startY = null
-    dy = 0
+    const go = !!start && dy >= THRESHOLD && Math.abs(dy) > Math.abs(dx) && scrollEl.scrollTop <= 0
+    reset()
     if (go) onRefresh()
   }, { passive: true })
-  scrollEl.addEventListener('touchcancel', () => { startY = null; dy = 0 }, { passive: true })
+  scrollEl.addEventListener('touchcancel', reset, { passive: true })
 }

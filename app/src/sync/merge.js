@@ -129,11 +129,13 @@ export function mergeRemote(local, remote, { now, defaultTabName, deviceId }) {
     pushBack.add(`tab:${home.id}`)
   }
   let movedOrphans = 0
+  let movedOrphansTab = null
   for (const it of state.item.values()) {
     if (state.tab.has(it.tabId)) continue
     state.item.set(it.id, { ...it, tabId: home.id, updatedAt: now })
     pushBack.add(`item:${it.id}`)
     movedOrphans++
+    movedOrphansTab = home.name
   }
 
   const diff = (kind) => {
@@ -159,6 +161,7 @@ export function mergeRemote(local, remote, { now, defaultTabName, deviceId }) {
     }),
     photosNeeded: [...referenced].filter((p) => !present.has(p)),
     movedOrphans,
+    movedOrphansTab,
     changesBy,
   }
 }

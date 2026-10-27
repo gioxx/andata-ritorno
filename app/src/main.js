@@ -85,7 +85,7 @@ if (db) {
     hooks.onSyncLine = () => syncNow('line');
     const api = createApi({ getToken: async () => (await getFamily(db))?.token });
     await initSync({ db, api });
-    subscribeSync(() => draw());
+    subscribeSync((s) => { document.documentElement.classList.toggle('in-family', s.state !== 'removed'); draw(); });
     draw();
     initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });

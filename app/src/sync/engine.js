@@ -18,7 +18,7 @@ import { t } from '../i18n.js'
 /** @typedef {import('../types.js').SyncPlan} SyncPlan */
 /**
  * @typedef {{ state:'idle'|'syncing'|'offline'|'removed'|'error', lastSyncAt:string|null, pending:number,
- *   lastChanges:{count:number, by:string|null}, movedOrphans:number, errorCode:string|null,
+ *   lastChanges:{count:number, by:string|null}, movedOrphans:number, movedOrphansTab:string|null, errorCode:string|null,
  *   deviceNames:Map<string,string|null>,
  *   family:{name:string|null, deviceLimit:number, devices:{id:string, name:string|null, createdAt:string, lastSeenAt:string, isThis:boolean}[]}|null }} SyncStatus
  */
@@ -39,7 +39,7 @@ class MembershipChanged extends Error {}
 
 /** @returns {SyncStatus} */
 const freshStatus = () => ({
-  state: 'idle', lastSyncAt: null, pending: 0, lastChanges: { count: 0, by: null }, movedOrphans: 0, errorCode: null,
+  state: 'idle', lastSyncAt: null, pending: 0, lastChanges: { count: 0, by: null }, movedOrphans: 0, movedOrphansTab: null, errorCode: null,
   deviceNames: new Map(), family: null,
 })
 
@@ -316,7 +316,7 @@ export function createSyncEngine({
     emit({
       state: refused.length ? 'error' : 'idle', errorCode: refused[0] ?? null, lastSyncAt, pending,
       lastChanges: plan ? summarise(plan.changesBy) : { count: 0, by: null },
-      movedOrphans: plan?.movedOrphans ?? 0,
+      movedOrphans: plan?.movedOrphans ?? 0, movedOrphansTab: plan?.movedOrphansTab ?? null,
       family: view, deviceNames: new Map(view.devices.map((d) => [d.id, d.name])),
     })
     startDownloads()

@@ -18,4 +18,4 @@
  * pushBack: records to (re)upload because the server holds something else; changesBy: deviceId → applied records.
  * @typedef {{ tabsPut:Tab[], tabsDelete:string[], categoriesPut:Category[], categoriesDelete:string[],
  *   itemsPut:Item[], itemsDelete:string[], photosDelete:string[], tombstonesPut:Tombstone[], tombstonesDelete:string[],
- *   pushBack:{kind:string, id:string}[], photosNeeded:string[], movedOrphans:number, changesBy:Map<string,number> }} SyncPlan */
+ *   pushBack:{kind:string, id:string}[], photosNeeded:string[], movedOrphans:number, movedOrphansTab:string|null, changesBy:Map<string,number> }} SyncPlan */
