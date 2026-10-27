@@ -332,4 +332,5 @@ export default {
   'family.leave.title': 'Uscire dalla famiglia?',
   'family.leave.body': 'I capi e le foto restano su questo telefono, che torna a funzionare da solo. Gli altri telefoni continuano a sincronizzarsi. Se questo è l’ultimo telefono, i dati cifrati sul server vengono cancellati.',
   'family.leave.go': 'Esci',
+  'family.retry': 'Riprova',
 }

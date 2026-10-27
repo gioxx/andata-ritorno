@@ -34,12 +34,13 @@ describe('familyMenuHtml', () => {
   it('active: name, last sync, devices count, slot price only with payments', () => {
     const info = { state: 'idle', lastSyncAt: '2026-10-25T11:55:00Z', family: { name: 'Famiglia Rossi', deviceLimit: 4, devices: [{ id: 'a' }, { id: 'b' }] } }
     const on = familyMenuHtml({ family, info, payments: true, now: NOW })
-    expect(acts(on)).toEqual(['sync', 'devices', 'invite', 'slot', 'kit', 'leave'])
+    expect(acts(on)).toEqual(['sync', 'devices', 'invite', 'slot', 'code', 'kit', 'leave'])
     expect(on).toContain('Famiglia Rossi')
     expect(on).toContain('Ultima sync: 5 min fa')
     expect(on).toContain('2 / 4')
     expect(on).toContain('1,99 €')
     expect(familyMenuHtml({ family, info, payments: false, now: NOW })).not.toContain('1,99')
+    expect(acts(familyMenuHtml({ family, info, payments: false, now: NOW }))).toContain('code') // manual seat codes always work
   })
 
   it('active before the first sync: no name or count yet, never throws', () => {

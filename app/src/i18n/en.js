@@ -331,4 +331,5 @@ export default {
   'family.leave.title': 'Leave the family?',
   'family.leave.body': 'Items and photos stay on this phone, which goes back to working on its own. The other phones keep syncing. If this is the last phone, the encrypted data on the server is deleted.',
   'family.leave.go': 'Leave',
+  'family.retry': 'Retry',
 }
