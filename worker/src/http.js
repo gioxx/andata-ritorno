@@ -19,12 +19,39 @@ export function json(obj, status = 200) {
   });
 }
 
+/**
+ * Read a request body, stopping as soon as it exceeds maxBytes (so a chunked body without
+ * Content-Length is never fully buffered). Throws HttpError(413, code) when too large.
+ * @returns {Promise<Uint8Array>}
+ */
+export async function readBody(req, maxBytes, code = 'too-large') {
+  if (Number(req.headers.get('content-length')) > maxBytes) throw new HttpError(413, code);
+  if (!req.body) return new Uint8Array(0);
+  const reader = req.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new HttpError(413, code);
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.byteLength;
+  }
+  return out;
+}
+
 /** Parse a JSON body, rejecting anything larger than maxBytes. */
 export async function readJson(req, maxBytes = 65536) {
-  const declared = Number(req.headers.get('content-length'));
-  if (declared > maxBytes) throw new HttpError(413, 'too-large');
-  const buf = await req.arrayBuffer();
-  if (buf.byteLength > maxBytes) throw new HttpError(413, 'too-large');
+  const buf = await readBody(req, maxBytes);
   try {
     return JSON.parse(new TextDecoder().decode(buf));
   } catch {

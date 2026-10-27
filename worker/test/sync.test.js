@@ -37,27 +37,6 @@ async function newFamily() {
   return { familyId: body.familyId, deviceId: body.deviceId, token };
 }
 
-async function invite(token) {
-  const res = await post('/api/invites', undefined, token);
-  expect(res.status).toBe(200);
-  return (await res.json()).token;
-}
-
-const joinBody = (inviteToken) => ({ inviteToken, deviceId: rid(), deviceNameEnc: 'bmV3' });
-
-/** Fill the family up to its limit (4) through invites; returns the joined devices. */
-async function fill(fam) {
-  const joined = [];
-  for (let i = 0; i < 3; i++) {
-    const body = joinBody(await invite(fam.token));
-    const res = await post('/api/join', body);
-    expect(res.status).toBe(200);
-    joined.push({ deviceId: body.deviceId, ...(await res.json()) });
-  }
-  return joined;
-}
-
-
 const put = (path, bytes, token) =>
   call(path, { method: 'PUT', headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` }, body: bytes });
 const rec = (data = 'AAAA') => ({ rid: rid(), data });
@@ -154,6 +133,36 @@ describe('record sync', () => {
     expect(over.status).toBe(413);
     expect((await over.json()).error).toBe('limit-records');
     expect((await post('/api/sync', { records: [{ rid: 'filler-0-xxxx', data: 'ZZZZ' }] }, f.token)).status).toBe(200);
+  });
+});
+
+describe('streamed bodies without Content-Length', () => {
+  const stream = (n) => {
+    let sent = 0;
+    return new ReadableStream({
+      pull(c) {
+        if (sent >= n) return c.close();
+        const k = Math.min(64 * 1024, n - sent);
+        sent += k;
+        c.enqueue(new Uint8Array(k));
+      },
+    });
+  };
+  const streamed = (path, n, token) =>
+    call(path, { method: path.includes('photos') ? 'PUT' : 'POST', headers: { authorization: `Bearer ${token}` }, body: stream(n), duplex: 'half' });
+
+  it('rejects a photo over 3 MB', async () => {
+    const f = await newFamily();
+    const res = await streamed(`/api/photos/${rid()}`, 3 * 1024 * 1024 + 1, f.token);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe('limit-photo-size');
+  });
+
+  it('rejects a JSON body over its cap', async () => {
+    const f = await newFamily();
+    const res = await streamed('/api/sync', 200 * (64 * 1024 + 128) + 1, f.token);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe('too-large');
   });
 });
 

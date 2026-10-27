@@ -1,4 +1,4 @@
-import { HttpError, json } from './http.js';
+import { HttpError, json, readBody } from './http.js';
 import { requireApiDevice } from './auth.js';
 import { ID } from './validate.js';
 
@@ -12,9 +12,7 @@ function checkPid(pid) {
 async function put(req, env, ctx, { pid }) {
   const { familyId } = await requireApiDevice(env, req);
   checkPid(pid);
-  if (Number(req.headers.get('content-length')) > MAX_PHOTO) throw new HttpError(413, 'limit-photo-size');
-  const body = await req.arrayBuffer();
-  if (body.byteLength > MAX_PHOTO) throw new HttpError(413, 'limit-photo-size');
+  const body = await readBody(req, MAX_PHOTO, 'limit-photo-size');
   if (body.byteLength === 0) throw new HttpError(400, 'bad-request');
   // Replacing an existing photo does not grow the count.
   const row = await env.DB.prepare(
