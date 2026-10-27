@@ -236,4 +236,5 @@ export default {
   'category.default.underwear': 'Underwear',
   'category.default.socks': 'Socks',
   'category.default.accessories': 'Accessories',
+  'sync.defaultTab': 'Tab',
 }

@@ -5,6 +5,7 @@ import {
   replacePhoto, deleteItems, getPhoto, getMeta, setMeta, applyPlan, setVersionChangeHandler,
   putCategory, deleteCategory, putCategories, putTabs, setItemsCategory,
   setSyncTracking, readOutbox, clearOutbox, getTombstones, putTombstones, clearSyncStores, clearWardrobe, applySyncPlan,
+  markAllDirty, getPhotoIds, putSyncedPhoto,
 } from '../src/db.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
@@ -464,11 +465,46 @@ describe('db', () => {
       expect((await getTombstones(db)).get('t')).toEqual({ kind: 'tab', id: 't', deletedAt: T0 })
       track(true)
       try { await putTab(db, tab('A')); await putTab(db, tab('B')) } finally { finish() }
-      await clearOutbox(db, ['tab:A'])
+      await clearOutbox(db, (await readOutbox(db)).filter((e) => e.id === 'A'))
       expect(await keys(db)).toEqual(['tab:B'])
       await clearSyncStores(db)
       expect(await readOutbox(db)).toEqual([])
       expect((await getTombstones(db)).size).toBe(0)
+    })
+
+    it('an edit made while a push is in flight stays in the outbox', async () => {
+      const db = await fresh()
+      track(true)
+      try {
+        await putTab(db, tab('A'))
+        await putTab(db, tab('B'))
+        const pushed = await readOutbox(db)
+        expect(pushed.every((e) => typeof e.at === 'string')).toBe(true)
+        await putTab(db, { ...tab('A'), name: 'renamed' }) // lands between read and clear
+        await clearOutbox(db, pushed)
+      } finally { finish() }
+      expect(await keys(db)).toEqual(['tab:A'])
+    })
+
+    it('markAllDirty queues every tab, category and item; getPhotoIds lists local blobs', async () => {
+      const db = await fresh()
+      await seed(db)
+      await putCategory(db, cat('c1'))
+      await markAllDirty(db)
+      expect(await keys(db)).toEqual(['category:c1', 'item:i1', 'item:i2', 'item:i3', 'tab:A', 'tab:B'])
+      expect([...(await getPhotoIds(db))].sort()).toEqual(['p-i1', 'p-i2', 'p-i3'])
+    })
+
+    it('putSyncedPhoto stores a blob only while an item still points at it', async () => {
+      const db = await fresh()
+      await seed(db)
+      expect(await putSyncedPhoto(db, 'i1', photo('p-other', 'x'))).toBe(false)
+      expect(await getPhoto(db, 'p-other')).toBeUndefined()
+      await deleteItems(db, ['i1'], T1)
+      expect(await putSyncedPhoto(db, 'i1', photo('p-i1', 'again'))).toBe(false)
+      expect(await getPhoto(db, 'p-i1')).toBeUndefined()
+      expect(await putSyncedPhoto(db, 'i2', photo('p-i2', 'new'))).toBe(true)
+      await expectBlob(await getPhoto(db, 'p-i2'), 'new')
     })
 
     it('clearWardrobe empties data stores, keeps meta', async () => {

@@ -237,4 +237,5 @@ export default {
   'category.default.underwear': 'Intimo',
   'category.default.socks': 'Calze',
   'category.default.accessories': 'Accessori',
+  'sync.defaultTab': 'Scheda',
 }

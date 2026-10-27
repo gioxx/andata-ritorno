@@ -1,0 +1,245 @@
+// Family membership on this device: the stored family (meta key 'family') and the flows that
+// create, join, recover, restart or leave one. Creating, joining or recovering turns sync tracking
+// on and queues every local tab, category and item, so local data uploads on the next sync.
+import { getMeta, setMeta, deleteMeta, setSyncTracking, markAllDirty, clearSyncStores, clearWardrobe } from '../db.js'
+import { generateKeyRaw, importKey, encryptJson, decryptJson, b64url, randomToken, sha256Hex } from './crypto.js'
+
+/**
+ * keyRaw: the family key, base64url. recoverySecret is null on a device that joined by invite
+ * (the invite carries the key only). pending: a redeem/restart sent but not yet answered.
+ * removed: the server no longer knows this device (sync stops until it leaves or rejoins).
+ * @typedef {{ familyId:string, deviceId:string, token:string|null, keyRaw:string, recoverySecret:string|null,
+ *   cursor:number, lastSyncAt:string|null, licenceKind:'family', deviceLimit?:number,
+ *   pending?:{op:'redeem'|'restart', body:object}, removed?:boolean }} FamilyMeta
+ */
+
+const META = 'family'
+const ID = /^[A-Za-z0-9_-]{8,64}$/
+const TOKEN = /^[A-Za-z0-9_-]{1,128}$/
+const KEY_B64 = /^[A-Za-z0-9_-]{43}$/ // 32 bytes, unpadded
+const KIT_PREFIX = 'ARKIT1'
+
+/** @returns {Promise<FamilyMeta|null>} */
+export const getFamily = async (db) => (await getMeta(db, META)) ?? null
+/** @param {FamilyMeta} meta */
+export const setFamily = (db, meta) => setMeta(db, META, meta)
+export const clearFamily = (db) => deleteMeta(db, META)
+
+/**
+ * Merge `patch` into the stored family, only if it is still `familyId`: a sync finishing after
+ * the user left (or joined another family) must not bring the old one back.
+ * @returns {Promise<FamilyMeta|null>}
+ */
+export async function updateFamily(db, familyId, patch) {
+  const cur = await getFamily(db)
+  if (!cur || cur.familyId !== familyId) return null
+  const next = { ...cur, ...patch }
+  await setFamily(db, next)
+  return next
+}
+
+export const familyKey = (meta) => importKey(b64url.decode(meta.keyRaw))
+const familyNameAad = (familyId) => `${familyId}:family-name`
+const deviceAad = (familyId, deviceId) => `${familyId}:device:${deviceId}`
+
+/** A name that cannot be decrypted (or is missing) shows as null rather than failing the screen. */
+async function openName(key, aad, enc) {
+  try {
+    const v = await decryptJson(key, aad, enc)
+    return typeof v === 'string' ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** @param {{id:string, nameEnc:string, createdAt:string, lastSeenAt:string}[]} devices */
+export async function openDevices(key, familyId, devices, thisDeviceId) {
+  return Promise.all(devices.map(async (d) => ({
+    id: d.id, name: await openName(key, deviceAad(familyId, d.id), d.nameEnc),
+    createdAt: d.createdAt, lastSeenAt: d.lastSeenAt, isThis: d.id === thisDeviceId,
+  })))
+}
+
+/** GET /api/family decrypted for display. */
+export async function describeFamily(key, res) {
+  return {
+    name: await openName(key, familyNameAad(res.familyId), res.familyNameEnc),
+    deviceLimit: res.deviceLimit,
+    devices: await openDevices(key, res.familyId, res.devices, res.you),
+  }
+}
+
+/** Decrypt the family name of an invite (GET /api/invites/info) with the key from its link. */
+export async function inviteFamilyName({ familyId, keyRaw }, familyNameEnc) {
+  return openName(await importKey(b64url.decode(keyRaw)), familyNameAad(familyId), familyNameEnc)
+}
+
+/** A create/join call whose answer was lost is sent again once, same body: the server replays it. */
+async function withRetry(fn) {
+  try {
+    return await fn()
+  } catch (e) {
+    if (e?.status !== 0) throw e
+    return fn()
+  }
+}
+
+const newMeta = ({ familyId, deviceId, keyRaw, recoverySecret }) => ({
+  familyId, deviceId, token: null, keyRaw, recoverySecret, cursor: 0, lastSyncAt: null, licenceKind: 'family',
+})
+
+/** Store the family and start tracking: from here every local change is queued for upload. */
+async function enter(db, meta, { token, deviceLimit }) {
+  const { pending: _p, removed: _r, ...rest } = meta
+  const done = { ...rest, token, deviceLimit }
+  await setFamily(db, done)
+  await deleteMeta(db, 'orphanSeen')
+  // Tracking first, then queue everything: an edit in between is covered either way.
+  setSyncTracking(true)
+  await clearSyncStores(db)
+  await markAllDirty(db)
+  return done
+}
+
+/** Fields of a brand-new family and its first device, as redeem and restart send them. */
+async function newFamily({ familyName, deviceName }) {
+  const keyRaw = b64url.encode(generateKeyRaw())
+  const ids = { familyId: crypto.randomUUID(), deviceId: crypto.randomUUID(), keyRaw, recoverySecret: randomToken() }
+  const key = await importKey(b64url.decode(keyRaw))
+  const body = {
+    familyId: ids.familyId,
+    deviceId: ids.deviceId,
+    familyNameEnc: await encryptJson(key, familyNameAad(ids.familyId), familyName),
+    deviceNameEnc: await encryptJson(key, deviceAad(ids.familyId, ids.deviceId), deviceName),
+    recoveryHash: await sha256Hex(ids.recoverySecret),
+  }
+  return { ids, body }
+}
+
+/**
+ * Finish a redeem/restart that was stored as pending (called right away, and again at the next
+ * start if the answer never came). A refusal forgets the attempt; no answer keeps it for later.
+ * @returns {Promise<FamilyMeta|null>}
+ */
+export async function resumePending(db, api) {
+  const meta = await getFamily(db)
+  if (!meta?.pending) return meta
+  const { op, body } = meta.pending
+  let res
+  try {
+    res = await withRetry(() => (op === 'restart' ? api.licenceRestart(body) : api.redeem(body)))
+  } catch (e) {
+    if (e?.status !== 0 && (await getFamily(db))?.familyId === meta.familyId) await clearFamily(db)
+    throw e
+  }
+  return enter(db, meta, res)
+}
+
+/** Redeem an unlock code: a new family with this device in it. */
+export async function createFamily(db, api, { code, familyName, deviceName }) {
+  const { ids, body } = await newFamily({ familyName, deviceName })
+  // Saved before the call: if the answer is lost, the key and secret are not.
+  await setFamily(db, { ...newMeta(ids), pending: { op: 'redeem', body: { code, ...body } } })
+  return resumePending(db, api)
+}
+
+/** A licence-recovery link: a fresh family on the same licence (the old one is wiped on the server). */
+export async function restartFromLicence(db, api, { linkToken, familyName, deviceName }) {
+  const { ids, body } = await newFamily({ familyName, deviceName })
+  await setFamily(db, { ...newMeta(ids), pending: { op: 'restart', body: { linkToken, ...body } } })
+  return resumePending(db, api)
+}
+
+/**
+ * Join with an invite. 'replace' empties the local wardrobe only once the server accepted the
+ * device (the UI has already saved a backup); 'merge' keeps it and uploads it.
+ * @param {{inviteToken:string, familyId:string, keyRaw:string, deviceName:string, mode:'merge'|'replace'}} p
+ */
+export async function joinFamily(db, api, { inviteToken, familyId, keyRaw, deviceName, mode = 'merge' }) {
+  const key = await importKey(b64url.decode(keyRaw))
+  const deviceId = crypto.randomUUID()
+  const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
+  const res = await withRetry(() => api.join({ inviteToken, deviceId, deviceNameEnc }))
+  if (mode === 'replace') await clearWardrobe(db)
+  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret: null }), res)
+}
+
+/**
+ * Rejoin with a recovery kit. A full family rejects with ApiError family-full whose
+ * `extra.devices` carry decrypted names, so the user can pick one to remove.
+ * @param {string|{familyId:string, keyRaw:string, recoverySecret:string}} kit
+ */
+export async function recoverFamily(db, api, kit, deviceName) {
+  const { familyId, keyRaw, recoverySecret } = typeof kit === 'string' ? parseKit(kit) : kit
+  const key = await importKey(b64url.decode(keyRaw))
+  const deviceId = crypto.randomUUID()
+  const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
+  let res
+  try {
+    res = await withRetry(() => api.recover({ familyId, recoverySecret, deviceId, deviceNameEnc }))
+  } catch (e) {
+    if (e?.code === 'family-full' && Array.isArray(e.extra?.devices)) e.extra.devices = await openDevices(key, familyId, e.extra.devices, null)
+    throw e
+  }
+  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret }), res)
+}
+
+/**
+ * Leave: the server forgets this device (the last one out wipes the family's server data), the
+ * device forgets the family. Local data stays as a plain local wardrobe.
+ * @returns {Promise<{purged:boolean}>}
+ */
+export async function leaveFamily(db, api) {
+  const meta = await getFamily(db)
+  if (!meta) return { purged: false }
+  let purged = false
+  if (meta.token && !meta.removed) {
+    try {
+      ;({ purged } = await api.removeDevice(meta.deviceId))
+    } catch (e) {
+      if (e?.status !== 401) throw e // already removed by someone else: nothing left to revoke
+    }
+  }
+  setSyncTracking(false)
+  await clearFamily(db)
+  await deleteMeta(db, 'orphanSeen')
+  await clearSyncStores(db)
+  return { purged }
+}
+
+/** The recovery kit as one pasteable string. */
+export function kitOf(meta) {
+  if (!meta?.recoverySecret) throw new Error('no-kit')
+  return `${KIT_PREFIX}.${meta.familyId}.${meta.keyRaw}.${meta.recoverySecret}`
+}
+
+const isKey = (s) => KEY_B64.test(s ?? '') && b64url.decode(s).length === 32
+
+/** @returns {{familyId:string, keyRaw:string, recoverySecret:string}} throws Error('bad-kit') */
+export function parseKit(str) {
+  const parts = String(str ?? '').replace(/\s+/g, '').split('.')
+  const [prefix, familyId, keyRaw, recoverySecret] = parts
+  if (parts.length !== 4 || prefix !== KIT_PREFIX || !ID.test(familyId) || !isKey(keyRaw) || !TOKEN.test(recoverySecret)) {
+    throw new Error('bad-kit')
+  }
+  return { familyId, keyRaw, recoverySecret }
+}
+
+/** `<origin>/join#<invite token>.<family id>.<family key>`: the part after # never reaches a server. */
+export function inviteLink(token, meta, origin = globalThis.location?.origin ?? '') {
+  return `${origin}/join#${token}.${meta.familyId}.${meta.keyRaw}`
+}
+
+/**
+ * Accepts the full link, its `#…` fragment or the bare fragment.
+ * @returns {{inviteToken:string, familyId:string, keyRaw:string}} throws Error('bad-invite')
+ */
+export function parseInvite(urlOrHash) {
+  let s = String(urlOrHash ?? '').trim()
+  const hash = s.indexOf('#')
+  if (hash >= 0) s = s.slice(hash + 1)
+  const parts = s.split('.')
+  const [inviteToken, familyId, keyRaw] = parts
+  if (parts.length !== 3 || !TOKEN.test(inviteToken) || !ID.test(familyId) || !isKey(keyRaw)) throw new Error('bad-invite')
+  return { inviteToken, familyId, keyRaw }
+}

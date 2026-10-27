@@ -1,0 +1,392 @@
+// Background sync for a device in a family. One run: pull every page → decode → merge once →
+// apply → upload photos the outbox needs → push the outbox (tabs, categories, items) → download
+// missing photos → sweep orphan photos → refresh the family view. Runs never overlap; nothing here
+// runs (or touches the network) for a device outside a family.
+import {
+  loadAll, readOutbox, clearOutbox, getTombstones, applySyncPlan, getMeta, setMeta, getPhotoIds, getPhotoRecord,
+  putSyncedPhoto, setSyncTracking,
+} from '../db.js'
+import { encodeRecord, encodeTombstone, decodeRecord } from './records.js'
+import { mergeRemote } from './merge.js'
+import { encrypt, decrypt } from './crypto.js'
+import { getFamily, updateFamily, familyKey, describeFamily, resumePending } from './family.js'
+import { runExclusive, reloadFromDb, subscribe } from '../store.js'
+import { t } from '../i18n.js'
+
+/** @typedef {import('./family.js').FamilyMeta} FamilyMeta */
+/** @typedef {import('../types.js').SyncPlan} SyncPlan */
+/**
+ * @typedef {{ state:'idle'|'syncing'|'offline'|'removed'|'error', lastSyncAt:string|null, pending:number,
+ *   lastChanges:{count:number, by:string|null}, movedOrphans:number, errorCode:string|null,
+ *   deviceNames:Map<string,string|null>,
+ *   family:{name:string|null, deviceLimit:number, devices:{id:string, name:string|null, createdAt:string, lastSeenAt:string, isThis:boolean}[]}|null }} SyncStatus
+ */
+
+const BATCH = 200 // records per push (server limit)
+const MAX_DATA = 64 * 1024 // encrypted record size the server accepts
+const DEBOUNCE_MS = 2000
+const PHOTO_PARALLEL = 3
+const ORPHAN_MS = 30 * 24 * 60 * 60 * 1000
+const ID = /^[A-Za-z0-9_-]{8,64}$/
+// Push order: a device pulling between two batches never sees an item before its tab, nor a tab
+// deletion before the deletions of its items (it would move them to another tab, reviving them).
+const PUT_RANK = { tab: 0, category: 1, item: 2 }
+const DEAD_RANK = { item: 2, category: 3, tab: 4 }
+
+/** @returns {SyncStatus} */
+const freshStatus = () => ({
+  state: 'idle', lastSyncAt: null, pending: 0, lastChanges: { count: 0, by: null }, movedOrphans: 0, errorCode: null,
+  deviceNames: new Map(), family: null,
+})
+
+const photoAad = (familyId, pid) => `${familyId}:photo:${pid}`
+const enc = new TextEncoder()
+const dec = new TextDecoder()
+
+/** Photo plaintext: uint16 header length, JSON header {t: type, w, h}, then the image bytes. */
+async function sealPhoto(key, familyId, photo) {
+  const head = enc.encode(JSON.stringify({ t: photo.blob.type, w: photo.width, h: photo.height }))
+  const bytes = new Uint8Array(await photo.blob.arrayBuffer())
+  const plain = new Uint8Array(2 + head.length + bytes.length)
+  new DataView(plain.buffer).setUint16(0, head.length)
+  plain.set(head, 2)
+  plain.set(bytes, 2 + head.length)
+  return encrypt(key, photoAad(familyId, photo.id), plain)
+}
+
+/** @returns {Promise<import('../types.js').Photo>} */
+async function openPhoto(key, familyId, pid, data) {
+  const plain = await decrypt(key, photoAad(familyId, pid), data)
+  const n = new DataView(plain.buffer, plain.byteOffset).getUint16(0)
+  const head = JSON.parse(dec.decode(plain.subarray(2, 2 + n)))
+  const blob = new Blob([plain.subarray(2 + n)], { type: String(head.t ?? '') })
+  return { id: pid, blob, width: Number(head.w) || 0, height: Number(head.h) || 0 }
+}
+
+/** Run `fn` over `list` with at most `n` in flight; the first rejection rejects the whole. */
+async function pool(list, n, fn) {
+  let next = 0
+  const worker = async () => {
+    while (next < list.length) await fn(list[next++])
+  }
+  await Promise.all(Array.from({ length: Math.min(n, list.length) }, worker))
+}
+
+const changesLocal = (p) =>
+  [p.tabsPut, p.tabsDelete, p.categoriesPut, p.categoriesDelete, p.itemsPut, p.itemsDelete].some((l) => l.length)
+const changesAnything = (p) =>
+  changesLocal(p) || [p.photosDelete, p.tombstonesPut, p.tombstonesDelete, p.pushBack].some((l) => l.length)
+
+/** The device that brought the most changes, with the total count. */
+function summarise(changesBy) {
+  let count = 0
+  let by = null
+  let top = 0
+  for (const [dev, n] of changesBy) {
+    count += n
+    if (n > top) { top = n; by = dev }
+  }
+  return { count, by }
+}
+
+/**
+ * @param {{ db:any, api:ReturnType<typeof import('./api.js').createApi>, onApplied?:() => any,
+ *   exclusive?:<T>(fn:() => Promise<T>) => Promise<T>, now?:() => string, defaultTabName?:string|(() => string),
+ *   setTimer?:Function, clearTimer?:Function, status?:SyncStatus, listeners?:Set<Function> }} opts
+ *   exclusive: runs the read-merge-apply step alone (the app passes the store's mutation queue);
+ *   onApplied: called after local data changed (outside `exclusive`).
+ */
+export function createSyncEngine({
+  db, api, onApplied = () => {}, exclusive = (fn) => fn(), now = () => new Date().toISOString(),
+  defaultTabName = () => t('sync.defaultTab'), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id),
+  status = freshStatus(), listeners = new Set(),
+}) {
+  let running = null
+  let again = false
+  let timer = null
+  let inFamily = false
+
+  function emit(patch) {
+    Object.assign(status, patch)
+    for (const fn of [...listeners]) fn(status)
+  }
+  const outboxSize = async () => (await readOutbox(db)).length
+
+  /** Pull every page, then decode; a record that cannot be decoded is skipped (and logged). */
+  async function pull(key, meta) {
+    const raw = []
+    let cursor = meta.cursor ?? 0
+    for (;;) {
+      const page = await api.pull(cursor)
+      raw.push(...page.records)
+      cursor = page.next
+      if (!page.more) break
+    }
+    const remote = []
+    for (const r of raw) {
+      try {
+        remote.push(await decodeRecord(key, meta.familyId, r))
+      } catch (e) {
+        console.warn('sync: skipped a record that could not be read', r.rid, e?.message)
+      }
+    }
+    return { remote, cursor }
+  }
+
+  /** Merge everything pulled in one step, alone in the mutation queue, and write it in one tx. */
+  async function merge(meta, remote) {
+    return exclusive(async () => {
+      const [{ tabs, categories, items }, tombstones, photoIds] = await Promise.all([loadAll(db), getTombstones(db), getPhotoIds(db)])
+      const name = typeof defaultTabName === 'function' ? defaultTabName() : defaultTabName
+      const plan = mergeRemote({ tabs, categories, items, tombstones, photoIds }, remote, { now: now(), defaultTabName: name, deviceId: meta.deviceId })
+      if (changesAnything(plan)) await applySyncPlan(db, plan)
+      return plan
+    })
+  }
+
+  /** Upload the photos of these items that the server lacks; a photo refused for its size is skipped. */
+  async function uploadPhotos(key, meta, items) {
+    const wanted = new Set(items.map((it) => it.photoId).filter(Boolean))
+    if (!wanted.size) return []
+    const { photos } = await api.listPhotos()
+    for (const p of photos) wanted.delete(p.pid)
+    const refused = []
+    for (const pid of wanted) {
+      const photo = ID.test(pid) && (await getPhotoRecord(db, pid))
+      if (!photo) continue // not on this device (yet): the device that has it uploads it
+      try {
+        await api.putPhoto(pid, await sealPhoto(key, meta.familyId, photo))
+      } catch (e) {
+        if (e?.status !== 413) throw e
+        console.warn('sync: photo refused', pid, e.code)
+        refused.push(e.code)
+      }
+    }
+    return refused
+  }
+
+  /** @returns {Promise<string[]>} codes of photos the server refused */
+  async function push(key, meta) {
+    const entries = await readOutbox(db)
+    if (!entries.length) return []
+    const { tabs, categories, items } = await loadAll(db)
+    const local = { tab: new Map(tabs.map((x) => [x.id, x])), category: new Map(categories.map((x) => [x.id, x])), item: new Map(items.map((x) => [x.id, x])) }
+    const tombs = await getTombstones(db)
+    const jobs = []
+    const drop = []
+    for (const e of entries) {
+      const value = local[e.kind]?.get(e.id)
+      const tomb = tombs.get(e.id)
+      if (!ID.test(e.id)) {
+        console.warn('sync: id the server cannot store', e.kind, e.id)
+        drop.push(e)
+      } else if (value) jobs.push({ e, rank: PUT_RANK[e.kind], value })
+      else if (tomb?.kind === e.kind) jobs.push({ e, rank: DEAD_RANK[e.kind], tomb })
+      else drop.push(e) // gone without a trace: nothing to send
+    }
+    if (drop.length) await clearOutbox(db, drop)
+    jobs.sort((a, b) => a.rank - b.rank)
+
+    // Photos before the records that reference them.
+    const refused = await uploadPhotos(key, meta, jobs.filter((j) => j.value && j.e.kind === 'item').map((j) => j.value))
+    for (let i = 0; i < jobs.length; i += BATCH) {
+      const records = []
+      const done = []
+      for (const j of jobs.slice(i, i + BATCH)) {
+        const by = meta.deviceId
+        const rec = j.value
+          ? await encodeRecord(key, meta.familyId, { kind: j.e.kind, value: j.value, by })
+          : await encodeTombstone(key, meta.familyId, { ...j.tomb, by })
+        done.push(j.e)
+        if (rec.data.length > MAX_DATA) console.warn('sync: record too large to send', j.e.kind, j.e.id)
+        else records.push(rec)
+      }
+      if (records.length) await api.push(records)
+      await clearOutbox(db, done)
+    }
+    return refused
+  }
+
+  /** Fetch photos referenced here but missing on this device, a few at a time. */
+  async function downloadPhotos(key, meta, items) {
+    const have = await getPhotoIds(db)
+    const missing = new Map()
+    for (const it of items) if (it.photoId && !have.has(it.photoId) && ID.test(it.photoId)) missing.set(it.photoId, it.id)
+    let stored = 0
+    await pool([...missing], PHOTO_PARALLEL, async ([pid, itemId]) => {
+      let data
+      try {
+        data = await api.getPhoto(pid)
+      } catch (e) {
+        if (e?.status === 404) return // not uploaded yet: next sync
+        throw e
+      }
+      try {
+        if (await putSyncedPhoto(db, itemId, await openPhoto(key, meta.familyId, pid, data))) stored++
+      } catch (e) {
+        console.warn('sync: skipped a photo that could not be read', pid, e?.message)
+      }
+    })
+    return stored
+  }
+
+  /** Delete server photos no local item has referenced for 30 days (only once fully synced). */
+  async function sweepOrphans(items) {
+    const referenced = new Set(items.map((it) => it.photoId))
+    const seen = (await getMeta(db, 'orphanSeen')) ?? {}
+    const at = now()
+    const next = {}
+    const { photos } = await api.listPhotos()
+    for (const { pid } of photos) {
+      if (referenced.has(pid)) continue
+      const first = seen[pid] ?? at
+      if (Date.parse(at) - Date.parse(first) >= ORPHAN_MS) await api.deletePhoto(pid)
+      else next[pid] = first
+    }
+    await setMeta(db, 'orphanSeen', next)
+  }
+
+  async function syncFamily(meta) {
+    const key = await familyKey(meta)
+    const { remote, cursor } = await pull(key, meta)
+    /** @type {SyncPlan|null} */
+    const plan = remote.length ? await merge(meta, remote) : null
+    await updateFamily(db, meta.familyId, { cursor })
+    if (plan && changesLocal(plan)) await onApplied()
+
+    const refused = await push(key, meta)
+    const { items } = await loadAll(db)
+    if (await downloadPhotos(key, meta, items)) await onApplied()
+    const pending = await outboxSize()
+    if (!pending) await sweepOrphans(items)
+
+    const view = await describeFamily(key, await api.family())
+    const lastSyncAt = now()
+    await updateFamily(db, meta.familyId, { lastSyncAt, deviceLimit: view.deviceLimit })
+    emit({
+      state: refused.length ? 'error' : 'idle', errorCode: refused[0] ?? null, lastSyncAt, pending,
+      lastChanges: plan ? summarise(plan.changesBy) : { count: 0, by: null },
+      movedOrphans: plan?.movedOrphans ?? 0,
+      family: view, deviceNames: new Map(view.devices.map((d) => [d.id, d.name])),
+    })
+  }
+
+  async function runOnce() {
+    let meta = await getFamily(db)
+    inFamily = !!meta
+    if (!meta) {
+      if (status.family || status.state !== 'idle') emit(freshStatus())
+      return
+    }
+    if (meta.removed) {
+      setSyncTracking(false)
+      emit({ state: 'removed' })
+      return
+    }
+    emit({ state: 'syncing' })
+    try {
+      if (meta.pending) meta = await resumePending(db, api)
+      await syncFamily(meta)
+    } catch (e) {
+      if (e?.status === 401) {
+        // No longer in the family: keep everything local, stop syncing until the user acts.
+        setSyncTracking(false)
+        await updateFamily(db, meta.familyId, { removed: true })
+        emit({ state: 'removed', errorCode: null })
+      } else if (e?.status === 0) {
+        emit({ state: 'offline', pending: await outboxSize() })
+      } else {
+        console.warn('sync failed', e)
+        emit({ state: 'error', errorCode: e?.code ?? e?.message ?? 'internal', pending: await outboxSize() })
+      }
+    }
+  }
+
+  return {
+    status,
+    /** @param {(s:SyncStatus) => void} fn @returns {() => void} unsubscribe */
+    subscribe(fn) {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    },
+    /** Read the stored family (no network): tracking on, or the removed state shown. */
+    async init() {
+      const meta = await getFamily(db)
+      inFamily = !!meta
+      if (!meta || meta.pending) return
+      if (meta.removed) {
+        setSyncTracking(false)
+        emit({ state: 'removed' })
+        return
+      }
+      setSyncTracking(true)
+      emit({ lastSyncAt: meta.lastSyncAt ?? null, pending: await outboxSize() })
+    },
+    /**
+     * Start a run, or (while one runs) schedule exactly one more after it. Never rejects.
+     * @param {'start'|'visible'|'pull'|'menu'|'line'|'debounce'} _reason
+     */
+    syncNow(_reason) {
+      if (running) {
+        again = true
+        return running
+      }
+      running = (async () => {
+        try {
+          do {
+            again = false
+            await runOnce()
+          } while (again)
+        } finally {
+          running = null
+        }
+      })()
+      return running
+    },
+    /** A local change happened: sync 2 s after the last one if anything waits to be pushed. */
+    localChanged() {
+      if (!inFamily || status.state === 'offline' || status.state === 'removed') return
+      if (timer) clearTimer(timer)
+      timer = setTimer(async () => {
+        timer = null
+        const pending = await outboxSize()
+        emit({ pending })
+        if (pending) await this.syncNow('debounce')
+      }, DEBOUNCE_MS)
+    },
+    stop() {
+      if (timer) clearTimer(timer)
+      timer = null
+    },
+  }
+}
+
+// The app's single engine.
+/** @type {SyncStatus} */
+export const syncStatus = freshStatus()
+const appListeners = new Set()
+let appEngine = null
+let unsubscribeStore = null
+
+/** @param {(s:SyncStatus) => void} fn @returns {() => void} unsubscribe */
+export function subscribeSync(fn) {
+  appListeners.add(fn)
+  return () => appListeners.delete(fn)
+}
+
+/**
+ * Set up the app's engine (no network): call after the first render. Store mutations and the
+ * merge step share the store's queue, store changes feed the debounce, applied plans reload it.
+ */
+export async function initSync({ db, api, onApplied = reloadFromDb, exclusive = runExclusive }) {
+  appEngine?.stop()
+  unsubscribeStore?.()
+  const engine = createSyncEngine({ db, api, onApplied, exclusive, status: syncStatus, listeners: appListeners })
+  appEngine = engine
+  await engine.init()
+  unsubscribeStore = subscribe(() => engine.localChanged())
+  return engine
+}
+
+/** @param {'start'|'visible'|'pull'|'menu'|'line'|'debounce'} reason */
+export const syncNow = (reason) => appEngine?.syncNow(reason) ?? Promise.resolve()

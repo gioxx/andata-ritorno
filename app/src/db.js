@@ -72,8 +72,14 @@ export function setSyncTracking(on) {
 /** Stores a write tx must open: the outbox joins in when tracking. */
 const withOutbox = (stores) => (tracking ? [...stores, 'outbox'] : stores)
 
+// Every mark gets a fresh `at`, so clearOutbox can tell an entry re-marked during a push from the
+// one that was pushed (time + counter: unique across reloads, where a bare counter restarts).
+let marks = 0
+const outboxEntry = (kind, id) => ({ kind, id, at: `${new Date().toISOString()}#${++marks}` })
+const putOutbox = (tx, track, kind, id) => track(tx.objectStore('outbox').put(outboxEntry(kind, id), `${kind}:${id}`))
+
 function markDirty(tx, track, kind, id) {
-  if (tracking) track(tx.objectStore('outbox').put({ kind, id }, `${kind}:${id}`))
+  if (tracking) putOutbox(tx, track, kind, id)
 }
 
 /** Delete bookkeeping; the caller must have opened 'tombstones' (tracking only). */
@@ -82,14 +88,57 @@ function markDeleted(tx, track, kind, id, now) {
   markDirty(tx, track, kind, id)
 }
 
-/** @returns {Promise<{kind:string, id:string}[]>} */
+/** @typedef {{kind:string, id:string, at:string}} OutboxEntry */
+
+/** @returns {Promise<OutboxEntry[]>} */
 export const readOutbox = (db) => db.getAll('outbox')
 
-/** @param {string[]} keys  `${kind}:${id}` keys to drop once pushed. */
-export async function clearOutbox(db, keys) {
-  await withTx(db, ['outbox'], (tx, track) => {
-    for (const k of keys) track(tx.store.delete(k))
+/**
+ * Drop pushed entries, each only if it was not marked again since it was read: an edit made
+ * while the push was in flight keeps its entry and goes out next time.
+ * @param {OutboxEntry[]} entries  as returned by readOutbox
+ */
+export async function clearOutbox(db, entries) {
+  await withTx(db, ['outbox'], async (tx) => {
+    for (const e of entries) {
+      const key = `${e.kind}:${e.id}`
+      if ((await tx.store.get(key))?.at === e.at) await tx.store.delete(key)
+    }
   })
+}
+
+/** Queue every local tab, category and item for upload (a device entering a family). */
+export async function markAllDirty(db) {
+  await withTx(db, ['tabs', 'categories', 'items', 'outbox'], async (tx, track) => {
+    for (const [store, kind] of [['tabs', 'tab'], ['categories', 'category'], ['items', 'item']]) {
+      for (const id of await tx.objectStore(store).getAllKeys()) putOutbox(tx, track, kind, id)
+    }
+  })
+}
+
+/** @returns {Promise<Set<string>>} ids of the photo blobs on this device */
+export async function getPhotoIds(db) {
+  return new Set(await db.getAllKeys('photos'))
+}
+
+/**
+ * Store a downloaded photo only if `itemId` still points at it (the item may have been deleted
+ * or given another photo while it downloaded), so no unreferenced blob is left behind.
+ * @param {import('./types.js').Photo} photo
+ * @returns {Promise<boolean>} whether it was stored
+ */
+export async function putSyncedPhoto(db, itemId, photo) {
+  let stored = false
+  await withTx(db, ['items', 'photos'], async (tx) => {
+    if ((await tx.objectStore('items').get(itemId))?.photoId !== photo.id) return
+    await tx.objectStore('photos').put(photo)
+    stored = true
+  })
+  return stored
+}
+
+export const deleteMeta = async (db, key) => {
+  await db.delete('meta', key)
 }
 
 /** @returns {Promise<Map<string, Tombstone>>} by id */
@@ -289,6 +338,9 @@ export async function getPhoto(db, id) {
   return (await db.get('photos', id))?.blob
 }
 
+/** @returns {Promise<import('./types.js').Photo|undefined>} blob with its dimensions */
+export const getPhotoRecord = (db, id) => db.get('photos', id)
+
 export const getMeta = (db, key) => db.get('meta', key)
 export const setMeta = async (db, key, value) => {
   await db.put('meta', value, key)
@@ -341,7 +393,7 @@ export async function applySyncPlan(db, plan) {
     for (const c of plan.categoriesPut) track(st('categories').put(c))
     for (const it of plan.itemsPut) track(st('items').put(it))
     for (const t of plan.tombstonesPut) track(st('tombstones').put(t))
-    for (const { kind, id } of plan.pushBack) track(st('outbox').put({ kind, id }, `${kind}:${id}`))
+    for (const { kind, id } of plan.pushBack) putOutbox(tx, track, kind, id)
   })
 }
 

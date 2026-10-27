@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDb, putTab, addItems, getMeta, loadAll, getPhoto, setSyncTracking } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected, setShowTags } from '../src/store.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected, setShowTags, reloadFromDb } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -495,5 +495,32 @@ describe('categorize selection', () => {
     selectToggle('a1'); selectToggle('a2')
     await expect(categorizeSelected('nope')).rejects.toThrow('not-found')
     expect([...store.selected].sort()).toEqual(['a1', 'a2'])
+  })
+})
+
+describe('reloadFromDb', () => {
+  it('picks up writes made behind the store, keeping tab and still-valid selection, after queued mutations', async () => {
+    setCurrentTab('A')
+    selectToggle('a1')
+    selectToggle('a2')
+    await db.delete('items', 'a2') // as a sync plan would
+    await db.put('items', { ...item('a9', 'A', 'home') })
+    const order = []
+    const queued = runExclusive(async () => { order.push('mutation') })
+    const reloaded = reloadFromDb().then(() => order.push('reload'))
+    await Promise.all([queued, reloaded])
+    expect(order).toEqual(['mutation', 'reload'])
+    expect(store.currentTabId).toBe('A')
+    expect(store.items.map((i) => i.id).sort()).toEqual(['a1', 'a3', 'a9', 'b1'])
+    expect([...store.selected]).toEqual(['a1'])
+  })
+
+  it('falls back to the first tab when the current one is gone', async () => {
+    setCurrentTab('B')
+    selectToggle('b1')
+    await db.delete('tabs', 'B')
+    await reloadFromDb()
+    expect(store.currentTabId).toBe('A')
+    expect(store.selected.size).toBe(0)
   })
 })

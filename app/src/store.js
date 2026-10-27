@@ -148,6 +148,29 @@ export function runExclusive(fn) {
   return queue(fn)
 }
 
+/**
+ * Re-read tabs, categories and items after sync wrote to the DB, keeping the current tab,
+ * selection and filter where they still make sense. Queued like a mutation, so it never lands
+ * in the middle of one.
+ */
+export function reloadFromDb() {
+  return queue(async () => {
+    const { tabs, items, categories } = await loadAll(store.db)
+    store.tabs = tabs
+    store.categories = categories
+    store.items = items
+    if (!tabs.some((t) => t.id === store.currentTabId)) {
+      store.currentTabId = tabs[0]?.id ?? null
+      store.selected.clear()
+      store.filter.clear()
+    }
+    const ids = new Set(items.filter((i) => i.tabId === store.currentTabId).map((i) => i.id))
+    for (const id of [...store.selected]) if (!ids.has(id)) store.selected.delete(id)
+    settle()
+    notify()
+  })
+}
+
 async function bump(n) {
   const next = store.unsaved + n
   await setMeta(store.db, 'unsavedCount', next)
