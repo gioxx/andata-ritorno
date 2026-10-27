@@ -64,3 +64,8 @@ export async function limited(binding, key) {
   const { success } = await binding.limit({ key });
   return !success;
 }
+
+/** The tight per-IP bucket for unauthenticated routes that check a secret or a code. */
+export async function strictLimit(env, req) {
+  if (await limited(env.RL_STRICT, req.headers.get('cf-connecting-ip') || 'unknown')) throw new HttpError(429, 'rate-limited');
+}

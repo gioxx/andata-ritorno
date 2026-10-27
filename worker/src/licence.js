@@ -1,18 +1,16 @@
-import { HttpError, json, limited, readJson } from './http.js';
+import { HttpError, json, readJson, strictLimit } from './http.js';
 import { hmacHex, randomToken, requireDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
 import { getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
+import { deviceLimit, purgePhotos, purgeStatements } from './store.js';
+import { ENC, HEX64, ID, isSecret } from './validate.js';
 
 const LINK_TTL_MS = 30 * 60 * 1000;
 // Open (unused, unexpired) links per licence beyond which recovery emails stop: protects the
 // mailbox and the Resend daily quota from repeated requests.
 const MAX_OPEN_LINKS = 3;
 const PAID_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
-
-const ID = /^[A-Za-z0-9_-]{8,64}$/;
-const ENC = /^[A-Za-z0-9_-]{1,4096}$/;
-const HEX64 = /^[0-9a-f]{64}$/;
 
 /** Validate the fields shared by redeem and restart: the new family and its first device. */
 function newFamilyFields(body) {
@@ -23,10 +21,6 @@ function newFamilyFields(body) {
   return { familyId, deviceId, familyNameEnc, deviceNameEnc, recoveryHash };
 }
 
-async function strictLimit(env, req) {
-  if (await limited(env.RL_STRICT, req.headers.get('cf-connecting-ip') || 'unknown')) throw new HttpError(429, 'rate-limited');
-}
-
 /** Run background work after the response when the runtime allows it, inline otherwise (tests). */
 async function defer(ctx, promise) {
   if (ctx?.waitUntil) ctx.waitUntil(promise);
@@ -34,11 +28,6 @@ async function defer(ctx, promise) {
 }
 
 const emailHmac = (env, email) => hmacHex(env.EMAIL_HMAC_KEY, email.trim().toLowerCase());
-
-async function deviceLimit(env, licenceId) {
-  const row = await env.DB.prepare('SELECT base_limit + extra_slots AS n FROM licences WHERE id = ?').bind(licenceId).first();
-  return row.n;
-}
 
 /** Statements creating a family and its first device, each run only if `guard` (an SQL condition) holds. */
 function insertFamilyAndDevice(env, f, licenceId, tokenHash, at, guard, guardArgs) {
@@ -50,16 +39,6 @@ function insertFamilyAndDevice(env, f, licenceId, tokenHash, at, guard, guardArg
       `INSERT INTO devices (id, family_id, token_hash, name_enc, created_at, last_seen_at) SELECT ?, ?, ?, ?, ?, ? WHERE ${guard}`,
     ).bind(f.deviceId, f.familyId, tokenHash, f.deviceNameEnc, at, at, ...guardArgs),
   ];
-}
-
-/** Delete every R2 object under prefix (photos of a purged family). */
-export async function deletePrefix(bucket, prefix) {
-  let cursor;
-  do {
-    const page = await bucket.list({ prefix, cursor });
-    if (page.objects.length) await bucket.delete(page.objects.map((o) => o.key));
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
 }
 
 /** @returns {'family'|'slot'} the kind bought by the session's price; 404 bad-session otherwise. */
@@ -240,7 +219,7 @@ async function licenceRestart(req, env) {
   await strictLimit(env, req);
   const body = await readJson(req);
   const f = newFamilyFields(body);
-  if (typeof body.linkToken !== 'string' || body.linkToken.length > 128) throw new HttpError(410, 'link-expired');
+  if (!isSecret(body.linkToken)) throw new HttpError(410, 'link-expired');
   const linkHash = await sha256Hex(body.linkToken);
   const at = new Date().toISOString();
   const link = await env.DB.prepare(
@@ -260,14 +239,7 @@ async function licenceRestart(req, env) {
   const token = randomToken();
   const claimed = 'EXISTS (SELECT 1 FROM licences WHERE id = ? AND family_id = ?)';
   const guard = [licenceId, f.familyId];
-  const purge = old
-    ? [
-        ...['records', 'photos', 'devices', 'invites'].map((t) =>
-          env.DB.prepare(`DELETE FROM ${t} WHERE family_id = ? AND ${claimed}`).bind(old, ...guard),
-        ),
-        env.DB.prepare(`DELETE FROM families WHERE id = ? AND ${claimed}`).bind(old, ...guard),
-      ]
-    : [];
+  const purge = old ? purgeStatements(env.DB, old, claimed, guard) : [];
   let results;
   try {
     results = await env.DB.batch([
@@ -287,13 +259,7 @@ async function licenceRestart(req, env) {
     throw e;
   }
   if (results[1].meta.changes !== 1) return (await replay(env, licenceId, f)) ?? expired();
-  if (old) {
-    try {
-      await deletePrefix(env.PHOTOS, `${old}/`);
-    } catch (e) {
-      console.error('restart: photo purge failed', old, e);
-    }
-  }
+  if (old) await purgePhotos(env, old);
   return json({ token, deviceLimit: await deviceLimit(env, licenceId) });
 }
 
