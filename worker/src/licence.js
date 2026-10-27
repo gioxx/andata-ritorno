@@ -5,6 +5,9 @@ import { getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
 
 const LINK_TTL_MS = 30 * 60 * 1000;
+// Open (unused, unexpired) links per licence beyond which recovery emails stop: protects the
+// mailbox and the Resend daily quota from repeated requests.
+const MAX_OPEN_LINKS = 3;
 const PAID_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
 
 const ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -90,11 +93,32 @@ export async function issueCodeForSession(env, session) {
   return { code, kind: row.kind };
 }
 
+/**
+ * Replay of a redeem/restart whose response was lost: the licence already powers the family the body
+ * names, with the same recovery hash and the body's device in it. That device gets a fresh token
+ * (the lost one is replaced), so the client can finish. Anything else → null.
+ */
+async function replay(env, licenceId, f) {
+  if (!licenceId) return null;
+  const hit = await env.DB.prepare(
+    `SELECT 1 FROM licences l JOIN families f ON f.id = l.family_id JOIN devices d ON d.family_id = f.id
+     WHERE l.id = ? AND l.family_id = ? AND f.recovery_hash = ? AND d.id = ?`,
+  )
+    .bind(licenceId, f.familyId, f.recoveryHash, f.deviceId)
+    .first();
+  if (!hit) return null;
+  const token = randomToken();
+  await env.DB.prepare('UPDATE devices SET token_hash = ?, last_seen_at = ? WHERE id = ? AND family_id = ?')
+    .bind(await sha256Hex(token), new Date().toISOString(), f.deviceId, f.familyId)
+    .run();
+  return json({ token, deviceLimit: await deviceLimit(env, licenceId) });
+}
+
 async function findCode(env, input) {
   const code = normaliseCode(input);
   if (!code) throw new HttpError(404, 'bad-code');
   const hash = await hashCode(code);
-  const row = await env.DB.prepare('SELECT kind, redeemed_at FROM codes WHERE hash = ?').bind(hash).first();
+  const row = await env.DB.prepare('SELECT kind, redeemed_at, licence_id FROM codes WHERE hash = ?').bind(hash).first();
   if (!row) throw new HttpError(404, 'bad-code');
   return { hash, ...row };
 }
@@ -105,7 +129,7 @@ async function redeem(req, env) {
   const f = newFamilyFields(body);
   const code = await findCode(env, body.code);
   if (code.kind === 'slot') throw new HttpError(409, 'code-is-slot');
-  if (code.redeemed_at) throw new HttpError(409, 'code-used');
+  if (code.redeemed_at) return (await replay(env, code.licence_id, f)) ?? codeUsed();
 
   const licenceId = crypto.randomUUID();
   const token = randomToken();
@@ -120,8 +144,16 @@ async function redeem(req, env) {
     ).bind(licenceId, f.familyId, at, code.hash, licenceId),
     ...insertFamilyAndDevice(env, f, licenceId, await sha256Hex(token), at, won, [code.hash, licenceId]),
   ]);
-  if (results[0].meta.changes !== 1) throw new HttpError(409, 'code-used');
+  if (results[0].meta.changes !== 1) {
+    // Lost a race: maybe to an identical request (client retry), which then is a replay.
+    const row = await env.DB.prepare('SELECT licence_id FROM codes WHERE hash = ?').bind(code.hash).first();
+    return (await replay(env, row?.licence_id, f)) ?? codeUsed();
+  }
   return json({ token, deviceLimit: await deviceLimit(env, licenceId) });
+}
+
+function codeUsed() {
+  throw new HttpError(409, 'code-used');
 }
 
 async function slot(req, env) {
@@ -180,8 +212,13 @@ async function licenceEmail(req, env, ctx) {
   if (typeof email !== 'string' || email.length > 320) throw new HttpError(400, 'bad-request');
   // Everything that depends on a match runs after the response, so neither status nor timing tells.
   const work = (async () => {
-    const { results } = await env.DB.prepare('SELECT id FROM licences WHERE email_hmac = ? ORDER BY created_at LIMIT 5')
-      .bind(await emailHmac(env, email))
+    const nowIso = new Date().toISOString();
+    const { results } = await env.DB.prepare(
+      `SELECT l.id FROM licences l WHERE l.email_hmac = ?
+       AND (SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = l.id AND k.used_at IS NULL AND k.expires_at > ?) < ?
+       ORDER BY l.created_at LIMIT 5`,
+    )
+      .bind(await emailHmac(env, email), nowIso, MAX_OPEN_LINKS)
       .all();
     if (!results.length) return;
     const expires = new Date(Date.now() + LINK_TTL_MS).toISOString();
@@ -207,12 +244,16 @@ async function licenceRestart(req, env) {
   const linkHash = await sha256Hex(body.linkToken);
   const at = new Date().toISOString();
   const link = await env.DB.prepare(
-    'SELECT k.licence_id, l.family_id AS old FROM licence_links k JOIN licences l ON l.id = k.licence_id WHERE k.hash = ? AND k.used_at IS NULL AND k.expires_at > ?',
+    'SELECT k.licence_id, k.used_at, k.expires_at, l.family_id AS old FROM licence_links k JOIN licences l ON l.id = k.licence_id WHERE k.hash = ?',
   )
-    .bind(linkHash, at)
+    .bind(linkHash)
     .first();
   if (!link) throw new HttpError(410, 'link-expired');
   const { licence_id: licenceId, old } = link;
+  const expired = () => {
+    throw new HttpError(410, 'link-expired');
+  };
+  if (link.used_at || link.expires_at <= at) return (await replay(env, licenceId, f)) ?? expired();
   // The new family id must differ from the old one: it is the marker of the request that used the link.
   if (f.familyId === old) throw new HttpError(400, 'bad-request');
 
@@ -227,14 +268,25 @@ async function licenceRestart(req, env) {
         env.DB.prepare(`DELETE FROM families WHERE id = ? AND ${claimed}`).bind(old, ...guard),
       ]
     : [];
-  const results = await env.DB.batch([
-    env.DB.prepare('UPDATE licence_links SET used_at = ? WHERE hash = ? AND used_at IS NULL AND expires_at > ?').bind(at, linkHash, at),
-    // Only the request that just used the link moves the licence (see slot() for changes()).
-    env.DB.prepare('UPDATE licences SET family_id = ? WHERE id = ? AND changes() = 1').bind(f.familyId, licenceId),
-    ...purge,
-    ...insertFamilyAndDevice(env, f, licenceId, await sha256Hex(token), at, claimed, guard),
-  ]);
-  if (results[1].meta.changes !== 1) throw new HttpError(410, 'link-expired');
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare('UPDATE licence_links SET used_at = ? WHERE hash = ? AND used_at IS NULL AND expires_at > ?').bind(at, linkHash, at),
+      // Only the request that just used the link moves the licence (see slot() for changes()).
+      env.DB.prepare('UPDATE licences SET family_id = ? WHERE id = ? AND changes() = 1').bind(f.familyId, licenceId),
+      // Every other open link of this licence dies too: none may restart the new family.
+      env.DB.prepare(`UPDATE licence_links SET used_at = ? WHERE licence_id = ? AND used_at IS NULL AND ${claimed}`).bind(at, licenceId, ...guard),
+      ...purge,
+      ...insertFamilyAndDevice(env, f, licenceId, await sha256Hex(token), at, claimed, guard),
+    ]);
+  } catch (e) {
+    // An identical concurrent request won first: its family id now exists, so this batch failed on
+    // the primary key and was rolled back as a whole. Treat it as a replay.
+    const r = await replay(env, licenceId, f);
+    if (r) return r;
+    throw e;
+  }
+  if (results[1].meta.changes !== 1) return (await replay(env, licenceId, f)) ?? expired();
   if (old) {
     try {
       await deletePrefix(env.PHOTOS, `${old}/`);

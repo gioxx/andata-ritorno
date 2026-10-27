@@ -2,6 +2,8 @@ import { HttpError } from './http.js';
 import { hmacHex } from './auth.js';
 
 const TOLERANCE_SEC = 300;
+// Pinned so the response shape does not follow the account's default version.
+export const STRIPE_VERSION = '2026-09-30.endive';
 
 function equalHex(a, b) {
   if (a.length !== b.length) return false;
@@ -37,7 +39,7 @@ export async function verifyWebhook(rawBody, sigHeader, secret, nowSec) {
 export async function getCheckoutSession(env, id) {
   if (typeof id !== 'string' || !/^cs_[A-Za-z0-9_]{1,250}$/.test(id)) throw new HttpError(404, 'bad-session');
   const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${id}?expand[]=line_items`, {
-    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'stripe-version': STRIPE_VERSION },
   });
   if (res.status === 404) throw new HttpError(404, 'bad-session');
   if (!res.ok) throw new Error(`stripe ${res.status}`);

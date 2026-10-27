@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import worker from '../src/index.js';
 import { sha256Hex } from '../src/auth.js';
 import { newCode, normaliseCode, hashCode } from '../src/codes.js';
-import { verifyWebhook } from '../src/stripe.js';
+import { STRIPE_VERSION, verifyWebhook } from '../src/stripe.js';
 
 const SECRETS = {
   STRIPE_SECRET_KEY: 'sk_test_x',
@@ -58,6 +58,7 @@ function mockFetch(sessions) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input.url);
     if (url.hostname === 'api.stripe.com') {
+      if (new Headers(init?.headers).get('stripe-version') !== STRIPE_VERSION) return new Response('unpinned', { status: 400 });
       const id = decodeURIComponent(url.pathname.split('/').pop());
       const s = sessions[id];
       if (!s) return Response.json({ error: { type: 'invalid_request_error' } }, { status: 404 });
@@ -147,6 +148,37 @@ describe('POST /api/redeem', () => {
     expect(await env.DB.prepare('SELECT id FROM devices WHERE id = ?').bind(loser.deviceId).first()).toBeNull();
   });
 
+  it('replays a redeem whose response was lost: same body gets a fresh token', async () => {
+    const code = await insertCode('family');
+    const body = redeemBody(code);
+    const first = await (await post('/api/redeem', body)).json();
+    const res = await post('/api/redeem', body);
+    expect(res.status).toBe(200);
+    const again = await res.json();
+    expect(again.deviceLimit).toBe(4);
+    expect(again.token).not.toBe(first.token);
+    expect(await tokenWorks(again.token)).toBe(true);
+    expect(await tokenWorks(first.token)).toBe(false);
+    const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM devices WHERE family_id = ?').bind(body.familyId).first();
+    expect(n).toBe(1);
+
+    for (const wrong of [{ recoveryHash: 'b'.repeat(64) }, { deviceId: rid() }, { familyId: rid() }]) {
+      const r = await post('/api/redeem', { ...body, ...wrong });
+      expect(r.status).toBe(409);
+      expect(await r.json()).toEqual({ error: 'code-used' });
+    }
+    expect(await tokenWorks(again.token)).toBe(true);
+  });
+
+  it('answers two concurrent identical redeems with 200, never 500', async () => {
+    const body = redeemBody(await insertCode('family'));
+    const results = await Promise.all([post('/api/redeem', body), post('/api/redeem', body)]);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    const tokens = await Promise.all(results.map(async (r) => (await r.json()).token));
+    // The replay replaced the first token: exactly one of the two is live.
+    expect((await Promise.all(tokens.map(tokenWorks))).filter(Boolean)).toHaveLength(1);
+  });
+
   it('returns 429 when the strict rate limit trips', async () => {
     const RL_STRICT = { limit: async () => ({ success: false }) };
     const res = await post('/api/redeem', redeemBody(await insertCode('family')), {}, { RL_STRICT });
@@ -154,6 +186,12 @@ describe('POST /api/redeem', () => {
     expect(await res.json()).toEqual({ error: 'rate-limited' });
   });
 });
+
+/** A device token is live if an authed call gets past auth (bad-code instead of 401). */
+async function tokenWorks(token) {
+  const res = await post('/api/slot', { code: newCode() }, { authorization: `Bearer ${token}` });
+  return res.status !== 401;
+}
 
 async function newFamily() {
   const res = await post('/api/redeem', redeemBody(await insertCode('family')));
@@ -232,7 +270,7 @@ describe('Stripe', () => {
     expect(rows.results[0].hash).toBe(await hashCode(first.code));
     expect(rows.results[0].source).toBe('stripe');
     expect(rows.results[0].email_hmac).toBe(await hmacHex(SECRETS.EMAIL_HMAC_KEY, 'payer@example.com'));
-    expect(emails.length).toBeGreaterThan(0);
+    expect(emails).toHaveLength(2);
     expect(emails[0].to).toEqual(['Payer@Example.com']);
     expect(emails[0].from).toBe('A/R <noreply@ar.gioxx.org>');
     expect(emails[0].text).toContain(first.code);
@@ -401,5 +439,61 @@ describe('licence recovery', () => {
     expect(lic.family_id).toBe(winner.familyId);
     expect(await env.DB.prepare('SELECT id FROM families WHERE id = ?').bind(loser.familyId).first()).toBeNull();
     expect(await env.DB.prepare('SELECT id FROM families WHERE id = ?').bind(oldFamily).first()).toBeNull();
+  });
+
+  async function linkFor(email, emails) {
+    await post('/api/licence/email', { email });
+    return /licence#([A-Za-z0-9_-]{43})/.exec(emails.at(-1).text)[1];
+  }
+  const restartBody = (linkToken) => {
+    const b = { ...redeemBody(undefined), linkToken };
+    delete b.code;
+    return b;
+  };
+
+  it('replays a restart whose response was lost; wrong body stays 410', async () => {
+    await paidFamily('replay@example.com');
+    const emails = mockFetch({});
+    const body = restartBody(await linkFor('replay@example.com', emails));
+    const first = await (await post('/api/licence/restart', body)).json();
+    const res = await post('/api/licence/restart', body);
+    expect(res.status).toBe(200);
+    const again = await res.json();
+    expect(await tokenWorks(again.token)).toBe(true);
+    expect(await tokenWorks(first.token)).toBe(false);
+    for (const wrong of [{ recoveryHash: 'b'.repeat(64) }, { deviceId: rid() }, { familyId: rid() }]) {
+      const r = await post('/api/licence/restart', { ...body, ...wrong });
+      expect(r.status).toBe(410);
+      expect(await r.json()).toEqual({ error: 'link-expired' });
+    }
+    expect(await env.DB.prepare('SELECT id FROM families WHERE id = ?').bind(body.familyId).first()).not.toBeNull();
+  });
+
+  it('answers two concurrent identical restarts with 200, never 500', async () => {
+    await paidFamily('same@example.com');
+    const emails = mockFetch({});
+    const body = restartBody(await linkFor('same@example.com', emails));
+    const results = await Promise.all([post('/api/licence/restart', body), post('/api/licence/restart', body)]);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    const tokens = await Promise.all(results.map(async (r) => (await r.json()).token));
+    expect((await Promise.all(tokens.map(tokenWorks))).filter(Boolean)).toHaveLength(1);
+  });
+
+  it('a restart voids the other open links of the licence', async () => {
+    await paidFamily('links@example.com');
+    const emails = mockFetch({});
+    const a = await linkFor('links@example.com', emails);
+    const b = await linkFor('links@example.com', emails);
+    expect((await post('/api/licence/restart', restartBody(a))).status).toBe(200);
+    const res = await post('/api/licence/restart', restartBody(b));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toEqual({ error: 'link-expired' });
+  });
+
+  it('stops emailing once a licence has 3 open links', async () => {
+    await paidFamily('flood@example.com');
+    const emails = mockFetch({});
+    for (let i = 0; i < 5; i++) expect((await post('/api/licence/email', { email: 'flood@example.com' })).status).toBe(202);
+    expect(emails).toHaveLength(3);
   });
 });
