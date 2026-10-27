@@ -207,15 +207,16 @@ export async function recoverFamily(db, api, kit, deviceName) {
 /**
  * Leave: the server forgets this device (the last one out wipes the family's server data), the
  * device forgets the family. Local data stays as a plain local wardrobe.
+ * @param {{timeoutMs?: number}} [o] timeoutMs: give up on the server (throws ApiError offline)
  * @returns {Promise<{purged:boolean}>}
  */
-export async function leaveFamily(db, api) {
+export async function leaveFamily(db, api, { timeoutMs } = {}) {
   const meta = await getFamily(db)
   if (!meta) return { purged: false }
   let purged = false
   if (meta.token && !meta.removed) {
     try {
-      ;({ purged } = await api.removeDevice(meta.deviceId))
+      ;({ purged } = await api.removeDevice(meta.deviceId, timeoutMs ? { timeoutMs } : undefined))
     } catch (e) {
       if (e?.status !== 401) throw e // already removed by someone else: nothing left to revoke
     }

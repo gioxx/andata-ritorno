@@ -23,9 +23,25 @@ export function createApi({ fetchFn = (...a) => fetch(...a), getToken = () => nu
   /**
    * @param {string} method
    * @param {string} path
-   * @param {{ auth?: boolean, json?: any, bytes?: Uint8Array, as?: 'json'|'bytes'|'none' }} [o]
+   * @param {{ auth?: boolean, json?: any, bytes?: Uint8Array, as?: 'json'|'bytes'|'none', timeoutMs?: number }} [o]
+   *   timeoutMs: give up (as 'offline') when no full answer came in time
    */
-  async function call(method, path, { auth = false, json, bytes, as = 'json' } = {}) {
+  async function call(method, path, { auth = false, json, bytes, as = 'json', timeoutMs } = {}) {
+    if (timeoutMs) {
+      // Raced too, not only passed to fetch: a stalled body read or a fetch ignoring the signal still ends.
+      const controller = new AbortController()
+      let timer
+      const expired = new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new ApiError(0, 'offline')) }, timeoutMs) })
+      try {
+        return await Promise.race([send(method, path, { auth, json, bytes, as, signal: controller.signal }), expired])
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    return send(method, path, { auth, json, bytes, as })
+  }
+
+  async function send(method, path, { auth, json, bytes, as, signal }) {
     const headers = {}
     if (auth) {
       const token = await getToken()
@@ -41,7 +57,7 @@ export function createApi({ fetchFn = (...a) => fetch(...a), getToken = () => nu
     }
     let res
     try {
-      res = await fetchFn(base + path, { method, headers, body, cache: 'no-store' })
+      res = await fetchFn(base + path, { method, headers, body, cache: 'no-store', ...(signal ? { signal } : {}) })
     } catch {
       throw new ApiError(0, 'offline')
     }
@@ -71,7 +87,8 @@ export function createApi({ fetchFn = (...a) => fetch(...a), getToken = () => nu
     createInvite: () => call('POST', '/api/invites', authed),
     inviteInfo: (token) => call('GET', `/api/invites/info?t=${q(token)}`),
     join: (body) => post('/api/join', body),
-    removeDevice: (id) => call('DELETE', `/api/devices/${q(id)}`, authed),
+    /** @param {{timeoutMs?: number}} [o] */
+    removeDevice: (id, { timeoutMs } = {}) => call('DELETE', `/api/devices/${q(id)}`, { auth: true, timeoutMs }),
     recover: (body) => post('/api/recover', body),
     recoverRemoveDevice: (body) => post('/api/recover/remove-device', body),
     licenceEmail: (email) => call('POST', '/api/licence/email', { json: { email }, as: 'none' }),

@@ -18,7 +18,7 @@ import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
 import { initMenu, runExport } from './ui/menu.js';
 import { initFamilyUi, familyHooks } from './ui/familyDialogs.js';
-import { renderUnlockPage, renderHandoff } from './ui/pages.js';
+import { renderUnlockPage, landOn } from './ui/pages.js';
 import { routeOf } from './routes.js';
 import { currentPlatform, isStandalone } from './platform.js';
 import { desktopGate } from './ui/desktop.js';
@@ -40,9 +40,8 @@ if (route.page === 'unlock') {
   // The payment success page: shows the code only, the app itself does not start here.
   await renderUnlockPage(root, { api: createApi(), sessionId: route.sessionId, inSafari });
 } else {
-  if (route.page !== 'app' && inSafari) await renderHandoff(root, { kind: route.page, link: location.href });
-  // The fragment carries a key or a token: off the address bar (and out of a later reload).
-  if (route.page !== 'app') history.replaceState(null, '', '/');
+  // The fragment carries a key or a token: off the address bar first, then the iOS hand-off.
+  await landOn(root, route, { inSafari });
   await desktopGate(root);
   await startApp();
 }

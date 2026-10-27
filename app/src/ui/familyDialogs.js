@@ -24,7 +24,7 @@ import {
 export const familyHooks = {
   onJoinInvite: (link) => openHaveInvite(link),
   onRestore: (o) => openRestore(o),
-  onLicence: (linkToken) => (linkToken ? openLicenceRestart(linkToken) : openLicence()),
+  onLicence: (linkToken) => openLicenceLink(linkToken),
 }
 
 /** @type {{ db:any, api:any, onEntered:()=>Promise<void>|void, onLeft:()=>void, onExport:()=>Promise<boolean> }} */
@@ -397,8 +397,22 @@ export async function openRestore({ kit = '' } = {}) {
 
 // ---- Licence recovery --------------------------------------------------------------------
 
-/** Step 1: ask for the email used to pay; the link it gets can also be pasted here (iOS). */
-export async function openLicence() {
+/**
+ * A token from the URL: only a well-formed one may lead to the destructive confirmation; a bad
+ * one lands on step 1 saying so.
+ */
+function openLicenceLink(linkToken) {
+  if (!linkToken) return openLicence()
+  let token
+  try { token = parseLicenceLink(linkToken) } catch { return openLicence({ error: t('family.licence.badLink') }) }
+  return openLicenceRestart(token)
+}
+
+/**
+ * Step 1: ask for the email used to pay; the link it gets can also be pasted here (iOS).
+ * @param {{error?: string}} [o] a message to show from the start
+ */
+export async function openLicence({ error = '' } = {}) {
   if (await refusedByMembership(t('family.licence'))) return
   const d = show(`<form method="dialog"><h3>${t('family.licence')}</h3>
     <p class="plain">${t('family.licence.body')}</p>
@@ -407,7 +421,7 @@ export async function openLicence() {
     <p class="plain">${t('family.licence.pasteBody')}</p>
     <input type="text" id="famLicLink" aria-label="${t('family.licence.pasteLabel')}" autocomplete="off" autocapitalize="off" spellcheck="false">
     <button type="button" data-link>${t('family.join.next')}</button>
-    <p class="plain err" role="alert"></p>
+    <p class="plain err" role="alert">${esc(error)}</p>
     <button value="" class="cancel">${t('common.close')}</button></form>`)
   const email = d.querySelector('#famLicEmail')
   const link = d.querySelector('#famLicLink')
@@ -461,13 +475,18 @@ export async function openLicenceRestart(linkToken) {
 
 /**
  * Leave the family before the data is wiped, so the phone does not linger in "Dispositivi".
- * Best effort: offline, the wipe goes on and the user is told to remove it from another phone.
+ * Best effort: offline or no answer within `timeoutMs`, the wipe goes on and the user is told to
+ * remove it from another phone. So is a redeem/restart still pending: the server may already have
+ * added this phone, and it has no token to remove itself with.
+ * @param {{timeoutMs?: number}} [o]
  * @returns {Promise<'none'|'left'|'failed'>}
  */
-export async function leaveBeforeWipe() {
-  if (!ctx || !(await getFamily(ctx.db))) return 'none'
+export async function leaveBeforeWipe({ timeoutMs = 10000 } = {}) {
+  const meta = ctx && (await getFamily(ctx.db))
+  if (!meta) return 'none'
+  if (meta.pending) return 'failed'
   try {
-    await leaveFamily(ctx.db, ctx.api)
+    await leaveFamily(ctx.db, ctx.api, { timeoutMs })
     return 'left'
   } catch {
     return 'failed'

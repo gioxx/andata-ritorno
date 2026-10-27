@@ -50,6 +50,20 @@ export async function renderUnlockPage(root, { api, sessionId, inSafari }) {
 }
 
 /**
+ * First step for a routed link (/join, /licence): take the key or token off the address bar and
+ * history right away, then, in iOS Safari, offer the hand-off with the full link kept in memory.
+ * @param {HTMLElement} root
+ * @param {import('../routes.js').Route} route
+ * @param {{ inSafari: boolean, href?: string, replaceUrl?: (url: string) => void }} o
+ * @returns {Promise<void>} resolves when the app may start
+ */
+export async function landOn(root, route, { inSafari, href = location.href, replaceUrl = (u) => history.replaceState(null, '', u) }) {
+  if (route.page !== 'join' && route.page !== 'licence') return
+  replaceUrl('/')
+  if (inSafari) await renderHandoff(root, { kind: route.page, link: href })
+}
+
+/**
  * iOS Safari landing for /join or /licence: copy the link for the installed app, or carry on here
  * (A/R not installed: Safari is the app then).
  * @param {HTMLElement} root

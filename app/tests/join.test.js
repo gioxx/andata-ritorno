@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { openDb, putTab, addItems, loadAll, setSyncTracking } from '../src/db.js'
 import { createApi } from '../src/sync/api.js'
 import { getFamily, setFamily, createFamily, inviteLink, parseInvite } from '../src/sync/family.js'
-import { initFamilyUi, openJoin, leaveBeforeWipe } from '../src/ui/familyDialogs.js'
+import { initFamilyUi, openJoin, leaveBeforeWipe, familyHooks } from '../src/ui/familyDialogs.js'
 import { createFakeServer } from './helpers/fakeServer.js'
 
 const CODE = 'AR-ABCD-EFGH-JK12'
@@ -183,5 +183,41 @@ describe('leaveBeforeWipe', () => {
     server.offline = false
     expect(await leaveBeforeWipe()).toBe('left')
     expect(await getFamily(p.db)).toBeNull()
+  })
+})
+
+describe('leaveBeforeWipe edge cases', () => {
+  it('a hanging connection times out as failed, so the wipe can go on', async () => {
+    const p = await phone()
+    initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
+    server.addCode(CODE)
+    await createFamily(p.db, p.api, { code: CODE, familyName: 'Famiglia Rossi', deviceName: 'Telefono 1' })
+    server.beforeHandle = () => new Promise(() => {}) // never answers
+    expect(await leaveBeforeWipe({ timeoutMs: 30 })).toBe('failed')
+  })
+
+  it('a redeem still pending is reported as failed (the server may know this phone)', async () => {
+    const p = await phone()
+    initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
+    await setFamily(p.db, { familyId: 'family-1234', deviceId: 'device-01', token: null, keyRaw: 'A'.repeat(43), recoverySecret: 's', cursor: 0, lastSyncAt: null, licenceKind: 'family', pending: { op: 'redeem', body: {} } })
+    expect(await leaveBeforeWipe()).toBe('failed')
+  })
+})
+
+describe('licence link from the URL', () => {
+  it('a malformed token never reaches the destructive confirmation: step 1 with the bad-link message', async () => {
+    const p = await phone()
+    initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
+    await familyHooks.onLicence('not a token!')
+    expect(dlg().querySelector('#famLicEmail')).not.toBeNull()
+    expect(dlg().textContent).toContain('Link non valido')
+    expect(dlg().textContent).not.toContain('Inizia una nuova famiglia con la tua licenza')
+  })
+
+  it('a well-formed token opens step 2', async () => {
+    const p = await phone()
+    initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
+    await familyHooks.onLicence('A'.repeat(43))
+    expect(dlg().textContent).toContain('Inizia una nuova famiglia con la tua licenza')
   })
 })

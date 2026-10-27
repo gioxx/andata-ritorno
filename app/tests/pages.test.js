@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderUnlockPage, renderHandoff } from '../src/ui/pages.js'
+import { renderUnlockPage, renderHandoff, landOn } from '../src/ui/pages.js'
+import { routeOf } from '../src/routes.js'
 import { ApiError } from '../src/sync/api.js'
 
 let root
@@ -48,5 +49,32 @@ describe('iOS Safari hand-off', () => {
     root.querySelector('[data-here]').click()
     await done
     expect(root.innerHTML).toBe('')
+  })
+})
+
+describe('landOn (routed links)', () => {
+  it('iOS Safari: the key leaves the address bar before the hand-off shows, the copy keeps the full link', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    history.replaceState(null, '', '/join#tok.family-1234.key')
+    const href = location.href
+    const route = routeOf(location.pathname, location.hash, location.search)
+    const done = landOn(root, route, { inSafari: true })
+    expect(root.querySelector('[data-copy]')).not.toBeNull()
+    expect(location.pathname + location.hash).toBe('/')
+    root.querySelector('[data-copy]').click()
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(href))
+    root.querySelector('[data-here]').click()
+    await done
+  })
+
+  it('elsewhere: the URL is cleaned and nothing is shown; the plain app route is left alone', async () => {
+    history.replaceState(null, '', '/licence#tok')
+    await landOn(root, routeOf(location.pathname, location.hash, location.search), { inSafari: false })
+    expect(location.pathname + location.hash).toBe('/')
+    expect(root.innerHTML).toBe('')
+    history.replaceState(null, '', '/?x=1')
+    await landOn(root, { page: 'app' }, { inSafari: true })
+    expect(location.search).toBe('?x=1')
   })
 })
