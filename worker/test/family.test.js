@@ -210,6 +210,39 @@ describe('DELETE /api/devices/:id', () => {
     expect((await get('/api/family', fam.token)).status).toBe(200);
   });
 
+  it('keeps the family when two devices remove each other at once', async () => {
+    const fam = await newFamily();
+    const body = joinBody(await invite(fam.token));
+    const other = { deviceId: body.deviceId, ...(await (await post('/api/join', body)).json()) };
+    await env.DB.prepare("INSERT INTO records (family_id, rid, seq, data) VALUES (?, 'r1', 1, 'x')").bind(fam.familyId).run();
+    const results = await Promise.all([del(`/api/devices/${other.deviceId}`, fam.token), del(`/api/devices/${fam.deviceId}`, other.token)]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 404]);
+    expect(await results.find((r) => r.status === 200).json()).toEqual({ purged: false });
+    expect(await count('devices', fam.familyId)).toBe(1);
+    expect(await count('records', fam.familyId)).toBe(1);
+    expect(await env.DB.prepare('SELECT 1 FROM families WHERE id = ?').bind(fam.familyId).first()).not.toBeNull();
+  });
+
+  it('purges exactly once when the last two devices leave at once', async () => {
+    const fam = await newFamily();
+    const body = joinBody(await invite(fam.token));
+    const other = { deviceId: body.deviceId, ...(await (await post('/api/join', body)).json()) };
+    const results = await Promise.all([del(`/api/devices/${fam.deviceId}`, fam.token), del(`/api/devices/${other.deviceId}`, other.token)]);
+    const outs = await Promise.all(results.map((r) => r.json()));
+    expect(outs.map((o) => o.purged).sort()).toEqual([false, true]);
+    expect(await env.DB.prepare('SELECT 1 FROM families WHERE id = ?').bind(fam.familyId).first()).toBeNull();
+  });
+
+  it('answers 404 for an unknown device without touching the family', async () => {
+    const fam = await newFamily();
+    await env.DB.prepare("INSERT INTO records (family_id, rid, seq, data) VALUES (?, 'r1', 1, 'x')").bind(fam.familyId).run();
+    const res = await del(`/api/devices/${rid()}`, fam.token);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not-found' });
+    expect(await count('devices', fam.familyId)).toBe(1);
+    expect(await count('records', fam.familyId)).toBe(1);
+  });
+
   it('purges the family when the last device leaves, keeping the licence', async () => {
     const fam = await newFamily();
     const { licence_id: licenceId } = await env.DB.prepare('SELECT licence_id FROM families WHERE id = ?').bind(fam.familyId).first();

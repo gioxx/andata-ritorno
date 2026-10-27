@@ -28,13 +28,15 @@ async function devicesOf(env, familyId) {
   return results;
 }
 
-/** Give an existing device of the family a fresh token (its old one stops working). */
-async function newTokenFor(env, familyId, deviceId, guard = '1', guardArgs = []) {
-  const token = randomToken();
-  const { meta } = await env.DB.prepare(`UPDATE devices SET token_hash = ?, last_seen_at = ? WHERE id = ? AND family_id = ? AND ${guard}`)
-    .bind(await sha256Hex(token), nowIso(), deviceId, familyId, ...guardArgs)
-    .run();
-  return meta.changes === 1 ? token : null;
+/** Statement giving an existing device of the family a new token hash (its old token stops working). */
+function rotateToken(env, familyId, deviceId, tokenHash, at, guard = '1', guardArgs = []) {
+  return env.DB.prepare(`UPDATE devices SET token_hash = ?, last_seen_at = ? WHERE id = ? AND family_id = ? AND ${guard}`).bind(
+    tokenHash,
+    at,
+    deviceId,
+    familyId,
+    ...guardArgs,
+  );
 }
 
 async function family(req, env) {
@@ -109,8 +111,9 @@ async function join(req, env) {
  * that device, created at the moment the invite was used, gets a fresh token. Anything else → 410.
  */
 async function replayJoin(env, inv, deviceId) {
-  const token = await newTokenFor(env, inv.family_id, deviceId, 'created_at = ?', [inv.used_at]);
-  if (!token) inviteExpired();
+  const token = randomToken();
+  const { meta } = await rotateToken(env, inv.family_id, deviceId, await sha256Hex(token), nowIso(), 'created_at = ?', [inv.used_at]).run();
+  if (meta.changes !== 1) inviteExpired();
   return json({ token, deviceLimit: await deviceLimit(env, await licenceOf(env, inv.family_id)) });
 }
 
@@ -119,16 +122,31 @@ async function licenceOf(env, familyId) {
 }
 
 async function removeDevice(req, env, ctx, params) {
-  const { familyId } = await requireDevice(env, req);
-  // Removing the family's last device (only possible as a self-removal, i.e. leaving) purges it in
-  // the same transaction; the licence stays, detached, for a later restart.
+  const { deviceId, familyId } = await requireDevice(env, req);
+  // Every statement requires the caller's device to still exist when the batch runs: two devices
+  // removing each other at once then remove only one of them, never the family.
+  const callerExists = 'EXISTS (SELECT 1 FROM devices WHERE id = ? AND family_id = ?)';
+  // Only a device leaving can be the last one. It purges the family in the same transaction when no
+  // other device is left; the licence stays, detached, for a later restart.
+  const purge =
+    params.id === deviceId
+      ? purgeStatements(env.DB, familyId, `${callerExists} AND NOT EXISTS (SELECT 1 FROM devices WHERE family_id = ? AND id <> ?)`, [
+          deviceId,
+          familyId,
+          familyId,
+          deviceId,
+        ])
+      : [];
   const results = await env.DB.batch([
-    env.DB.prepare('DELETE FROM devices WHERE id = ? AND family_id = ?').bind(params.id, familyId),
-    ...purgeStatements(env.DB, familyId, 'NOT EXISTS (SELECT 1 FROM devices WHERE family_id = ?)', [familyId]),
+    ...purge,
+    env.DB.prepare(`DELETE FROM devices WHERE id = ? AND family_id = ? AND ${callerExists}`).bind(params.id, familyId, deviceId, familyId),
   ]);
-  if (results[0].meta.changes !== 1) throw new HttpError(404, 'not-found');
-  const purged = results.at(-1).meta.changes === 1;
-  if (purged) await purgePhotos(env, familyId);
+  const purged = purge.length > 0 && results[purge.length - 2].meta.changes === 1;
+  if (purged) {
+    await purgePhotos(env, familyId);
+    return json({ purged });
+  }
+  if (results.at(-1).meta.changes !== 1) throw new HttpError(404, 'not-found');
   return json({ purged });
 }
 
@@ -158,7 +176,7 @@ async function recover(req, env) {
   // One transaction: a device already in the family (a retried recovery) gets the new token;
   // otherwise it is added only while the family has room.
   const results = await env.DB.batch([
-    env.DB.prepare('UPDATE devices SET token_hash = ?, last_seen_at = ? WHERE id = ? AND family_id = ?').bind(tokenHash, at, body.deviceId, kit.familyId),
+    rotateToken(env, kit.familyId, body.deviceId, tokenHash, at),
     env.DB.prepare(
       `INSERT INTO devices (id, family_id, token_hash, name_enc, created_at, last_seen_at)
        SELECT ?, f.id, ?, ?, ?, ? FROM families f JOIN licences l ON l.id = f.licence_id

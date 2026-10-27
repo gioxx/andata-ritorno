@@ -6,17 +6,18 @@ export async function deviceLimit(env, licenceId) {
 }
 
 /**
- * Statements deleting every row of a family (records, photos, devices, invites, the family itself)
+ * Statements deleting every row of a family (records, photos, invites, the family itself, devices)
  * and detaching it from its licence, which is kept. Each runs only if `guard` (an SQL condition)
- * holds, so a batch can make the purge depend on an earlier statement.
+ * holds, so a batch can make the purge depend on an earlier statement. Devices go last, so a guard
+ * may require a device to exist; the families delete is second to last (its result tells whether
+ * the purge ran).
  */
 export function purgeStatements(db, familyId, guard = '1', guardArgs = []) {
   return [
-    ...['records', 'photos', 'devices', 'invites'].map((t) =>
-      db.prepare(`DELETE FROM ${t} WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs),
-    ),
+    ...['records', 'photos', 'invites'].map((t) => db.prepare(`DELETE FROM ${t} WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs)),
     db.prepare(`UPDATE licences SET family_id = NULL WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs),
     db.prepare(`DELETE FROM families WHERE id = ? AND ${guard}`).bind(familyId, ...guardArgs),
+    db.prepare(`DELETE FROM devices WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs),
   ];
 }
 
