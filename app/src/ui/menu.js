@@ -19,7 +19,7 @@ import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
 import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
-import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, logOutIcon, eraseIcon } from './icons.js'
+import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, logOutIcon, eraseIcon, shieldIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
 let dlg = null
@@ -104,6 +104,7 @@ const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="clos
     <h4>${t('menu.app')}</h4>
     ${isStandalone() ? '' : menuItem('install', smartphoneIcon, t('menu.installApp'))}
     ${menuItem('uninstall', logOutIcon, t('menu.uninstallHow'))}
+    ${menuItem('privacy', shieldIcon, t('menu.privacy'))}
     ${menuItem('wipe', eraseIcon, t('menu.wipe'), '', ' danger')}
     ${menuFooter()}`
 
@@ -128,7 +129,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
       invite: openInvite, slot: () => openPayment(import.meta.env.VITE_STRIPE_LINK_SLOT), kit: () => openKit(), leave: openLeave }[item.dataset.menu]

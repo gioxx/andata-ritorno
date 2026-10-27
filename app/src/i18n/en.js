@@ -176,6 +176,8 @@ export default {
   'menu.app': 'App',
   'menu.installApp': 'Install app',
   'menu.uninstallHow': 'How to uninstall',
+  'menu.privacy': 'Privacy',
+  'privacy.link': 'Privacy policy',
   'menu.wipe': 'Delete all data',
   'wipe.title': 'Delete all data',
   'wipe.body': 'This erases tabs, items, photos, categories and preferences from this phone. It cannot be undone.',

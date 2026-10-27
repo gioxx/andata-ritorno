@@ -98,6 +98,7 @@ export async function openCodeDialog() {
     <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
     ${inFamily ? '' : `<input type="text" id="famName" aria-label="${t('family.code.name')}" placeholder="${esc(t('family.code.nameHint'))}" maxlength="60" autocomplete="off">
     <input type="text" id="famDevice" aria-label="${t('family.code.device')}" placeholder="${esc(t('family.code.deviceHint'))}" maxlength="40" autocomplete="off">`}
+    <p class="plain"><a href="/privacy.html" target="_blank" rel="noopener">${t('privacy.link')}</a></p>
     <p class="plain err" role="alert"></p>
     <button type="button" class="primary" data-go>${t(inFamily ? 'family.slotCode.go' : 'family.code.go')}</button>
     <button value="" class="cancel">${t('common.cancel')}</button></form>`)

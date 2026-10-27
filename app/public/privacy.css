@@ -1,0 +1,29 @@
+/* Standalone stylesheet for privacy.html (the app's CSP allows no inline <style>). Same tokens as src/styles.css. */
+:root {
+  color-scheme: light;
+  --bg: #fbf7f1; --fg: #2b2620; --muted: #6a6052; --chip: #efe7db; --tile: #fff;
+  --accent-strong: #b4532f;
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0d0f15; --fg: #eceef5; --muted: #9399ad; --chip: #1f232e; --tile: #151821;
+    --accent-strong: #e88563;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font); font-weight: 500; background: var(--bg); color: var(--fg); line-height: 1.6; }
+main { max-width: 42rem; margin: 0 auto; padding: calc(24px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 4px; }
+h2 { font-size: 1.125rem; margin: 28px 0 6px; }
+p, ul { margin: 0 0 12px; }
+ul { padding-left: 22px; }
+li { margin-bottom: 6px; }
+a { color: var(--accent-strong); font-weight: 600; }
+a:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; border-radius: 4px; }
+.meta { color: var(--muted); font-size: 0.875rem; }
+nav.langs { display: flex; gap: 8px; margin: 12px 0 8px; }
+nav.langs a { padding: 8px 14px; border-radius: 999px; background: var(--chip); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+section + section { margin-top: 48px; padding-top: 24px; border-top: 2px solid var(--chip); }
+.back { display: inline-block; padding: 12px 0; }

@@ -20,6 +20,14 @@ describe('/unlock page', () => {
     expect(root.textContent).toContain('Se hai installato A/R, aprila dalla schermata Home: questa pagina è in Safari.')
   })
 
+  it('links the privacy policy in a new tab', async () => {
+    const api = { unlockSession: vi.fn(async () => ({ code: 'AR-ABCD-EFGH-JK12', kind: 'family' })) }
+    await renderUnlockPage(root, { api, sessionId: 'cs_test_1', inSafari: false })
+    const a = root.querySelector('a[href="/privacy.html"]')
+    expect(a.textContent).toBe('Informativa sulla privacy')
+    expect(a.rel).toContain('noopener')
+  })
+
   it('not paid: says so and offers a retry that can succeed', async () => {
     const api = { unlockSession: vi.fn().mockRejectedValueOnce(new ApiError(402, 'not-paid')).mockResolvedValueOnce({ code: 'AR-ABCD-EFGH-JK12', kind: 'family' }) }
     await renderUnlockPage(root, { api, sessionId: 'cs_test_1', inSafari: false })

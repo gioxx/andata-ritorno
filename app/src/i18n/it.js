@@ -177,6 +177,8 @@ export default {
   'menu.app': 'App',
   'menu.installApp': 'Installa app',
   'menu.uninstallHow': 'Come disinstallare',
+  'menu.privacy': 'Privacy',
+  'privacy.link': 'Informativa sulla privacy',
   'menu.wipe': 'Elimina tutti i dati',
   'wipe.title': 'Elimina tutti i dati',
   'wipe.body': 'Verranno cancellati da questo telefono schede, capi, foto, categorie e preferenze. Non si può annullare.',
