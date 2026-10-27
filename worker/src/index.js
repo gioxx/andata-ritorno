@@ -1,9 +1,11 @@
 import { HttpError, json, limited, route } from './http.js';
 import { familyRoutes } from './family.js';
 import { licenceRoutes } from './licence.js';
+import { syncRoutes } from './sync.js';
+import { photoRoutes } from './photos.js';
 
 // Later tasks add routes here as 'METHOD /api/path/:param': async (req, env, ctx, params) => Response.
-export const routes = { ...licenceRoutes, ...familyRoutes };
+export const routes = { ...licenceRoutes, ...familyRoutes, ...syncRoutes, ...photoRoutes };
 
 export default {
   async fetch(req, env, ctx) {

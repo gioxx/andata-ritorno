@@ -1,4 +1,4 @@
-import { HttpError } from './http.js';
+import { HttpError, limited } from './http.js';
 
 export async function sha256Hex(s) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -34,4 +34,11 @@ export async function requireDevice(env, req) {
     .bind(new Date().toISOString(), row.id)
     .run();
   return { deviceId: row.id, familyId: row.family_id };
+}
+
+/** requireDevice plus the per-device API rate limit (a no-op when RL_API is not bound). */
+export async function requireApiDevice(env, req) {
+  const dev = await requireDevice(env, req);
+  if (await limited(env.RL_API, `device:${dev.deviceId}`)) throw new HttpError(429, 'rate-limited');
+  return dev;
 }
