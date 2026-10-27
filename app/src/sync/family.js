@@ -1,7 +1,7 @@
 // Family membership on this device: the stored family (meta key 'family') and the flows that
 // create, join, recover, restart or leave one. Creating, joining or recovering turns sync tracking
 // on and queues every local tab, category and item, so local data uploads on the next sync.
-import { getMeta, setMeta, deleteMeta, setSyncTracking, markAllDirty, clearSyncStores, clearWardrobe } from '../db.js'
+import { getMeta, setMeta, deleteMeta, setSyncTracking, markAllDirty, queueOutbox, clearSyncStores, clearWardrobe } from '../db.js'
 import { generateKeyRaw, importKey, encryptJson, decryptJson, b64url, randomToken, sha256Hex } from './crypto.js'
 
 /**
@@ -19,20 +19,32 @@ const TOKEN = /^[A-Za-z0-9_-]{1,128}$/
 const KEY_B64 = /^[A-Za-z0-9_-]{43}$/ // 32 bytes, unpadded
 const KIT_PREFIX = 'ARKIT1'
 
+/**
+ * The recovery secret travels to every device as one encrypted sync record (an invite carries
+ * only the key): kind 'kit', value {id: KIT_RID, recoverySecret}. Never tombstoned.
+ */
+export const KIT_KIND = 'kit'
+export const KIT_RID = 'family-kit'
+export const isRecoverySecret = (s) => typeof s === 'string' && TOKEN.test(s)
+
 /** @returns {Promise<FamilyMeta|null>} */
 export const getFamily = async (db) => (await getMeta(db, META)) ?? null
 /** @param {FamilyMeta} meta */
 export const setFamily = (db, meta) => setMeta(db, META, meta)
 export const clearFamily = (db) => deleteMeta(db, META)
 
+/** Whether the stored family is still the one `meta` describes (same family, same device). */
+export const sameMembership = (cur, meta) => !!cur && !!meta && cur.familyId === meta.familyId && cur.deviceId === meta.deviceId
+
 /**
- * Merge `patch` into the stored family, only if it is still `familyId`: a sync finishing after
- * the user left (or joined another family) must not bring the old one back.
+ * Merge `patch` into the stored family, only if it is still the membership `match` describes: a
+ * sync finishing after the user left (or joined again) must not write into the new one.
+ * @param {{familyId:string, deviceId:string}} match
  * @returns {Promise<FamilyMeta|null>}
  */
-export async function updateFamily(db, familyId, patch) {
+export async function updateFamily(db, match, patch) {
   const cur = await getFamily(db)
-  if (!cur || cur.familyId !== familyId) return null
+  if (!sameMembership(cur, match)) return null
   const next = { ...cur, ...patch }
   await setFamily(db, next)
   return next
@@ -98,6 +110,7 @@ async function enter(db, meta, { token, deviceLimit }) {
   setSyncTracking(true)
   await clearSyncStores(db)
   await markAllDirty(db)
+  if (done.recoverySecret) await queueOutbox(db, KIT_KIND, KIT_RID) // lets invited devices show the kit
   return done
 }
 
@@ -117,8 +130,15 @@ async function newFamily({ familyName, deviceName }) {
 }
 
 /**
+ * A refusal that will not change on retry. Rate limits (429), timeouts and server errors may come
+ * after the server already acted on the first attempt: those keep the attempt for a replay.
+ */
+const definitive = (e) => e?.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429
+
+/**
  * Finish a redeem/restart that was stored as pending (called right away, and again at the next
- * start if the answer never came). A refusal forgets the attempt; no answer keeps it for later.
+ * start if the answer never came). A definitive refusal forgets the attempt; no answer, a rate
+ * limit or a server error keeps it, so the next start replays the same body.
  * @returns {Promise<FamilyMeta|null>}
  */
 export async function resumePending(db, api) {
@@ -129,7 +149,7 @@ export async function resumePending(db, api) {
   try {
     res = await withRetry(() => (op === 'restart' ? api.licenceRestart(body) : api.redeem(body)))
   } catch (e) {
-    if (e?.status !== 0 && (await getFamily(db))?.familyId === meta.familyId) await clearFamily(db)
+    if (definitive(e) && (await getFamily(db))?.familyId === meta.familyId) await clearFamily(db)
     throw e
   }
   return enter(db, meta, res)

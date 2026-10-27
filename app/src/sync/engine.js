@@ -1,6 +1,7 @@
 // Background sync for a device in a family. One run: pull every page → decode → merge once →
-// apply → upload photos the outbox needs → push the outbox (tabs, categories, items) → download
-// missing photos → sweep orphan photos → refresh the family view. Runs never overlap; nothing here
+// apply → upload photos the outbox needs → push the outbox (tabs, categories, items) → sweep
+// orphan photos → refresh the family view. Missing photos then download in a separate background
+// queue, so a long first download never holds up the next push. Runs never overlap; nothing here
 // runs (or touches the network) for a device outside a family.
 import {
   loadAll, readOutbox, clearOutbox, getTombstones, applySyncPlan, getMeta, setMeta, getPhotoIds, getPhotoRecord,
@@ -9,7 +10,7 @@ import {
 import { encodeRecord, encodeTombstone, decodeRecord } from './records.js'
 import { mergeRemote } from './merge.js'
 import { encrypt, decrypt } from './crypto.js'
-import { getFamily, updateFamily, familyKey, describeFamily, resumePending } from './family.js'
+import { getFamily, updateFamily, familyKey, describeFamily, resumePending, sameMembership, KIT_KIND, KIT_RID, isRecoverySecret } from './family.js'
 import { runExclusive, reloadFromDb, subscribe } from '../store.js'
 import { t } from '../i18n.js'
 
@@ -30,8 +31,11 @@ const ORPHAN_MS = 30 * 24 * 60 * 60 * 1000
 const ID = /^[A-Za-z0-9_-]{8,64}$/
 // Push order: a device pulling between two batches never sees an item before its tab, nor a tab
 // deletion before the deletions of its items (it would move them to another tab, reviving them).
-const PUT_RANK = { tab: 0, category: 1, item: 2 }
+const PUT_RANK = { [KIT_KIND]: 0, tab: 0, category: 1, item: 2 }
 const DEAD_RANK = { item: 2, category: 3, tab: 4 }
+
+/** The user left or joined while a run was in flight: its remaining work belongs to the old membership. */
+class MembershipChanged extends Error {}
 
 /** @returns {SyncStatus} */
 const freshStatus = () => ({
@@ -105,6 +109,8 @@ export function createSyncEngine({
   let again = false
   let timer = null
   let inFamily = false
+  let photoRun = null
+  let photoAgain = false
 
   function emit(patch) {
     Object.assign(status, patch)
@@ -130,7 +136,14 @@ export function createSyncEngine({
         console.warn('sync: skipped a record that could not be read', r.rid, e?.message)
       }
     }
-    return { remote, cursor }
+    // The kit record is not wardrobe data: it never reaches the merge. The newest one wins.
+    let secret = null
+    const wardrobe = []
+    for (const r of remote) {
+      if (r.kind !== KIT_KIND) wardrobe.push(r)
+      else if (isRecoverySecret(r.value?.recoverySecret)) secret = r.value.recoverySecret
+    }
+    return { remote: wardrobe, cursor, secret }
   }
 
   /** Merge everything pulled in one step, alone in the mutation queue, and write it in one tx. */
@@ -170,7 +183,12 @@ export function createSyncEngine({
     const entries = await readOutbox(db)
     if (!entries.length) return []
     const { tabs, categories, items } = await loadAll(db)
-    const local = { tab: new Map(tabs.map((x) => [x.id, x])), category: new Map(categories.map((x) => [x.id, x])), item: new Map(items.map((x) => [x.id, x])) }
+    const local = {
+      tab: new Map(tabs.map((x) => [x.id, x])),
+      category: new Map(categories.map((x) => [x.id, x])),
+      item: new Map(items.map((x) => [x.id, x])),
+      [KIT_KIND]: new Map(meta.recoverySecret ? [[KIT_RID, { id: KIT_RID, recoverySecret: meta.recoverySecret }]] : []),
+    }
     const tombs = await getTombstones(db)
     const jobs = []
     const drop = []
@@ -181,7 +199,7 @@ export function createSyncEngine({
         console.warn('sync: id the server cannot store', e.kind, e.id)
         drop.push(e)
       } else if (value) jobs.push({ e, rank: PUT_RANK[e.kind], value })
-      else if (tomb?.kind === e.kind) jobs.push({ e, rank: DEAD_RANK[e.kind], tomb })
+      else if (e.kind !== KIT_KIND && tomb?.kind === e.kind) jobs.push({ e, rank: DEAD_RANK[e.kind], tomb })
       else drop.push(e) // gone without a trace: nothing to send
     }
     if (drop.length) await clearOutbox(db, drop)
@@ -246,29 +264,62 @@ export function createSyncEngine({
     await setMeta(db, 'orphanSeen', next)
   }
 
+  /** One pass of the photo queue; never rejects (offline or removed: the next sync retries). */
+  async function downloadOnce() {
+    const meta = await getFamily(db)
+    if (!meta?.token || meta.removed || meta.pending) return
+    try {
+      const { items } = await loadAll(db)
+      if (await downloadPhotos(await familyKey(meta), meta, items)) await onApplied()
+    } catch (e) {
+      if (e?.status !== 0 && e?.status !== 401) console.warn('sync: photo download stopped', e)
+    }
+  }
+
+  /** Start the photo queue, or (while it runs) schedule one more pass after it. */
+  function startDownloads() {
+    if (photoRun) {
+      photoAgain = true
+      return photoRun
+    }
+    photoRun = (async () => {
+      try {
+        do {
+          photoAgain = false
+          await downloadOnce()
+        } while (photoAgain)
+      } finally {
+        photoRun = null
+      }
+    })()
+    return photoRun
+  }
+
   async function syncFamily(meta) {
     const key = await familyKey(meta)
-    const { remote, cursor } = await pull(key, meta)
+    const { remote, cursor, secret } = await pull(key, meta)
     /** @type {SyncPlan|null} */
     const plan = remote.length ? await merge(meta, remote) : null
-    await updateFamily(db, meta.familyId, { cursor })
+    const kit = secret && secret !== meta.recoverySecret ? { recoverySecret: secret } : {}
+    meta = await updateFamily(db, meta, { cursor, ...kit })
+    if (!meta) throw new MembershipChanged()
     if (plan && changesLocal(plan)) await onApplied()
 
     const refused = await push(key, meta)
     const { items } = await loadAll(db)
-    if (await downloadPhotos(key, meta, items)) await onApplied()
     const pending = await outboxSize()
     if (!pending) await sweepOrphans(items)
 
     const view = await describeFamily(key, await api.family())
     const lastSyncAt = now()
-    await updateFamily(db, meta.familyId, { lastSyncAt, deviceLimit: view.deviceLimit })
+    if (!(await updateFamily(db, meta, { lastSyncAt, deviceLimit: view.deviceLimit }))) throw new MembershipChanged()
     emit({
       state: refused.length ? 'error' : 'idle', errorCode: refused[0] ?? null, lastSyncAt, pending,
       lastChanges: plan ? summarise(plan.changesBy) : { count: 0, by: null },
       movedOrphans: plan?.movedOrphans ?? 0,
       family: view, deviceNames: new Map(view.devices.map((d) => [d.id, d.name])),
     })
+    startDownloads()
   }
 
   async function runOnce() {
@@ -288,10 +339,17 @@ export function createSyncEngine({
       if (meta.pending) meta = await resumePending(db, api)
       await syncFamily(meta)
     } catch (e) {
-      if (e?.status === 401) {
+      const membershipError = e instanceof MembershipChanged || e?.status === 401
+      const cur = membershipError ? await getFamily(db) : null
+      const stillOurs = sameMembership(cur, meta) && cur.token === meta.token
+      if (membershipError && !stillOurs) {
+        // The user left or joined during this run: what failed belongs to the old membership.
+        again = true
+        emit({ state: 'idle' })
+      } else if (e?.status === 401) {
         // No longer in the family: keep everything local, stop syncing until the user acts.
         setSyncTracking(false)
-        await updateFamily(db, meta.familyId, { removed: true })
+        await updateFamily(db, meta, { removed: true })
         emit({ state: 'removed', errorCode: null })
       } else if (e?.status === 0) {
         emit({ state: 'offline', pending: await outboxSize() })
@@ -353,6 +411,10 @@ export function createSyncEngine({
         emit({ pending })
         if (pending) await this.syncNow('debounce')
       }, DEBOUNCE_MS)
+    },
+    /** Resolves once the background photo queue is empty (tests, and callers that need the blobs). */
+    photosIdle() {
+      return photoRun ?? Promise.resolve()
     },
     stop() {
       if (timer) clearTimer(timer)

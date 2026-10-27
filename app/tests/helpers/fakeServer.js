@@ -50,6 +50,7 @@ export function createFakeServer({ clock = () => Date.now(), pageSize = 500 } = 
   const invites = new Map() // token -> {familyId, expiresAt, usedAt}
   const links = new Map() // token -> {licenceId, expiresAt, usedAt}
   let lose = null
+  let failure = null
 
   const server = {
     /** When true every request fails like a dropped connection. */
@@ -58,6 +59,8 @@ export function createFakeServer({ clock = () => Date.now(), pageSize = 500 } = 
     requests: [],
     /** Called with (deviceId, records) before a push is stored: lets a test act mid-push. */
     onPush: null,
+    /** Awaited with (method, path) before a request is handled: lets a test hold requests back. */
+    beforeHandle: null,
     families,
     devices,
 
@@ -79,6 +82,13 @@ export function createFakeServer({ clock = () => Date.now(), pageSize = 500 } = 
       const f = families.get(familyId)
       f.records.set(rid, { rid, seq: ++f.seq, data })
     },
+    /**
+     * Answer the next matching request with `status` / `{error: code}`. With `act` (default) the
+     * server still does the work first, like a rate limiter or proxy failing after the fact.
+     */
+    failNext(method, path, status, code, { act = true } = {}) {
+      failure = { method, path, status, code, act }
+    },
     /** The request after which the response is lost (the server still acted on it). */
     loseNextResponse(method, path) {
       lose = { method, path }
@@ -88,9 +98,14 @@ export function createFakeServer({ clock = () => Date.now(), pageSize = 500 } = 
       const u = new URL(url, 'https://fake.test')
       const method = (init.method ?? 'GET').toUpperCase()
       server.requests.push({ method, path: u.pathname })
+      await server.beforeHandle?.(method, u.pathname)
+      const fails = failure && failure.method === method && failure.path === u.pathname ? failure : null
+      if (fails) failure = null
       let res
       try {
+        if (fails && !fails.act) fail(fails.status, fails.code)
         res = await handle(method, u, init)
+        if (fails) fail(fails.status, fails.code)
       } catch (e) {
         if (!(e instanceof HttpError)) throw e
         res = json({ error: e.code, ...e.extra }, e.status)

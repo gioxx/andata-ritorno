@@ -107,6 +107,11 @@ export async function clearOutbox(db, entries) {
   })
 }
 
+/** Queue one record for upload, tracking or not (e.g. the family's recovery kit). */
+export async function queueOutbox(db, kind, id) {
+  await withTx(db, ['outbox'], (tx, track) => putOutbox(tx, track, kind, id))
+}
+
 /** Queue every local tab, category and item for upload (a device entering a family). */
 export async function markAllDirty(db) {
   await withTx(db, ['tabs', 'categories', 'items', 'outbox'], async (tx, track) => {

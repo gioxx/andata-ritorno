@@ -43,7 +43,9 @@ async function phone(opts = {}) {
   const api = createApi({ fetchFn: server.fetch, getToken: async () => (await getFamily(db))?.token })
   let applied = 0
   const engine = createSyncEngine({ db, api, now: iso, defaultTabName: 'Scheda', onApplied: () => { applied++ }, ...opts })
-  return { db, api, engine, sync: () => engine.syncNow('menu'), applied: () => applied }
+  // A user-visible "done": records synced and the background photo queue drained.
+  const sync = async () => { await engine.syncNow('menu'); await engine.photosIdle() }
+  return { db, api, engine, sync, applied: () => applied }
 }
 
 async function seed(p, tabId, ids) {
@@ -85,7 +87,7 @@ describe('family orchestration', () => {
     expect(meta.pending).toBeUndefined()
     expect(meta.token).toMatch(/^tok_/)
     expect(b64url.decode(meta.keyRaw)).toHaveLength(32)
-    expect((await readOutbox(a.db)).map((e) => `${e.kind}:${e.id}`).sort()).toEqual(['item:item-a01', 'item:item-a02', 'tab:tab-home-a'])
+    expect((await readOutbox(a.db)).map((e) => `${e.kind}:${e.id}`).sort()).toEqual(['item:item-a01', 'item:item-a02', 'kit:family-kit', 'tab:tab-home-a'])
   })
 
   it('a lost redeem response is retried once with the same body and the replayed token is kept', async () => {
@@ -118,7 +120,66 @@ describe('family orchestration', () => {
     expect(meta.pending).toBeUndefined()
     expect(meta.familyId).toBe(pending.familyId)
     await a.sync()
-    expect(server.families.get(meta.familyId).records.size).toBe(2)
+    expect(server.families.get(meta.familyId).records.size).toBe(3) // tab, item, kit
+  })
+
+  for (const [status, code] of [[429, 'rate-limited'], [503, 'internal']]) {
+    it(`a redeem answered ${status} after the server acted stays pending; the next start replays it`, async () => {
+      const a = await phone()
+      await seed(a, 'tab-home-a', ['item-a01'])
+      server.addCode(CODE)
+      server.failNext('POST', '/api/redeem', status, code)
+      await expect(createFamily(a.db, a.api, { code: CODE, familyName: 'Famiglia Rossi', deviceName: 'Telefono 1' }))
+        .rejects.toMatchObject({ status, code })
+      const pending = await getFamily(a.db)
+      expect(pending.pending).toBeTruthy()
+      expect(server.families.has(pending.familyId)).toBe(true) // the code is already spent
+
+      const engine = createSyncEngine({ db: a.db, api: a.api, now: iso }) // the next app start
+      await engine.init()
+      await engine.syncNow('start')
+      const meta = await getFamily(a.db)
+      expect(meta.pending).toBeUndefined()
+      expect(meta.familyId).toBe(pending.familyId)
+      expect(meta.recoverySecret).toBe(pending.recoverySecret)
+      expect(engine.status.state).toBe('idle')
+      expect(server.families.get(meta.familyId).records.size).toBe(3)
+    })
+  }
+
+  it('a pending redeem refused for good at a later start is forgotten', async () => {
+    const a = await phone()
+    server.offline = true
+    await expect(createFamily(a.db, a.api, { code: CODE, familyName: 'F', deviceName: 'T' })).rejects.toMatchObject({ status: 0 })
+    expect((await getFamily(a.db)).pending).toBeTruthy()
+    server.offline = false // the code was never added: 404 bad-code
+    await a.engine.syncNow('start')
+    expect(await getFamily(a.db)).toBeNull()
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'bad-code' })
+  })
+
+  it('an invited phone gets the recovery kit after one sync; a restart replaces it', async () => {
+    const a = await phone()
+    const meta = await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    expect((await join(a, b)).recoverySecret).toBeNull()
+    expect(() => kitOf({ recoverySecret: null })).toThrow('no-kit')
+    await b.sync()
+    expect(kitOf(await getFamily(b.db))).toBe(kitOf(meta))
+
+    const d = await phone()
+    await restartFromLicence(d.db, d.api, { linkToken: server.issueLicenceLink(meta.familyId), familyName: 'Nuova', deviceName: 'Telefono 9' })
+    await d.sync()
+    const e = await phone()
+    await join(d, e)
+    await e.sync()
+    const kitD = kitOf(await getFamily(d.db))
+    expect(kitOf(await getFamily(e.db))).toBe(kitD)
+    expect(parseKit(kitD).recoverySecret).not.toBe(meta.recoverySecret)
+    // The kit record never reaches the wardrobe and is never tombstoned.
+    expect((await snapshot(e)).tabs).toEqual([])
+    expect((await getTombstones(e.db)).has('family-kit')).toBe(false)
   })
 
   it('a refused redeem leaves no family behind', async () => {
@@ -184,7 +245,7 @@ describe('family orchestration', () => {
     expect(meta.deviceLimit).toBe(4)
     await d.sync()
     expect(d.engine.status.family.name).toBe('Nuova')
-    expect(server.families.get(meta.familyId).records.size).toBe(2)
+    expect(server.families.get(meta.familyId).records.size).toBe(3) // tab, item, kit
     await a.sync()
     expect(a.engine.status.state).toBe('removed')
   })
@@ -402,16 +463,109 @@ describe('sync engine (two phones)', () => {
     const batches = []
     server.onPush = (_dev, records) => { batches.push(records.map((r) => r.rid)) }
     await a.sync()
-    expect(batches.map((b) => b.length)).toEqual([200, 51])
-    expect(batches[0][0]).toBe('tab-home-a')
+    expect(batches.map((b) => b.length)).toEqual([200, 52])
+    expect(batches[0].slice(0, 2).sort()).toEqual(['family-kit', 'tab-home-a'])
     const fam = server.families.get(meta.familyId)
-    expect(fam.records.size).toBe(251)
+    expect(fam.records.size).toBe(252)
     expect(fam.photos.size).toBe(249) // the deleted item's photo was never uploaded
     const b = await phone()
     await join(a, b)
     await b.sync()
     expect((await snapshot(b)).items).toHaveLength(249)
     expect((await getTombstones(b.db)).get('item-0001')).toMatchObject({ kind: 'item' })
+  })
+
+  it('photos download in the background: a local edit is pushed while downloads are still running', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01', 'item-a02', 'item-a03', 'item-a04', 'item-a05'])
+    await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    await join(a, b)
+    let release
+    const gate = new Promise((r) => { release = r })
+    let inFlight = 0
+    let maxInFlight = 0
+    server.beforeHandle = async (method, path) => {
+      if (method !== 'GET' || !path.startsWith('/api/photos/')) return
+      inFlight++
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await gate
+      inFlight--
+    }
+    await b.engine.syncNow('start')
+    expect(b.engine.status.state).toBe('idle')
+    expect((await snapshot(b)).items).toHaveLength(5)
+    expect(await getPhoto(b.db, 'ph-item-a01')).toBeUndefined()
+
+    await updateItem(b.db, 'item-a02', { label: 'subito' }, tick())
+    await b.engine.syncNow('debounce') // does not wait for the photo queue
+    await a.sync()
+    expect((await snapshot(a)).items.find((i) => i.id === 'item-a02').label).toBe('subito')
+    expect(maxInFlight).toBe(3)
+
+    release()
+    await b.engine.photosIdle()
+    expect(await snapshot(b)).toEqual(await snapshot(a))
+  })
+
+  it('a 401 after the user left and joined again during the run leaves the new membership alone', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    await join(a, b)
+    await b.sync()
+    await updateItem(b.db, 'item-a01', { label: 'b' }, tick())
+    let done = false
+    server.onPush = async () => {
+      if (done) return
+      done = true
+      await leaveFamily(b.db, b.api)
+      await join(a, b) // back in, new device id and token
+      server.failNext('GET', '/api/family', 401, 'unauthorized') // what the old run's next call would see
+    }
+    await b.sync()
+    const meta = await getFamily(b.db)
+    expect(meta.removed).toBeUndefined()
+    expect(b.engine.status.state).not.toBe('removed')
+    await updateItem(b.db, 'item-a01', { label: 'ancora tracciato' }, tick())
+    expect((await readOutbox(b.db)).some((e) => e.id === 'item-a01')).toBe(true)
+    await b.sync()
+    expect(b.engine.status.state).toBe('idle')
+    expect(server.devices.has(meta.deviceId)).toBe(true)
+  })
+
+  it('a 401 after the user left during the run does not mark anything removed', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    await join(a, b)
+    await b.sync()
+    await updateItem(b.db, 'item-a01', { label: 'b' }, tick())
+    server.onPush = async () => { server.onPush = null; await leaveFamily(b.db, b.api) }
+    await b.sync() // the next authed call goes out without a token: 401
+    expect(await getFamily(b.db)).toBeNull()
+    expect(b.engine.status).toMatchObject({ state: 'idle', family: null })
+  })
+
+  it('a photo refused as too large: the item is still pushed and the run ends in error (Ruling 21)', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const meta = await familyOf(a)
+    server.failNext('PUT', '/api/photos/ph-item-a01', 413, 'limit-photo-size', { act: false })
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'limit-photo-size', pending: 0 })
+    const fam = server.families.get(meta.familyId)
+    expect(fam.records.has('item-a01')).toBe(true)
+    expect(fam.photos.size).toBe(0)
+    const b = await phone()
+    await join(a, b)
+    await b.sync()
+    expect((await snapshot(b)).items.map((i) => i.id)).toEqual(['item-a01'])
   })
 
   it('after a sync the family view and device names are decrypted (Ruling 3)', async () => {
