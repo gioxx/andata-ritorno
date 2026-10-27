@@ -1,5 +1,5 @@
-import { HttpError, json, readJson, strictLimit } from './http.js';
-import { hmacHex, randomToken, requireDevice, sha256Hex } from './auth.js';
+import { HttpError, json, readBody, readJson, strictLimit } from './http.js';
+import { hmacHex, randomToken, requireApiDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
 import { getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
@@ -137,7 +137,7 @@ function codeUsed() {
 
 async function slot(req, env) {
   await strictLimit(env, req);
-  const { familyId } = await requireDevice(env, req);
+  const { familyId } = await requireApiDevice(env, req);
   const body = await readJson(req);
   const code = await findCode(env, body?.code);
   if (code.kind === 'family') throw new HttpError(409, 'code-is-family');
@@ -163,8 +163,7 @@ async function unlockSession(req, env) {
 }
 
 async function stripeWebhook(req, env, ctx) {
-  if (Number(req.headers.get('content-length')) > 512 * 1024) throw new HttpError(413, 'too-large');
-  const raw = await req.text();
+  const raw = new TextDecoder().decode(await readBody(req, 512 * 1024));
   const event = await verifyWebhook(raw, req.headers.get('stripe-signature'), env.STRIPE_WEBHOOK_SECRET, Math.floor(Date.now() / 1000));
   if (!PAID_EVENTS.includes(event.type)) return json({ received: true });
 

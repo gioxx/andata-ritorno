@@ -114,9 +114,10 @@ export async function openCodeDialog() {
       return
     }
     // An earlier attempt whose answer was lost is finished, not redone (the code may be spent
-    // already), so no code needs typing then.
-    const pending = (await getFamily(ctx.db))?.pending
-    if (pending?.op === 'redeem') await resumePending(ctx.db, ctx.api)
+    // already), so no code needs typing then. The engine may have finished it meanwhile: done.
+    const stored = await getFamily(ctx.db)
+    if (stored && !stored.pending) { /* finished in the background */ }
+    else if (stored?.pending?.op === 'redeem') await resumePending(ctx.db, ctx.api)
     else if (!code) return
     else await createFamily(ctx.db, ctx.api, { code, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') })
     // The family exists now: show the kit first, then start syncing; failures here have no form to show them.
@@ -194,7 +195,7 @@ export async function openInvite() {
       link = inviteLink(inv.token, meta)
     } catch (e) { body.innerHTML = ''; setError(d, e); return }
     body.innerHTML = `<p class="plain">${t('family.invite.body')}</p><div class="qr">${qrSvg(link)}</div>
-      <p class="plain" id="famInvLeft"></p><p class="plain warn">${t('family.invite.warn')}</p>
+      <p class="plain">${t('family.invite.seat', { n: inv.used + 1, m: inv.limit })}</p><p class="plain" id="famInvLeft"></p><p class="plain warn">${t('family.invite.warn')}</p>
       <button type="button" class="primary" data-share>${t('family.invite.share')}</button>`
     const left = body.querySelector('#famInvLeft')
     const share = body.querySelector('[data-share]')
@@ -461,8 +462,11 @@ export async function openLicenceRestart(linkToken) {
   const val = (id) => d.querySelector(id)?.value.trim() ?? ''
   enterGoes(d)
   d.querySelector('[data-go]').addEventListener('click', () => busy(d, async () => {
-    // A restart whose answer was lost is finished with the same body, not started again.
-    if ((await getFamily(ctx.db))?.pending?.op === 'restart') await resumePending(ctx.db, ctx.api)
+    // A restart whose answer was lost is finished with the same body, not started again; one the
+    // engine finished meanwhile is done.
+    const stored = await getFamily(ctx.db)
+    if (stored && !stored.pending) { /* finished in the background */ }
+    else if (stored?.pending?.op === 'restart') await resumePending(ctx.db, ctx.api)
     else await restartFromLicence(ctx.db, ctx.api, { linkToken, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') })
     // A new family means a new kit: show it first, as after a code.
     d.close()

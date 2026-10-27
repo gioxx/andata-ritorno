@@ -9,6 +9,7 @@ CREATE TABLE devices (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, token_hash T
   created_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
 CREATE INDEX devices_family ON devices(family_id);
 CREATE TABLE invites (hash TEXT PRIMARY KEY, family_id TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT);
+CREATE INDEX invites_family ON invites(family_id);
 CREATE TABLE licence_links (hash TEXT PRIMARY KEY, licence_id TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT);
 CREATE TABLE records (family_id TEXT NOT NULL, rid TEXT NOT NULL, seq INTEGER NOT NULL, data TEXT NOT NULL,
   PRIMARY KEY (family_id, rid));

@@ -144,6 +144,19 @@ describe('invites and join', () => {
     expect(await res.json()).toEqual({ error: 'invite-expired' });
   });
 
+  it('creating an invite deletes the expired invites of that family', async () => {
+    const fam = await newFamily();
+    const other = await newFamily();
+    const past = new Date(Date.now() - 60 * 1000).toISOString();
+    for (const [h, f] of [['expired-own', fam.familyId], ['expired-other', other.familyId]]) {
+      await env.DB.prepare('INSERT INTO invites (hash, family_id, expires_at) VALUES (?, ?, ?)').bind(h, f, past).run();
+    }
+    await invite(fam.token);
+    expect(await env.DB.prepare("SELECT 1 FROM invites WHERE hash = 'expired-own'").first()).toBeNull();
+    expect(await env.DB.prepare("SELECT 1 FROM invites WHERE hash = 'expired-other'").first()).not.toBeNull();
+    expect(await count('invites', fam.familyId)).toBe(1);
+  });
+
   it('refuses unknown or malformed invite tokens', async () => {
     expect((await get('/api/invites/info?t=nope')).status).toBe(410);
     expect((await get('/api/invites/info')).status).toBe(410);

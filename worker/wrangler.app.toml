@@ -39,7 +39,8 @@ simple = { limit = 10, period = 60 }
 [[ratelimits]]
 name = "RL_API"
 namespace_id = "1002"
-simple = { limit = 120, period = 60 }
+# Per device on token routes (a first sync makes one call per photo), per IP elsewhere.
+simple = { limit = 600, period = 60 }
 
 # Secrets (wrangler secret put): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 # EMAIL_HMAC_KEY, CODE_HMAC_KEY, RESEND_API_KEY.

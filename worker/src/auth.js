@@ -19,20 +19,26 @@ export function randomToken() {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+const SEEN_EVERY_MS = 10 * 60 * 1000;
+
 /**
- * Resolve the calling device from `Authorization: Bearer <token>` and touch last_seen_at.
+ * Resolve the calling device from `Authorization: Bearer <token>` and touch last_seen_at (at most
+ * every 10 minutes: a sync makes many calls, and D1's free plan caps writes per day).
  * @returns {Promise<{deviceId: string, familyId: string}>}
  */
 export async function requireDevice(env, req) {
   const m = /^Bearer (\S+)$/.exec(req.headers.get('authorization') || '');
   if (!m) throw new HttpError(401, 'unauthorized');
-  const row = await env.DB.prepare('SELECT id, family_id FROM devices WHERE token_hash = ?')
+  const row = await env.DB.prepare('SELECT id, family_id, last_seen_at FROM devices WHERE token_hash = ?')
     .bind(await sha256Hex(m[1]))
     .first();
   if (!row) throw new HttpError(401, 'unauthorized');
-  await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?')
-    .bind(new Date().toISOString(), row.id)
-    .run();
+  const now = Date.now();
+  if (!(now - Date.parse(row.last_seen_at) < SEEN_EVERY_MS)) {
+    await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?')
+      .bind(new Date(now).toISOString(), row.id)
+      .run();
+  }
   return { deviceId: row.id, familyId: row.family_id };
 }
 

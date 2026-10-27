@@ -1,5 +1,5 @@
 import { HttpError, json, readJson, strictLimit } from './http.js';
-import { randomToken, requireDevice, sha256Hex } from './auth.js';
+import { randomToken, requireApiDevice, sha256Hex } from './auth.js';
 import { deviceLimit, purgePhotos, purgeStatements } from './store.js';
 import { ENC, ID, isSecret } from './validate.js';
 
@@ -40,7 +40,7 @@ function rotateToken(env, familyId, deviceId, tokenHash, at, guard = '1', guardA
 }
 
 async function family(req, env) {
-  const { deviceId, familyId } = await requireDevice(env, req);
+  const { deviceId, familyId } = await requireApiDevice(env, req);
   const row = await env.DB.prepare(`SELECT f.name_enc, ${LIMIT} AS lim FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
     .bind(familyId)
     .first();
@@ -48,14 +48,18 @@ async function family(req, env) {
 }
 
 async function createInvite(req, env) {
-  const { familyId } = await requireDevice(env, req);
+  const { familyId } = await requireApiDevice(env, req);
   const row = await env.DB.prepare(`SELECT ${USED} AS used, ${LIMIT} AS lim FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
     .bind(familyId)
     .first();
   if (row.used >= row.lim) throw new HttpError(409, 'family-full');
   const token = randomToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
-  await env.DB.prepare('INSERT INTO invites (hash, family_id, expires_at) VALUES (?, ?, ?)').bind(await sha256Hex(token), familyId, expiresAt).run();
+  // Expired invites are dead weight: each new one clears the family's old ones.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM invites WHERE family_id = ? AND expires_at <= ?').bind(familyId, new Date().toISOString()),
+    env.DB.prepare('INSERT INTO invites (hash, family_id, expires_at) VALUES (?, ?, ?)').bind(await sha256Hex(token), familyId, expiresAt),
+  ]);
   return json({ token, expiresAt, used: row.used, limit: row.lim });
 }
 
@@ -122,7 +126,7 @@ async function licenceOf(env, familyId) {
 }
 
 async function removeDevice(req, env, ctx, params) {
-  const { deviceId, familyId } = await requireDevice(env, req);
+  const { deviceId, familyId } = await requireApiDevice(env, req);
   // Every statement requires the caller's device to still exist when the batch runs: two devices
   // removing each other at once then remove only one of them, never the family.
   const callerExists = 'EXISTS (SELECT 1 FROM devices WHERE id = ? AND family_id = ?)';

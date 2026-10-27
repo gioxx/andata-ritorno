@@ -84,7 +84,7 @@ The API is served by the **same Worker and origin** as the app (`ar.gioxx.org/ap
 - The first device generates a random 256-bit **family key** (Web Crypto). The key never reaches the server.
 - Every record and photo is encrypted with **AES-GCM**, fresh random 96-bit IV per encryption, with the family id and record id as additional authenticated data (so the server cannot swap blobs between records undetected).
 - Encrypted too: family name, device names, tombstones, the record kind (item / tab / category).
-- Visible to the server: random ids (family, device, record, photo), server sequence numbers, sizes, timestamps of uploads, device count, which device uploaded what.
+- Visible to the server: random ids (family, device, record, photo), server sequence numbers, sizes, timestamps of uploads, device count, when each device was created and last active.
 - The key is stored on the device in IndexedDB (raw, so it can be put into invites) (my call: a compromised phone exposes the data anyway).
 - **Accepted risk:** if every device of a family is lost, the server copy cannot be recovered. Local ZIP backups (existing feature) remain the safety net; the "Famiglia" section reminds this once at unlock.
 

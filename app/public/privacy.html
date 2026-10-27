@@ -29,7 +29,7 @@
 
 <h2>Condivisione in famiglia (a pagamento)</h2>
 <p>Solo se inserisci un codice di sblocco e crei una famiglia, i dati vengono sincronizzati tra i telefoni tramite Cloudflare (database D1 e archivio R2). Prima di partire dal telefono, capi, schede, categorie, foto, nome della famiglia e nomi dei telefoni sono cifrati (AES-GCM 256 bit) con una chiave generata sul tuo telefono. Quella chiave e il segreto del kit di recupero non vengono mai inviati al server in chiaro: chi gestisce il servizio non può leggere i tuoi dati.</p>
-<p>Il server vede invece questi metadati: identificatori casuali (famiglia, telefono, record, foto), numeri di sequenza, dimensioni, orari dei caricamenti, numero di telefoni collegati e quale telefono ha caricato cosa. Conserva inoltre solo l'impronta (hash) dei codici e dei token di accesso, non i valori.</p>
+<p>Il server vede invece questi metadati: identificatori casuali (famiglia, telefono, record, foto), numeri di sequenza, dimensioni, orari di caricamento delle foto, numero di telefoni collegati e, per ogni telefono, quando è stato aggiunto e quando è stato attivo l'ultima volta. Conserva inoltre solo l'impronta (hash) dei codici e dei token di accesso, non i valori.</p>
 <p>La sede fisica dei dati è decisa da Cloudflare (UE o USA, secondo la sua infrastruttura).</p>
 <p><strong>Attenzione:</strong> se perdi tutti i telefoni e anche il kit di recupero, la copia sul server non si può più leggere, nemmeno da noi. Per questo conserva il kit e fai ogni tanto un backup. I backup fatti mentre sei in una famiglia contengono il kit di recupero e non sono cifrati: tienili al sicuro.</p>
 
@@ -53,7 +53,7 @@
 <ul>
 <li>Quando l'ultimo telefono esce dalla famiglia, o quando riparti da zero con il recupero della licenza, i dati cifrati e le foto di quella famiglia vengono cancellati dal server.</li>
 <li>Le foto non più usate da nessun capo vengono cancellate dal server dopo 30 giorni.</li>
-<li>Il record della licenza (tipo, numero di telefoni, hash del codice e hash dell'email) resta, per poter onorare l'acquisto anche se cambi telefono.</li>
+<li>Il record della licenza (tipo, numero di telefoni, hash del codice, hash dell'email e, per i codici acquistati online, l'identificativo della sessione di pagamento Stripe come riferimento del pagamento) resta, per poter onorare l'acquisto anche se cambi telefono.</li>
 <li>Uscire dalla famiglia o usare "Elimina tutti i dati" non cancella i dati degli altri telefoni. I dati sul tuo telefono li cancelli tu, dal menu.</li>
 </ul>
 
@@ -79,7 +79,7 @@
 
 <h2>Family sharing (paid)</h2>
 <p>Only if you enter an unlock code and create a family is data synced between phones, through Cloudflare (D1 database and R2 storage). Before it leaves the phone, items, tabs, categories, photos, the family name and the phone names are encrypted (AES-GCM, 256-bit) with a key generated on your phone. That key and the recovery kit secret are never sent to the server in plaintext: whoever runs the service cannot read your data.</p>
-<p>The server does see this metadata: random identifiers (family, phone, record, photo), sequence numbers, sizes, upload times, how many phones are connected and which phone uploaded what. It also keeps only hashes of codes and access tokens, never the values themselves.</p>
+<p>The server does see this metadata: random identifiers (family, phone, record, photo), sequence numbers, sizes, photo upload times, how many phones are connected and, for each phone, when it was added and when it was last active. It also keeps only hashes of codes and access tokens, never the values themselves.</p>
 <p>Where the data physically sits is decided by Cloudflare (EU or US, depending on its infrastructure).</p>
 <p><strong>Note:</strong> if you lose every phone and the recovery kit too, the server copy can no longer be read, not even by us. Keep the kit safe and make a backup now and then. Backups made while you are in a family contain the recovery kit and are not encrypted: store them safely.</p>
 
@@ -103,7 +103,7 @@
 <ul>
 <li>When the last phone leaves the family, or when you start over through licence recovery, that family's encrypted data and photos are deleted from the server.</li>
 <li>Photos no longer used by any item are deleted from the server after 30 days.</li>
-<li>The licence record (kind, number of phones, code hash and email hash) is kept so the purchase is honoured if you change phone.</li>
+<li>The licence record (kind, number of phones, code hash, email hash and, for codes bought online, the Stripe Checkout session id as the payment reference) is kept so the purchase is honoured if you change phone.</li>
 <li>Leaving the family or using "Delete all data" does not delete the other phones' data. Data on your own phone is deleted by you, from the menu.</li>
 </ul>
 

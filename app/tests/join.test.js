@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { openDb, putTab, addItems, loadAll, setSyncTracking } from '../src/db.js'
 import { createApi } from '../src/sync/api.js'
-import { getFamily, setFamily, createFamily, inviteLink, parseInvite } from '../src/sync/family.js'
-import { initFamilyUi, openJoin, leaveBeforeWipe, familyHooks } from '../src/ui/familyDialogs.js'
+import { getFamily, setFamily, createFamily, inviteLink, parseInvite, resumePending, restartFromLicence } from '../src/sync/family.js'
+import { initFamilyUi, openJoin, leaveBeforeWipe, familyHooks, openCodeDialog, openLicenceRestart, openInvite } from '../src/ui/familyDialogs.js'
 import { createFakeServer } from './helpers/fakeServer.js'
 
 const CODE = 'AR-ABCD-EFGH-JK12'
@@ -219,5 +219,62 @@ describe('licence link from the URL', () => {
     initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
     await familyHooks.onLicence('A'.repeat(43))
     expect(dlg().textContent).toContain('Inizia una nuova famiglia con la tua licenza')
+  })
+})
+
+describe('a pending redeem or restart finished in the background', () => {
+  const OTHER = 'AR-ZZZZ-ZZZZ-ZZZZ'
+
+  it('the code dialog then treats Go as done: the family is kept, the kit shown, sync started', async () => {
+    const p = await phone()
+    const onEntered = vi.fn()
+    initFamilyUi({ ...p, onEntered, onLeft: vi.fn(), onExport: vi.fn() })
+    server.addCode(CODE)
+    server.offline = true
+    await expect(createFamily(p.db, p.api, { code: CODE, familyName: 'Famiglia Rossi', deviceName: 'Telefono 1' })).rejects.toMatchObject({ status: 0 })
+    server.offline = false
+    await openCodeDialog()
+    await resumePending(p.db, p.api) // the engine got there first
+    const meta = await getFamily(p.db)
+    server.addCode(OTHER)
+    dlg().querySelector('#famCode').value = OTHER
+    dlg().querySelector('[data-go]').click()
+    await until(() => onEntered.mock.calls.length === 1)
+    expect(await getFamily(p.db)).toEqual(meta)
+    expect(document.querySelector('dialog[open] .kitText')).not.toBeNull()
+    expect(server.requests.filter((r) => r.path === '/api/redeem')).toHaveLength(1) // the resume only: the typed code is never sent
+  })
+
+  it('the licence restart dialog then treats Go as done, not as a second restart', async () => {
+    const owner = await phone()
+    server.addCode(CODE)
+    await createFamily(owner.db, owner.api, { code: CODE, familyName: 'Famiglia Rossi', deviceName: 'Telefono 1' })
+    setSyncTracking(false)
+    const link = server.issueLicenceLink((await getFamily(owner.db)).familyId)
+    const p = await phone()
+    const onEntered = vi.fn()
+    initFamilyUi({ ...p, onEntered, onLeft: vi.fn(), onExport: vi.fn() })
+    server.offline = true
+    await expect(restartFromLicence(p.db, p.api, { linkToken: link, familyName: 'Nuova', deviceName: 'Telefono 9' })).rejects.toMatchObject({ status: 0 })
+    server.offline = false
+    await openLicenceRestart(link)
+    await resumePending(p.db, p.api)
+    const meta = await getFamily(p.db)
+    dlg().querySelector('[data-go]').click()
+    await until(() => onEntered.mock.calls.length === 1)
+    expect(await getFamily(p.db)).toEqual(meta)
+    expect(document.querySelector('dialog[open] .kitText')).not.toBeNull()
+  })
+})
+
+describe('invite screen', () => {
+  it('says which seat the invite fills', async () => {
+    const p = await phone()
+    server.addCode(CODE)
+    await createFamily(p.db, p.api, { code: CODE, familyName: 'Famiglia Rossi', deviceName: 'Telefono 1' })
+    initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
+    await openInvite()
+    await until(() => dlg()?.querySelector('.qr'))
+    expect(dlg().textContent).toContain('Posto 2 di 4')
   })
 })

@@ -80,6 +80,8 @@ export function createApi({ fetchFn = (...a) => fetch(...a), getToken = () => nu
   const authed = { auth: true }
 
   return {
+    /** The same client, always sending `token`: a sync run keeps its device token to the end. */
+    withToken: (token) => createApi({ fetchFn, base, getToken: () => token }),
     redeem: (body) => post('/api/redeem', body),
     slot: (code) => post('/api/slot', { code }, true),
     unlockSession: (id) => call('GET', `/api/unlock/session?id=${q(id)}`),

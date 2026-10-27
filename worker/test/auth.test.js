@@ -26,6 +26,25 @@ describe('worker base', () => {
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: 'rate-limited' });
   });
+
+  it('limits routes a device calls with its token per device only, never per IP', async () => {
+    const token = 'tok-rl-device';
+    await env.DB.prepare(
+      "INSERT INTO devices (id, family_id, token_hash, name_enc, created_at, last_seen_at) VALUES ('d-rl','f-rl',?,'n','2020-01-01T00:00:00.000Z','2020-01-01T00:00:00.000Z')",
+    )
+      .bind(await sha256Hex(token))
+      .run();
+    const headers = { authorization: `Bearer ${token}` };
+    // The IP bucket is exhausted, the device bucket is not: a first sync with many photos goes on.
+    const ipOnly = { limit: async ({ key }) => ({ success: key.startsWith('device:') }) };
+    expect((await call('/api/sync?since=0', { headers }, { RL_API: ipOnly })).status).toBe(200);
+    expect((await call('/api/photos', { headers }, { RL_API: ipOnly })).status).toBe(200);
+    expect((await call('/api/unknown', undefined, { RL_API: ipOnly })).status).toBe(429);
+    // The device bucket still applies.
+    const deviceOnly = { limit: async ({ key }) => ({ success: !key.startsWith('device:') }) };
+    expect((await call('/api/sync?since=0', { headers }, { RL_API: deviceOnly })).status).toBe(429);
+    expect((await call('/api/family', { headers }, { RL_API: deviceOnly })).status).toBe(429);
+  });
 });
 
 describe('requireDevice', async () => {
@@ -50,5 +69,15 @@ describe('requireDevice', async () => {
     expect(out).toEqual({ deviceId: 'd1', familyId: 'f1' });
     const row = await env.DB.prepare("SELECT last_seen_at FROM devices WHERE id='d1'").first();
     expect(row.last_seen_at > '2020-01-01T00:00:00.000Z').toBe(true);
+  });
+
+  it('touches last_seen_at at most every 10 minutes (D1 daily writes)', async () => {
+    const recent = new Date(Date.now() - 9 * 60 * 1000).toISOString();
+    await env.DB.prepare("INSERT INTO devices (id, family_id, token_hash, name_enc, created_at, last_seen_at) VALUES ('d3','f1',?,'n',?,?)")
+      .bind(await sha256Hex('tok-recent'), recent, recent)
+      .run();
+    await requireDevice(env, new Request('https://ar.test/x', { headers: { authorization: 'Bearer tok-recent' } }));
+    const row = await env.DB.prepare("SELECT last_seen_at FROM devices WHERE id='d3'").first();
+    expect(row.last_seen_at).toBe(recent);
   });
 });

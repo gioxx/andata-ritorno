@@ -2,6 +2,7 @@
 import { t } from '../i18n.js'
 import { syncStatus } from '../sync/engine.js'
 import { esc } from './esc.js'
+import { familyError } from './familyMenu.js'
 import { store } from '../store.js'
 
 let active = false
@@ -31,7 +32,10 @@ export function ago(iso, now) {
 export function syncLineText(status, now, deviceNames) {
   if (status.state === 'removed') return t('sync.removed')
   if (status.state === 'syncing') return t('sync.syncing')
-  if (status.state === 'offline') return t('sync.offline', { n: status.pending })
+  // Changes still waiting, appended to the offline and error wording.
+  const waiting = status.pending > 0 ? ` · ${t('sync.pending', { n: status.pending })}` : ''
+  if (status.state === 'offline') return t('sync.offline') + waiting
+  if (status.state === 'error') return familyError(status.errorCode ?? 'internal') + waiting
   if (!status.lastSyncAt) return ''
   let text = t('sync.updated', { ago: ago(status.lastSyncAt, now) })
   const { count, by } = status.lastChanges

@@ -28,6 +28,7 @@ const MAX_DATA = 64 * 1024 // encrypted record size the server accepts
 const DEBOUNCE_MS = 2000
 const PHOTO_PARALLEL = 3
 const ORPHAN_MS = 30 * 24 * 60 * 60 * 1000
+const RETRY_MS = 60 * 1000 // after a 429: the server's limits are per minute
 const ID = /^[A-Za-z0-9_-]{8,64}$/
 // Push order: a device pulling between two batches never sees an item before its tab, nor a tab
 // deletion before the deletions of its items (it would move them to another tab, reviving them).
@@ -111,6 +112,8 @@ export function createSyncEngine({
   let inFamily = false
   let photoRun = null
   let photoAgain = false
+  let retryTimer = null
+  let photoRetryTimer = null
 
   function emit(patch) {
     Object.assign(status, patch)
@@ -118,8 +121,15 @@ export function createSyncEngine({
   }
   const outboxSize = async () => (await readOutbox(db)).length
 
+  /**
+   * The API client for one run, bound to the token the run started with: if the user leaves and
+   * joins another family mid-run, the rest of the run fails (401) instead of sending old-key data
+   * with the new token.
+   */
+  const pinned = (meta) => api.withToken?.(meta.token) ?? api
+
   /** Pull every page, then decode; a record that cannot be decoded is skipped (and logged). */
-  async function pull(key, meta) {
+  async function pull(api, key, meta) {
     const raw = []
     let cursor = meta.cursor ?? 0
     for (;;) {
@@ -158,7 +168,7 @@ export function createSyncEngine({
   }
 
   /** Upload the photos of these items that the server lacks; a photo refused for its size is skipped. */
-  async function uploadPhotos(key, meta, items) {
+  async function uploadPhotos(api, key, meta, items) {
     const wanted = new Set(items.map((it) => it.photoId).filter(Boolean))
     if (!wanted.size) return []
     const { photos } = await api.listPhotos()
@@ -179,7 +189,7 @@ export function createSyncEngine({
   }
 
   /** @returns {Promise<string[]>} codes of photos the server refused */
-  async function push(key, meta) {
+  async function push(api, key, meta) {
     const entries = await readOutbox(db)
     if (!entries.length) return []
     const { tabs, categories, items } = await loadAll(db)
@@ -206,7 +216,7 @@ export function createSyncEngine({
     jobs.sort((a, b) => a.rank - b.rank)
 
     // Photos before the records that reference them.
-    const refused = await uploadPhotos(key, meta, jobs.filter((j) => j.value && j.e.kind === 'item').map((j) => j.value))
+    const refused = await uploadPhotos(api, key, meta, jobs.filter((j) => j.value && j.e.kind === 'item').map((j) => j.value))
     for (let i = 0; i < jobs.length; i += BATCH) {
       const records = []
       const done = []
@@ -226,7 +236,7 @@ export function createSyncEngine({
   }
 
   /** Fetch photos referenced here but missing on this device, a few at a time. */
-  async function downloadPhotos(key, meta, items) {
+  async function downloadPhotos(api, key, meta, items) {
     const have = await getPhotoIds(db)
     const missing = new Map()
     for (const it of items) if (it.photoId && !have.has(it.photoId) && ID.test(it.photoId)) missing.set(it.photoId, it.id)
@@ -249,7 +259,7 @@ export function createSyncEngine({
   }
 
   /** Delete server photos no local item has referenced for 30 days (only once fully synced). */
-  async function sweepOrphans(items) {
+  async function sweepOrphans(api, items) {
     const referenced = new Set(items.map((it) => it.photoId))
     const seen = (await getMeta(db, 'orphanSeen')) ?? {}
     const at = now()
@@ -270,9 +280,10 @@ export function createSyncEngine({
     if (!meta?.token || meta.removed || meta.pending) return
     try {
       const { items } = await loadAll(db)
-      if (await downloadPhotos(await familyKey(meta), meta, items)) await onApplied()
+      if (await downloadPhotos(pinned(meta), await familyKey(meta), meta, items)) await onApplied()
     } catch (e) {
-      if (e?.status !== 0 && e?.status !== 401) console.warn('sync: photo download stopped', e)
+      if (e?.status === 429) retryLater('photos')
+      else if (e?.status !== 0 && e?.status !== 401) console.warn('sync: photo download stopped', e)
     }
   }
 
@@ -295,9 +306,21 @@ export function createSyncEngine({
     return photoRun
   }
 
+  /** A rate limit is transient: try again in a minute (one timer per queue). */
+  function retryLater(what) {
+    if (what === 'photos') {
+      if (photoRetryTimer) return
+      photoRetryTimer = setTimer(() => { photoRetryTimer = null; return startDownloads() }, RETRY_MS)
+    } else {
+      if (retryTimer) return
+      retryTimer = setTimer(() => { retryTimer = null; return engine.syncNow('retry') }, RETRY_MS)
+    }
+  }
+
   async function syncFamily(meta) {
+    const api = pinned(meta)
     const key = await familyKey(meta)
-    const { remote, cursor, secret } = await pull(key, meta)
+    const { remote, cursor, secret } = await pull(api, key, meta)
     /** @type {SyncPlan|null} */
     const plan = remote.length ? await merge(meta, remote) : null
     const kit = secret && secret !== meta.recoverySecret ? { recoverySecret: secret } : {}
@@ -305,10 +328,10 @@ export function createSyncEngine({
     if (!meta) throw new MembershipChanged()
     if (plan && changesLocal(plan)) await onApplied()
 
-    const refused = await push(key, meta)
+    const refused = await push(api, key, meta)
     const { items } = await loadAll(db)
     const pending = await outboxSize()
-    if (!pending) await sweepOrphans(items)
+    if (!pending) await sweepOrphans(api, items)
 
     const view = await describeFamily(key, await api.family())
     const lastSyncAt = now()
@@ -353,6 +376,10 @@ export function createSyncEngine({
         emit({ state: 'removed', errorCode: null })
       } else if (e?.status === 0) {
         emit({ state: 'offline', pending: await outboxSize() })
+      } else if (e?.status === 429) {
+        // Not a failure of the data: shown, and retried by itself.
+        emit({ state: 'error', errorCode: 'rate-limited', pending: await outboxSize() })
+        retryLater('sync')
       } else {
         console.warn('sync failed', e)
         emit({ state: 'error', errorCode: e?.code ?? e?.message ?? 'internal', pending: await outboxSize() })
@@ -360,7 +387,7 @@ export function createSyncEngine({
     }
   }
 
-  return {
+  const engine = {
     status,
     /** @param {(s:SyncStatus) => void} fn @returns {() => void} unsubscribe */
     subscribe(fn) {
@@ -382,7 +409,7 @@ export function createSyncEngine({
     },
     /**
      * Start a run, or (while one runs) schedule exactly one more after it. Never rejects.
-     * @param {'start'|'visible'|'pull'|'menu'|'line'|'debounce'} _reason
+     * @param {'start'|'visible'|'online'|'pull'|'menu'|'line'|'debounce'|'retry'} _reason
      */
     syncNow(_reason) {
       if (running) {
@@ -417,10 +444,11 @@ export function createSyncEngine({
       return photoRun ?? Promise.resolve()
     },
     stop() {
-      if (timer) clearTimer(timer)
-      timer = null
+      for (const id of [timer, retryTimer, photoRetryTimer]) if (id) clearTimer(id)
+      timer = retryTimer = photoRetryTimer = null
     },
   }
+  return engine
 }
 
 // The app's single engine.
@@ -429,6 +457,7 @@ export const syncStatus = freshStatus()
 const appListeners = new Set()
 let appEngine = null
 let unsubscribeStore = null
+let onlineWired = false
 
 /** @param {(s:SyncStatus) => void} fn @returns {() => void} unsubscribe */
 export function subscribeSync(fn) {
@@ -447,8 +476,13 @@ export async function initSync({ db, api, onApplied = reloadFromDb, exclusive = 
   appEngine = engine
   await engine.init()
   unsubscribeStore = subscribe(() => engine.localChanged())
+  // Back online: whatever waited goes out now, not at the next visit or edit.
+  if (!onlineWired && typeof window !== 'undefined') {
+    onlineWired = true
+    window.addEventListener('online', () => syncNow('online'))
+  }
   return engine
 }
 
-/** @param {'start'|'visible'|'pull'|'menu'|'line'|'debounce'} reason */
+/** @param {'start'|'visible'|'online'|'pull'|'menu'|'line'|'debounce'|'retry'} reason */
 export const syncNow = (reason) => appEngine?.syncNow(reason) ?? Promise.resolve()

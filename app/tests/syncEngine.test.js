@@ -7,8 +7,9 @@ import { createApi, ApiError } from '../src/sync/api.js'
 import { createSyncEngine } from '../src/sync/engine.js'
 import {
   getFamily, createFamily, joinFamily, recoverFamily, restartFromLicence, leaveFamily, resumePending,
-  kitOf, parseKit, parseInvite, inviteLink,
+  kitOf, parseKit, parseInvite, inviteLink, familyKey,
 } from '../src/sync/family.js'
+import { decodeRecord } from '../src/sync/records.js'
 import { encrypt, encryptJson, importKey, b64url } from '../src/sync/crypto.js'
 import { createFakeServer } from './helpers/fakeServer.js'
 
@@ -652,5 +653,104 @@ describe('sync engine (two phones)', () => {
     a.engine.localChanged()
     expect(server.requests).toEqual([])
     expect(a.engine.status.state).toBe('idle')
+  })
+})
+
+describe('final review fixes', () => {
+  it('createFamily and restartFromLicence refuse to replace a family that is already set up', async () => {
+    const a = await phone()
+    const meta = await familyOf(a)
+    server.addCode('AR-ZZZZ-ZZZZ-ZZZZ')
+    await expect(createFamily(a.db, a.api, { code: 'AR-ZZZZ-ZZZZ-ZZZZ', familyName: 'F', deviceName: 'T' })).rejects.toThrow('already-in-family')
+    await expect(restartFromLicence(a.db, a.api, { linkToken: server.issueLicenceLink(meta.familyId), familyName: 'F', deviceName: 'T' }))
+      .rejects.toThrow('already-in-family')
+    expect(await getFamily(a.db)).toEqual(meta)
+    expect(server.requests.filter((r) => r.path === '/api/redeem' || r.path === '/api/licence/restart')).toHaveLength(1)
+  })
+
+  it('resumePending is single-flight: two callers share one redeem', async () => {
+    const a = await phone()
+    server.addCode(CODE)
+    server.offline = true
+    await expect(createFamily(a.db, a.api, { code: CODE, familyName: 'F', deviceName: 'T' })).rejects.toMatchObject({ status: 0 })
+    server.offline = false
+    const before = server.requests.length
+    const [m1, m2] = await Promise.all([resumePending(a.db, a.api), resumePending(a.db, a.api)])
+    expect(server.requests.slice(before).filter((r) => r.path === '/api/redeem')).toHaveLength(1)
+    expect(m1).toEqual(m2)
+    expect(await getFamily(a.db)).toEqual(m1)
+  })
+
+  it('a 429 during the first upload is transient: error shown, retried by itself after a minute', async () => {
+    const timers = []
+    const a = await phone({ setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {} })
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const meta = await familyOf(a)
+    server.failNext('PUT', '/api/photos/ph-item-a01', 429, 'rate-limited', { act: false })
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'rate-limited', pending: 3 })
+    const retry = timers.filter((x) => x.ms === 60000)
+    expect(retry).toHaveLength(1)
+    await retry[0].fn()
+    await a.engine.photosIdle()
+    expect(a.engine.status).toMatchObject({ state: 'idle', errorCode: null, pending: 0 })
+    expect(server.families.get(meta.familyId).photos.has('ph-item-a01')).toBe(true)
+  })
+
+  it('a 429 in the photo download queue is retried by itself after a minute', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    await a.sync()
+    const timers = []
+    const b = await phone({ setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {} })
+    await join(a, b)
+    server.failNext('GET', '/api/photos/ph-item-a01', 429, 'rate-limited', { act: false })
+    await b.sync()
+    expect((await snapshot(b)).photos['ph-item-a01']).toBeNull()
+    const retry = timers.filter((x) => x.ms === 60000)
+    expect(retry).toHaveLength(1)
+    await retry[0].fn()
+    await b.engine.photosIdle()
+    expect((await snapshot(b)).photos['ph-item-a01']).toBe('img-ph-item-a01')
+  })
+
+  it('pins the token for a whole run: a leave and join mid-run never sends old-key data into the new family', async () => {
+    const a = await phone()
+    await familyOf(a)
+    await a.sync()
+    const c = await phone()
+    server.addCode('AR-ZZZZ-ZZZZ-ZZZZ')
+    await createFamily(c.db, c.api, { code: 'AR-ZZZZ-ZZZZ-ZZZZ', familyName: 'Altra', deviceName: 'Telefono 3' })
+    await c.sync()
+
+    const db = await openDb(`ar-sync-${crypto.randomUUID()}`)
+    let switched = false
+    const b = { db }
+    // Right after the first photo upload of b's run, the user leaves and joins family C.
+    const fetchFn = async (url, init) => {
+      const res = await server.fetch(url, init)
+      if (!switched && init?.method === 'PUT') {
+        switched = true
+        await leaveFamily(b.db, b.api)
+        await join(c, b)
+      }
+      return res
+    }
+    b.api = createApi({ fetchFn, getToken: async () => (await getFamily(db))?.token })
+    b.engine = createSyncEngine({ db, api: b.api, now: iso, defaultTabName: 'Scheda' })
+    await seed(b, 'tab-home-b', ['item-b01'])
+    await join(a, b)
+    // Every record that reaches family C, as sent (the next run overwrites the same ids).
+    const intoC = []
+    const cFamily = (await getFamily(c.db)).familyId
+    server.onPush = (deviceId, records) => { if (server.devices.get(deviceId).familyId === cFamily) intoC.push(...records) }
+    await b.engine.syncNow('menu')
+    expect(switched).toBe(true)
+
+    expect(intoC.length).toBeGreaterThan(0) // the next run uploads b's data again, under C's key
+    const cMeta = await getFamily(c.db)
+    const key = await familyKey(cMeta)
+    for (const r of intoC) await expect(decodeRecord(key, cMeta.familyId, r)).resolves.toBeTruthy()
   })
 })

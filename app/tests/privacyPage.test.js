@@ -22,4 +22,12 @@ describe('privacy.html', () => {
       for (const w of ['Cloudflare', 'Stripe', 'Resend', 'HMAC', 'privacy@gioxx.org', 'AES-GCM']) expect(part).toContain(w)
     }
   })
+  it('describes the metadata the server keeps as it is stored', () => {
+    expect(html).not.toContain('quale telefono ha caricato cosa')
+    expect(html).not.toContain('which phone uploaded what')
+    expect(html).toContain("quando è stato attivo l'ultima volta")
+    expect(html).toContain('when it was last active')
+    expect(html).toContain('sessione di pagamento Stripe')
+    expect(html).toContain('Stripe Checkout session id')
+  })
 })

@@ -31,7 +31,7 @@ Open <https://ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**. Ins
 
 **Free use:** everything stays on your device, in the browser's storage (IndexedDB). There is no account and nothing is sent to a server: the site only serves the app's static files. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
 
-**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, upload times, the device count and which device uploaded what. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://ar.gioxx.org/privacy.html> and linked from the app menu.
+**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://ar.gioxx.org/privacy.html> and linked from the app menu.
 
 ## Development
 

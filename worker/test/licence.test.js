@@ -249,6 +249,19 @@ describe('Stripe', () => {
     await expect(verifyWebhook(body, '', 'whsec_test', 1000)).rejects.toMatchObject({ code: 'bad-signature' });
   });
 
+  it('refuses a webhook body over 512 KB even without Content-Length', async () => {
+    const chunk = new Uint8Array(64 * 1024);
+    let sent = 0;
+    const body = new ReadableStream({
+      pull(c) {
+        if (sent++ < 10) c.enqueue(chunk);
+        else c.close();
+      },
+    });
+    const res = await call('/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': 't=1,v1=x' }, body, duplex: 'half' });
+    expect(res.status).toBe(413);
+  });
+
   it('issues exactly one code per paid session, whatever the order of page and webhook', async () => {
     const id = 'cs_test_once';
     const emails = mockFetch({ [id]: { paid: true, price: 'price_family', email: 'Payer@Example.com' } });

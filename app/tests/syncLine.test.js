@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { syncLineText, renderSyncLine, enableSyncLine, initPullToRefresh } from '../src/ui/syncLine.js'
 import { setLang } from '../src/i18n.js'
 import { store } from '../src/store.js'
+import { syncStatus } from '../src/sync/engine.js'
+import { familyError } from '../src/ui/familyMenu.js'
 
 const NOW = new Date('2026-10-27T12:00:00Z')
 const names = new Map([['d1', 'Telefono 1']])
@@ -35,6 +37,16 @@ describe('syncLineText', () => {
     expect(syncLineText(st({ state: 'offline', pending: 2 }), NOW, names)).toBe('Offline · 2 changes to send')
     expect(syncLineText(st({ state: 'removed' }), NOW, names)).toBe('This phone is no longer in the family')
   })
+  it('offline with nothing waiting is plain Offline', () => {
+    expect(syncLineText(st({ state: 'offline', pending: 0 }), NOW, names)).toBe('Offline')
+  })
+  it('error: the message for its code, with the changes still to send; before the first sync too', () => {
+    const msg = familyError('limit-photo-size')
+    expect(syncLineText(st({ state: 'error', errorCode: 'limit-photo-size' }), NOW, names)).toBe(msg)
+    expect(syncLineText(st({ state: 'error', errorCode: 'limit-photo-size', pending: 2 }), NOW, names)).toBe(`${msg} · 2 changes to send`)
+    expect(syncLineText(st({ state: 'error', errorCode: 'rate-limited', lastSyncAt: null }), NOW, names)).toBe(familyError('rate-limited'))
+    expect(syncLineText(st({ state: 'error', errorCode: null, lastSyncAt: null }), NOW, names)).toBe(familyError('internal'))
+  })
   it('moved orphan items are appended', () => {
     expect(syncLineText(st({ movedOrphans: 2, movedOrphansTab: 'Scuola' }), NOW, names)).toContain('2 items moved to Scuola')
     expect(syncLineText(st({ movedOrphans: 1, movedOrphansTab: 'Scuola' }), NOW, names)).toContain('1 item moved to Scuola')
@@ -52,6 +64,17 @@ describe('renderSyncLine', () => {
   it('is empty when the device is not in a family', () => {
     enableSyncLine(false)
     expect(renderSyncLine()).toBe('')
+  })
+  it('an error before the first sync is shown, not "Syncing…" forever', () => {
+    const saved = { ...syncStatus }
+    Object.assign(syncStatus, { state: 'error', errorCode: 'bad-code', lastSyncAt: null, pending: 0 })
+    enableSyncLine(true)
+    try {
+      expect(renderSyncLine()).toContain(familyError('bad-code'))
+    } finally {
+      enableSyncLine(false)
+      Object.assign(syncStatus, saved)
+    }
   })
 })
 

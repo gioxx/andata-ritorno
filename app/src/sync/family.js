@@ -135,13 +135,22 @@ async function newFamily({ familyName, deviceName }) {
  */
 const definitive = (e) => e?.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429
 
+/** The resume in flight per database: the engine and a dialog may both try to finish the same one. */
+const resuming = new WeakMap()
+
 /**
  * Finish a redeem/restart that was stored as pending (called right away, and again at the next
  * start if the answer never came). A definitive refusal forgets the attempt; no answer, a rate
- * limit or a server error keeps it, so the next start replays the same body.
+ * limit or a server error keeps it, so the next start replays the same body. Single-flight: a
+ * call while one runs gets the same result.
  * @returns {Promise<FamilyMeta|null>}
  */
-export async function resumePending(db, api) {
+export function resumePending(db, api) {
+  if (!resuming.has(db)) resuming.set(db, resumeOnce(db, api).finally(() => resuming.delete(db)))
+  return resuming.get(db)
+}
+
+async function resumeOnce(db, api) {
   const meta = await getFamily(db)
   if (!meta?.pending) return meta
   const { op, body } = meta.pending
@@ -155,8 +164,16 @@ export async function resumePending(db, api) {
   return enter(db, meta, res)
 }
 
+/** Creating or restarting never replaces a family already set up: its key would be lost. */
+async function refuseIfSetUp(db) {
+  await resuming.get(db)?.catch(() => {})
+  const cur = await getFamily(db)
+  if (cur && !cur.pending) throw new Error('already-in-family')
+}
+
 /** Redeem an unlock code: a new family with this device in it. */
 export async function createFamily(db, api, { code, familyName, deviceName }) {
+  await refuseIfSetUp(db)
   const { ids, body } = await newFamily({ familyName, deviceName })
   // Saved before the call: if the answer is lost, the key and secret are not.
   await setFamily(db, { ...newMeta(ids), pending: { op: 'redeem', body: { code, ...body } } })
@@ -165,6 +182,7 @@ export async function createFamily(db, api, { code, familyName, deviceName }) {
 
 /** A licence-recovery link: a fresh family on the same licence (the old one is wiped on the server). */
 export async function restartFromLicence(db, api, { linkToken, familyName, deviceName }) {
+  await refuseIfSetUp(db)
   const { ids, body } = await newFamily({ familyName, deviceName })
   await setFamily(db, { ...newMeta(ids), pending: { op: 'restart', body: { linkToken, ...body } } })
   return resumePending(db, api)
