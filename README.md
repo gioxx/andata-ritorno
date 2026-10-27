@@ -58,7 +58,7 @@ Change the `routes` pattern in `worker/wrangler.app.toml` to deploy it on your o
 
 ```
 app/       the app (src/, tests/, public/ icons and manifest)
-worker/    Cloudflare config for the app, plus an unused API Worker (see below)
+worker/    the Cloudflare Worker: app hosting and the `/api/*` family sharing API
 legacy/    the first single-file prototype, kept only as reference for its backup format
 docs/      design notes and the implementation plan
 ```
@@ -77,17 +77,25 @@ Backups exported from the old prototype (`andata-ritorno-AAAA-MM-GG.json`) can s
 - [ ] Family sharing between phones
 - [ ] Privacy policy (public app, premium data on the server)
 
-## Unused API Worker
+## Worker and API deploy notes
 
-`worker/src` and `worker/schema.sql` (D1 + R2) are an early skeleton for a future sync/sharing feature. The app does not use them and they are not deployed. `/api/*` has **no authentication of its own**: never deploy `worker/wrangler.toml` without putting Cloudflare Access (or equivalent) in front of it. Setup order, for reference:
+`worker/` holds the Cloudflare Worker that serves the app (static assets) and the family sharing API under `/api/*` (D1 + R2). One-time setup, in this order:
 
 ```bash
 cd worker && npm install
-npx wrangler d1 create andata-ritorno          # paste the id into wrangler.toml
+npx wrangler d1 create andata-ritorno            # paste the id into wrangler.app.toml (database_id)
 npx wrangler r2 bucket create andata-ritorno-photos
-npm run db:init
-npm run deploy
+npm run db:init                                  # applies schema.sql to the remote database
+# Secrets (interactive prompt; never commit values):
+npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.app.toml
+npx wrangler secret put STRIPE_WEBHOOK_SECRET --config wrangler.app.toml
+npx wrangler secret put EMAIL_HMAC_KEY --config wrangler.app.toml
+npx wrangler secret put CODE_HMAC_KEY --config wrangler.app.toml
+npx wrangler secret put RESEND_API_KEY --config wrangler.app.toml
+npm run deploy:app
 ```
+
+Also set `PRICE_FAMILY` and `PRICE_SLOT` (Stripe price ids) in `[vars]`. The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the API simply does not rate-limit. Tests: `npm --prefix worker test`.
 
 ## In italiano
 
