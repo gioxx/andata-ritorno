@@ -5,6 +5,14 @@ export async function sha256Hex(s) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** HMAC-SHA256 of msg under key, hex. */
+export async function hmacHex(key, msg) {
+  const enc = new TextEncoder();
+  const k = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', k, enc.encode(msg));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** 32 random bytes, base64url. */
 export function randomToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));

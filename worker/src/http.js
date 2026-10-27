@@ -57,3 +57,10 @@ export function route(req, table) {
   }
   return null;
 }
+
+/** Rate limiting is optional: without the binding there is simply no limiting. */
+export async function limited(binding, key) {
+  if (!binding) return false;
+  const { success } = await binding.limit({ key });
+  return !success;
+}

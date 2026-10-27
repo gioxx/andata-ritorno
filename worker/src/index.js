@@ -1,14 +1,8 @@
-import { HttpError, json, route } from './http.js';
+import { HttpError, json, limited, route } from './http.js';
+import { licenceRoutes } from './licence.js';
 
 // Later tasks add routes here as 'METHOD /api/path/:param': async (req, env, ctx, params) => Response.
-export const routes = {};
-
-/** Rate limiting is optional: without the binding there is simply no limiting. */
-export async function limited(binding, key) {
-  if (!binding) return false;
-  const { success } = await binding.limit({ key });
-  return !success;
-}
+export const routes = { ...licenceRoutes };
 
 export default {
   async fetch(req, env, ctx) {
