@@ -318,10 +318,13 @@ export function createSyncEngine({
   }
 
   /** A joined phone's empty tabs go once the first pull is in (they were never uploaded, no tombstone). */
-  async function discardEmptyTabs() {
-    const ids = await getMeta(db, 'emptyTabsToDrop')
-    if (!ids) return 0
-    const dropped = await exclusive(() => dropEmptyTabs(db, ids))
+  async function discardEmptyTabs(remote) {
+    const stored = await getMeta(db, 'emptyTabsToDrop')
+    if (!stored) return 0
+    // A tab the family also has (same id, e.g. re-entering a family) is the family's tab: keep it.
+    const theirs = new Set(remote.filter((r) => r.kind === 'tab' && r.value).map((r) => r.rid))
+    const ids = stored.filter((id) => !theirs.has(id))
+    const dropped = ids.length ? await exclusive(() => dropEmptyTabs(db, ids)) : 0
     await deleteMeta(db, 'emptyTabsToDrop')
     return dropped
   }
@@ -335,7 +338,7 @@ export function createSyncEngine({
     const kit = secret && secret !== meta.recoverySecret ? { recoverySecret: secret } : {}
     meta = await updateFamily(db, meta, { cursor, ...kit })
     if (!meta) throw new MembershipChanged()
-    const droppedTabs = await discardEmptyTabs()
+    const droppedTabs = await discardEmptyTabs(remote)
     if ((plan && changesLocal(plan)) || droppedTabs) await onApplied()
 
     const refused = await push(api, key, meta)
