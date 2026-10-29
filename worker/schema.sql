@@ -15,6 +15,6 @@ CREATE TABLE records (family_id TEXT NOT NULL, rid TEXT NOT NULL, seq INTEGER NO
   PRIMARY KEY (family_id, rid));
 CREATE INDEX records_seq ON records(family_id, seq);
 CREATE TABLE photos (family_id TEXT NOT NULL, pid TEXT NOT NULL, size INTEGER NOT NULL, uploaded_at TEXT NOT NULL,
-  PRIMARY KEY (family_id, pid));
+  ready INTEGER NOT NULL DEFAULT 1, PRIMARY KEY (family_id, pid));
 CREATE TABLE usage (key TEXT PRIMARY KEY, bytes INTEGER NOT NULL);
-INSERT INTO usage (key, bytes) VALUES ('photo_bytes', 0);
+INSERT INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos;

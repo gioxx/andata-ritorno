@@ -285,6 +285,88 @@ describe('photos', () => {
     expect(await total()).toBe(0);
   });
 
+  /** An R2 bucket whose put fails after running `before`; everything else is the real bucket. */
+  const failingPut = (before = async () => {}) => ({
+    PHOTOS: {
+      put: async () => {
+        await before();
+        throw new Error('r2 down');
+      },
+      get: (...a) => env.PHOTOS.get(...a),
+      delete: (...a) => env.PHOTOS.delete(...a),
+      list: (...a) => env.PHOTOS.list(...a),
+    },
+  });
+  const putWith = (path, data, token, extra) =>
+    call(path, { method: 'PUT', headers: { authorization: `Bearer ${token}` }, body: data }, extra);
+  const row = (f, pid) => env.DB.prepare('SELECT size, ready FROM photos WHERE family_id = ? AND pid = ?').bind(f.familyId, pid).first();
+
+  it('gives the reservation back when the R2 write fails (new photo and replacement)', async () => {
+    const f = await newFamily();
+    const base = await total();
+    const fresh = rid();
+    expect((await putWith(`/api/photos/${fresh}`, bytes(10), f.token, failingPut())).status).toBe(500);
+    expect(await row(f, fresh)).toBeNull();
+    expect(await total()).toBe(base);
+    const pid = rid();
+    await put(`/api/photos/${pid}`, bytes(10), f.token);
+    expect((await putWith(`/api/photos/${pid}`, bytes(30), f.token, failingPut())).status).toBe(500);
+    expect(await row(f, pid)).toEqual({ size: 10, ready: 1 });
+    expect(await total()).toBe(base + 10);
+    expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(10));
+  });
+
+  it('does not double-subtract when the photo is deleted while its failed upload is undone', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    await put(`/api/photos/${pid}`, bytes(10), f.token);
+    const base = await total();
+    const res = await putWith(`/api/photos/${pid}`, bytes(30), f.token, failingPut(() => del(`/api/photos/${pid}`, f.token)));
+    expect(res.status).toBe(500);
+    expect(await row(f, pid)).toBeNull();
+    expect(await total()).toBe(base - 10);
+  });
+
+  it('hides an interrupted upload and heals it when the photo is sent again', async () => {
+    const f = await newFamily();
+    const base = await total();
+    const pid = rid();
+    // The state left by an isolate that died between the reservation and the R2 write.
+    await env.DB.batch([
+      env.DB.prepare("UPDATE usage SET bytes = bytes + 10 WHERE key = 'photo_bytes'"),
+      env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, 10, ?, 0)').bind(f.familyId, pid, now()),
+    ]);
+    expect((await (await get('/api/photos', f.token)).json()).photos).toEqual([]);
+    expect((await get(`/api/photos/${pid}`, f.token)).status).toBe(404);
+    expect((await put(`/api/photos/${pid}`, bytes(10, 4), f.token)).status).toBe(204);
+    expect(await total()).toBe(base + 10);
+    expect((await (await get('/api/photos', f.token)).json()).photos).toMatchObject([{ pid, size: 10 }]);
+    expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(10, 4));
+  });
+
+  it('lets a shrinking replacement through while the total is over the cap', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    await put(`/api/photos/${pid}`, bytes(20), f.token);
+    const base = await total();
+    expect((await putCap(`/api/photos/${pid}`, bytes(15), f.token, 5)).status).toBe(204);
+    expect(await total()).toBe(base - 5);
+    expect((await putCap(`/api/photos/${rid()}`, bytes(1), f.token, 5)).status).toBe(413);
+  });
+
+  it('leaves the total unchanged when a device that is not the last one is removed', async () => {
+    const f = await newFamily();
+    await put(`/api/photos/${rid()}`, bytes(9), f.token);
+    const base = await total();
+    const inv = await (await post('/api/invites', {}, f.token)).json();
+    const join = await post('/api/join', { inviteToken: inv.token, deviceId: rid(), deviceNameEnc: 'bmV3' });
+    expect(join.status).toBe(200);
+    const other = (await env.DB.prepare('SELECT id FROM devices WHERE family_id = ? AND id <> ?').bind(f.familyId, f.deviceId).first()).id;
+    const res = await del(`/api/devices/${other}`, f.token);
+    expect(await res.json()).toEqual({ purged: false });
+    expect(await total()).toBe(base);
+  });
+
   it('requires a device and a valid pid', async () => {
     const f = await newFamily();
     expect((await get('/api/photos')).status).toBe(401);
