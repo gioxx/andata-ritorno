@@ -289,6 +289,7 @@ export default {
   'family.err.link-expired': 'Link expired. Request a new one.',
   'family.err.limit-photos': 'The family reached its photo limit.',
   'family.err.limit-photo-size': 'A photo is too large to sync.',
+  'family.err.limit-storage': "Photo storage on the server is full: items still sync, new photos don't. Try again later.",
   'family.err.limit-record-size': 'An item is too large to sync.',
   'family.err.limit-records': 'The family reached its item limit.',
   'family.err.too-large': 'Request too large.',

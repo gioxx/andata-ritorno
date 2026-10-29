@@ -78,7 +78,7 @@ describe('devicesText', () => {
 describe('error messages', () => {
   // The contract table's codes; the worker sources are scanned too, so a new code cannot slip by.
   const CONTRACT = ['bad-code', 'code-used', 'code-is-slot', 'code-is-family', 'not-paid', 'bad-session', 'family-full', 'invite-expired',
-    'bad-kit', 'link-expired', 'limit-records', 'limit-photo-size', 'limit-photos', 'unauthorized', 'rate-limited', 'offline']
+    'bad-kit', 'link-expired', 'limit-records', 'limit-photo-size', 'limit-photos', 'limit-storage', 'unauthorized', 'rate-limited', 'offline']
   const workerDir = path.resolve(__dirname, '../../worker/src')
   const fromWorker = fs.existsSync(workerDir)
     ? fs.readdirSync(workerDir).filter((f) => f.endsWith('.js')).flatMap((f) => [...fs.readFileSync(path.join(workerDir, f), 'utf8').matchAll(/HttpError\(\d+,\s*'([a-z-]+)'/g)].map((m) => m[1]))

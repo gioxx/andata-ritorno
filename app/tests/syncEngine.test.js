@@ -687,6 +687,17 @@ describe('sync engine (two phones)', () => {
     expect((await snapshot(b)).items.map((i) => i.id)).toEqual(['item-a01'])
   })
 
+  it('a photo refused because server storage is full follows the same path, with no retry', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const meta = await familyOf(a)
+    server.failNext('PUT', '/api/photos/ph-item-a01', 413, 'limit-storage', { act: false })
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'limit-storage', pending: 0 })
+    expect(server.families.get(meta.familyId).records.has('item-a01')).toBe(true)
+    expect(server.families.get(meta.familyId).photos.size).toBe(0)
+  })
+
   it('after a sync the family view and device names are decrypted (Ruling 3)', async () => {
     const a = await phone()
     const meta = await familyOf(a)

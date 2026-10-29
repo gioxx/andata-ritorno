@@ -16,3 +16,5 @@ CREATE TABLE records (family_id TEXT NOT NULL, rid TEXT NOT NULL, seq INTEGER NO
 CREATE INDEX records_seq ON records(family_id, seq);
 CREATE TABLE photos (family_id TEXT NOT NULL, pid TEXT NOT NULL, size INTEGER NOT NULL, uploaded_at TEXT NOT NULL,
   PRIMARY KEY (family_id, pid));
+CREATE TABLE usage (key TEXT PRIMARY KEY, bytes INTEGER NOT NULL);
+INSERT INTO usage (key, bytes) VALUES ('photo_bytes', 0);

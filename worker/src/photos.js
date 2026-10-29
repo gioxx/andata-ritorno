@@ -9,6 +9,15 @@ function checkPid(pid) {
   if (!ID.test(pid)) throw new HttpError(400, 'bad-request');
 }
 
+const USAGE = "key = 'photo_bytes'";
+const DEFAULT_MAX_TOTAL = 9_000_000_000;
+
+/** Global cap on stored photo bytes (all families), from the MAX_TOTAL_PHOTO_BYTES var. */
+function totalCap(env) {
+  const n = Number(env.MAX_TOTAL_PHOTO_BYTES);
+  return env.MAX_TOTAL_PHOTO_BYTES != null && Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_MAX_TOTAL;
+}
+
 async function put(req, env, ctx, { pid }) {
   const { familyId } = await requireApiDevice(env, req);
   checkPid(pid);
@@ -16,18 +25,43 @@ async function put(req, env, ctx, { pid }) {
   if (body.byteLength === 0) throw new HttpError(400, 'bad-request');
   // Replacing an existing photo does not grow the count.
   const row = await env.DB.prepare(
-    'SELECT (SELECT COUNT(*) FROM photos WHERE family_id = ?1) AS n, EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2) AS known',
+    'SELECT (SELECT COUNT(*) FROM photos WHERE family_id = ?1) AS n, (SELECT size FROM photos WHERE family_id = ?1 AND pid = ?2) AS old',
   )
     .bind(familyId, pid)
     .first();
-  if (!row.known && row.n >= MAX_PHOTOS) throw new HttpError(413, 'limit-photos');
-  await env.PHOTOS.put(`${familyId}/${pid}`, body);
-  await env.DB.prepare(
-    `INSERT INTO photos (family_id, pid, size, uploaded_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at`,
-  )
-    .bind(familyId, pid, body.byteLength, new Date().toISOString())
-    .run();
+  if (row.old == null && row.n >= MAX_PHOTOS) throw new HttpError(413, 'limit-photos');
+  // Reserve the bytes in D1 first, in one batch: the total only moves when it stays within the cap
+  // (the delta is computed inside the statement, so concurrent uploads cannot both pass), and the
+  // row is written only if that happened. The R2 object is written afterwards, so a refusal never
+  // leaves one behind.
+  const size = body.byteLength;
+  const delta = `(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))`;
+  const results = await env.DB.batch([
+    env.DB.prepare(`INSERT OR IGNORE INTO usage (key, bytes) VALUES ('photo_bytes', 0)`),
+    env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND bytes + ${delta} <= ?4`).bind(size, familyId, pid, totalCap(env)),
+    env.DB.prepare(
+      `INSERT INTO photos (family_id, pid, size, uploaded_at) SELECT ?1, ?2, ?3, ?4 WHERE changes() = 1
+       ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at`,
+    ).bind(familyId, pid, size, new Date().toISOString()),
+  ]);
+  if (results[1].meta.changes !== 1) throw new HttpError(413, 'limit-storage');
+  try {
+    await env.PHOTOS.put(`${familyId}/${pid}`, body);
+  } catch (e) {
+    // Undo the reservation (best effort) so a failed upload does not eat the budget.
+    await env.DB.batch(
+      row.old == null
+        ? [
+            env.DB.prepare(`UPDATE usage SET bytes = MAX(0, bytes - ?) WHERE ${USAGE}`).bind(size),
+            env.DB.prepare('DELETE FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
+          ]
+        : [
+            env.DB.prepare(`UPDATE usage SET bytes = MAX(0, bytes - ? + ?) WHERE ${USAGE}`).bind(size, row.old),
+            env.DB.prepare('UPDATE photos SET size = ? WHERE family_id = ? AND pid = ?').bind(row.old, familyId, pid),
+          ],
+    ).catch(() => {});
+    throw e;
+  }
   return new Response(null, { status: 204 });
 }
 
@@ -52,7 +86,12 @@ async function remove(req, env, ctx, { pid }) {
   const { familyId } = await requireApiDevice(env, req);
   checkPid(pid);
   await env.PHOTOS.delete(`${familyId}/${pid}`);
-  await env.DB.prepare('DELETE FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE usage SET bytes = MAX(0, bytes - COALESCE((SELECT size FROM photos WHERE family_id = ? AND pid = ?), 0)) WHERE ${USAGE}`,
+    ).bind(familyId, pid),
+    env.DB.prepare('DELETE FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
+  ]);
   return new Response(null, { status: 204 });
 }
 

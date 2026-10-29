@@ -380,6 +380,8 @@ describe('licence recovery', () => {
       env.DB.prepare("INSERT INTO invites (hash, family_id, expires_at) VALUES (?, ?, '2099-01-01')").bind(rid(), old.familyId),
     ]);
     await env.PHOTOS.put(`${old.familyId}/p1`, 'abc');
+    await env.DB.prepare("UPDATE usage SET bytes = bytes + 3 WHERE key = 'photo_bytes'").run();
+    const usageBefore = (await env.DB.prepare("SELECT bytes FROM usage WHERE key = 'photo_bytes'").first()).bytes;
 
     const emails = mockFetch({});
     const res = await post('/api/licence/email', { email: '  OWNER@example.com ' });
@@ -404,6 +406,7 @@ describe('licence recovery', () => {
     }
     expect(await env.DB.prepare('SELECT id FROM families WHERE id = ?').bind(old.familyId).first()).toBeNull();
     expect(await env.PHOTOS.get(`${old.familyId}/p1`)).toBeNull();
+    expect((await env.DB.prepare("SELECT bytes FROM usage WHERE key = 'photo_bytes'").first()).bytes).toBe(usageBefore - 3);
     const lic = await env.DB.prepare('SELECT l.family_id, l.extra_slots FROM licences l JOIN families f ON f.licence_id = l.id WHERE f.id = ?')
       .bind(fresh.familyId)
       .first();

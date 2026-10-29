@@ -195,6 +195,96 @@ describe('photos', () => {
     expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(20, 9));
   });
 
+  const total = async () => (await env.DB.prepare("SELECT bytes FROM usage WHERE key = 'photo_bytes'").first()).bytes;
+  const withCap = (cap) => ({ MAX_TOTAL_PHOTO_BYTES: String(cap) });
+  const putCap = (path, data, token, cap) =>
+    call(path, { method: 'PUT', headers: { authorization: `Bearer ${token}` }, body: data }, withCap(cap));
+
+  it('counts stored bytes in the running total, replacing counts only the delta, deleting frees', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    const base = await total();
+    expect((await put(`/api/photos/${pid}`, bytes(10), f.token)).status).toBe(204);
+    expect(await total()).toBe(base + 10);
+    expect((await put(`/api/photos/${pid}`, bytes(25), f.token)).status).toBe(204);
+    expect(await total()).toBe(base + 25);
+    expect((await put(`/api/photos/${pid}`, bytes(4), f.token)).status).toBe(204);
+    expect(await total()).toBe(base + 4);
+    await del(`/api/photos/${pid}`, f.token);
+    expect(await total()).toBe(base);
+    await del(`/api/photos/${pid}`, f.token); // already gone: nothing to free
+    expect(await total()).toBe(base);
+  });
+
+  it('refuses a photo that would pass the cap, leaving no object and the total unchanged', async () => {
+    const f = await newFamily();
+    const base = await total();
+    const ok = rid();
+    expect((await putCap(`/api/photos/${ok}`, bytes(10), f.token, base + 10)).status).toBe(204);
+    const pid = rid();
+    const res = await putCap(`/api/photos/${pid}`, bytes(1), f.token, base + 10);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe('limit-storage');
+    expect(await env.PHOTOS.get(`${f.familyId}/${pid}`)).toBeNull();
+    expect(await env.DB.prepare('SELECT 1 FROM photos WHERE family_id = ? AND pid = ?').bind(f.familyId, pid).first()).toBeNull();
+    expect(await total()).toBe(base + 10);
+    // Existing photos stay readable, and a replacement that does not grow the total still fits.
+    expect((await get(`/api/photos/${ok}`, f.token)).status).toBe(200);
+    expect((await putCap(`/api/photos/${ok}`, bytes(10, 3), f.token, base + 10)).status).toBe(204);
+    // A refused replacement keeps the old object and size.
+    expect((await putCap(`/api/photos/${ok}`, bytes(11, 5), f.token, base + 10)).status).toBe(413);
+    expect(new Uint8Array(await (await get(`/api/photos/${ok}`, f.token)).arrayBuffer())).toEqual(bytes(10, 3));
+    expect((await (await get('/api/photos', f.token)).json()).photos).toMatchObject([{ pid: ok, size: 10 }]);
+    expect(await total()).toBe(base + 10);
+  });
+
+  it('defaults the cap to 9 GB and ignores a malformed value', async () => {
+    const f = await newFamily();
+    const base = await total();
+    await env.DB.prepare("UPDATE usage SET bytes = 9000000000 - 5 WHERE key = 'photo_bytes'").run();
+    try {
+      expect((await put(`/api/photos/${rid()}`, bytes(6), f.token)).status).toBe(413);
+      expect((await putCap(`/api/photos/${rid()}`, bytes(6), f.token, 'lots')).status).toBe(413);
+      expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204);
+    } finally {
+      await env.DB.prepare("UPDATE usage SET bytes = ? WHERE key = 'photo_bytes'").bind(base + 5).run();
+    }
+  });
+
+  it('lets only one of two concurrent uploads win when together they pass the cap', async () => {
+    const f = await newFamily();
+    const base = await total();
+    const results = await Promise.all([
+      putCap(`/api/photos/${rid()}`, bytes(10), f.token, base + 15),
+      putCap(`/api/photos/${rid()}`, bytes(10, 2), f.token, base + 15),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([204, 413]);
+    expect(await total()).toBe(base + 10);
+    const { photos } = await (await get('/api/photos', f.token)).json();
+    expect(photos).toHaveLength(1);
+    expect((await env.PHOTOS.list({ prefix: `${f.familyId}/` })).objects).toHaveLength(1);
+  });
+
+  it('frees the family photos from the total when its last device leaves', async () => {
+    const f = await newFamily();
+    const base = await total();
+    await put(`/api/photos/${rid()}`, bytes(7), f.token);
+    await put(`/api/photos/${rid()}`, bytes(8), f.token);
+    expect(await total()).toBe(base + 15);
+    const res = await del(`/api/devices/${f.deviceId}`, f.token);
+    expect(await res.json()).toEqual({ purged: true });
+    expect(await total()).toBe(base);
+  });
+
+  it('never lets the total go below zero', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    await put(`/api/photos/${pid}`, bytes(10), f.token);
+    await env.DB.prepare("UPDATE usage SET bytes = 0 WHERE key = 'photo_bytes'").run();
+    await del(`/api/photos/${pid}`, f.token);
+    expect(await total()).toBe(0);
+  });
+
   it('requires a device and a valid pid', async () => {
     const f = await newFamily();
     expect((await get('/api/photos')).status).toBe(401);

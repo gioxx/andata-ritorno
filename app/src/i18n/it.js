@@ -290,6 +290,7 @@ export default {
   'family.err.link-expired': 'Link scaduto. Richiedine uno nuovo.',
   'family.err.limit-photos': 'Raggiunto il limite di foto della famiglia.',
   'family.err.limit-photo-size': 'Una foto è troppo grande per essere sincronizzata.',
+  'family.err.limit-storage': 'Spazio per le foto esaurito sul server: i capi si sincronizzano, le nuove foto no. Riprova più avanti.',
   'family.err.limit-record-size': 'Un capo è troppo grande per essere sincronizzato.',
   'family.err.limit-records': 'Raggiunto il limite di elementi della famiglia.',
   'family.err.too-large': 'Richiesta troppo grande.',

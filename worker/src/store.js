@@ -10,10 +10,15 @@ export async function deviceLimit(env, licenceId) {
  * and detaching it from its licence, which is kept. Each runs only if `guard` (an SQL condition)
  * holds, so a batch can make the purge depend on an earlier statement. Devices go last, so a guard
  * may require a device to exist; the families delete is second to last (its result tells whether
- * the purge ran).
+ * the purge ran). The first statement frees the family's photo bytes from the global total.
  */
 export function purgeStatements(db, familyId, guard = '1', guardArgs = []) {
   return [
+    db
+      .prepare(
+        `UPDATE usage SET bytes = MAX(0, bytes - COALESCE((SELECT SUM(size) FROM photos WHERE family_id = ?), 0)) WHERE key = 'photo_bytes' AND ${guard}`,
+      )
+      .bind(familyId, ...guardArgs),
     ...['records', 'photos', 'invites'].map((t) => db.prepare(`DELETE FROM ${t} WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs)),
     db.prepare(`UPDATE licences SET family_id = NULL WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs),
     db.prepare(`DELETE FROM families WHERE id = ? AND ${guard}`).bind(familyId, ...guardArgs),
