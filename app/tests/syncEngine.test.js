@@ -4,7 +4,7 @@ import {
   getTombstones, getMeta,
 } from '../src/db.js'
 import { createApi, ApiError } from '../src/sync/api.js'
-import { createSyncEngine, isProgressOnly } from '../src/sync/engine.js'
+import { createSyncEngine, isProgressOnly, seedSyncStatus, syncStatus } from '../src/sync/engine.js'
 import {
   getFamily, createFamily, joinFamily, recoverFamily, restartFromLicence, leaveFamily, resumePending,
   kitOf, parseKit, parseInvite, inviteLink, familyKey,
@@ -948,6 +948,26 @@ describe('progress', () => {
     expect(b.engine.status.photoDownloads).toBeNull()
   })
 
+  it('a pull that brings nothing leaves no "receiving" behind for the rest of the run', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    await a.sync()
+    await a.sync() // the first push comes back once: from here pulls are empty
+    await updateItem(a.db, 'item-a01', { label: 'changed' })
+    const seen = []
+    let duringPush = 'unset'
+    a.engine.subscribe((s, patch) => {
+      if ('progress' in patch) seen.push(s.progress && { ...s.progress })
+      if (s.progress?.phase === 'push' && duringPush === 'unset') duringPush = seen.at(-2) // what was shown just before
+    })
+    await a.sync()
+    expect(seen[0]).toEqual({ phase: 'pull', done: 0, total: null })
+    expect(seen[1]).toBeNull() // cleared as soon as the empty pull is in
+    expect(duringPush).toBeNull()
+    expect(a.engine.status.progress).toBeNull()
+  })
+
   it('a failed run clears the progress too', async () => {
     const a = await phone()
     await seed(a, 'tab-home-a', ['item-a01'])
@@ -995,5 +1015,25 @@ describe('active membership flag', () => {
     await b.sync()
     expect(b.engine.status.state).toBe('removed')
     expect(b.engine.status.member).toBe(false)
+  })
+})
+
+describe('seedSyncStatus', () => {
+  it('marks an active family before the engine runs, and not a pending or absent one', async () => {
+    const saved = syncStatus.member
+    try {
+      const a = await phone()
+      await seedSyncStatus(a.db)
+      expect(syncStatus.member).toBe(false)
+      await familyOf(a)
+      await seedSyncStatus(a.db)
+      expect(syncStatus.member).toBe(true)
+      const b = await phone()
+      server.offline = true
+      await expect(createFamily(b.db, b.api, { code: 'AR-ZZZZ-ZZZZ-ZZZ1', familyName: 'F', deviceName: 'T' })).rejects.toMatchObject({ status: 0 })
+      server.offline = false
+      await seedSyncStatus(b.db)
+      expect(syncStatus.member).toBe(false)
+    } finally { syncStatus.member = saved }
   })
 })

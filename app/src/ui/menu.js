@@ -16,7 +16,7 @@ import { openInstallSteps, openUninstallSteps } from './appDialogs.js'
 import { openWipeFlow } from './wipeFlow.js'
 import { menuFooter } from './about.js'
 import { getFamily } from '../sync/family.js'
-import { syncStatus, syncNow, subscribeSync } from '../sync/engine.js'
+import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
 import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, logOutIcon, eraseIcon, shieldIcon } from './icons.js'
@@ -115,7 +115,8 @@ function build() {
   dlg.id = 'menu'
   dlg.innerHTML = menuHtml()
   document.body.append(dlg)
-  subscribeSync(() => { if (dlg.open) renderFamily() }) // last sync time, device count, removed state
+  // Last sync time, device count, removed state; progress ticks change nothing here.
+  subscribeSync((_s, patch) => { if (dlg.open && !isProgressOnly(patch)) renderFamily() })
   // Relabel in place (the drawer stays open while the language is switched from it).
   onLangChange(() => { keepFocus(dlg, () => { dlg.innerHTML = menuHtml(); labelDialog(dlg) }); if (todoDlg?.open) renderTodo(); refresh() })
   dlg.addEventListener('click', (e) => {

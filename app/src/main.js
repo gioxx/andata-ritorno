@@ -5,7 +5,7 @@ import './styles.css';
 import { openDb, setVersionChangeHandler } from './db.js';
 import { getFamily } from './sync/family.js';
 import { createApi } from './sync/api.js';
-import { initSync, syncNow, subscribeSync, isProgressOnly } from './sync/engine.js';
+import { initSync, syncNow, subscribeSync, isProgressOnly, seedSyncStatus } from './sync/engine.js';
 import { enableSyncLine, initPullToRefresh, scheduleSyncLinePatch } from './ui/syncLine.js';
 import { store, load, subscribe, addTab } from './store.js';
 import { renderApp, hooks } from './ui/render.js';
@@ -88,6 +88,7 @@ async function startApp() {
   if (db) {
     subscribe(() => draw());
     onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
+    await seedSyncStatus(db); // before the first draw: no backup nag flashing on a family device
     await load(db);
     // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
     initIosBanner({ onDismiss: () => draw(true) });

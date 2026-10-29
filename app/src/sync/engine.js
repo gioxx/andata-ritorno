@@ -153,6 +153,8 @@ export function createSyncEngine({
       if (!page.more) break
       progress('pull', raw.length, null)
     }
+    // Nothing arrived (the usual autosync after an edit): no "receiving" left on screen.
+    if (!raw.length) emit({ progress: null })
     const remote = []
     for (const [i, r] of raw.entries()) {
       if (i % DECODE_STEP === 0) progress('pull', i, raw.length)
@@ -507,6 +509,15 @@ const appListeners = new Set()
 let appEngine = null
 let unsubscribeStore = null
 let onlineWired = false
+
+/**
+ * Before the first render (no network): whether this device is in an active family, so a family
+ * device never flashes the backup reminder while the engine is not up yet.
+ */
+export async function seedSyncStatus(db) {
+  const meta = await getFamily(db)
+  syncStatus.member = !!meta && !meta.pending && !meta.removed
+}
 
 /** @param {(s:SyncStatus) => void} fn @returns {() => void} unsubscribe */
 export function subscribeSync(fn) {

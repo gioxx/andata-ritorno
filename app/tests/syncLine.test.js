@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { syncLineText, renderSyncLine, enableSyncLine, initPullToRefresh, syncProgress, progressText, paintSyncLine, patchSyncLine } from '../src/ui/syncLine.js'
+import { syncLineText, renderSyncLine, enableSyncLine, initPullToRefresh, syncProgress, progressText, paintSyncLine, patchSyncLine, scheduleSyncLinePatch } from '../src/ui/syncLine.js'
 import { setLang } from '../src/i18n.js'
 import { store } from '../src/store.js'
 import { syncStatus } from '../src/sync/engine.js'
@@ -167,6 +167,37 @@ describe('progress bar', () => {
     patchSyncLine(root)
     expect(root.querySelector('[role="progressbar"]')).toBeNull()
     expect(root.querySelector('.syncbar').getAttribute('aria-busy')).toBe('false')
+  })
+})
+
+describe('scheduleSyncLinePatch', () => {
+  let saved
+  beforeEach(() => { saved = { ...syncStatus }; vi.useFakeTimers(); document.body.innerHTML = '' })
+  afterEach(() => { vi.useRealTimers(); enableSyncLine(false); Object.assign(syncStatus, saved); document.body.innerHTML = '' })
+
+  it('coalesces ticks into at most one repaint per 100 ms, painting the latest status', () => {
+    Object.assign(syncStatus, { state: 'syncing', progress: { phase: 'push', done: 0, total: 10 }, photoDownloads: null })
+    enableSyncLine(true)
+    const root = document.createElement('div')
+    root.innerHTML = renderSyncLine()
+    document.body.append(root)
+    const now = () => root.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')
+    vi.advanceTimersByTime(1000) // well past any earlier repaint
+    for (const done of [1, 2, 3]) {
+      syncStatus.progress = { phase: 'push', done, total: 10 }
+      scheduleSyncLinePatch(root)
+    }
+    expect(now()).toBe('0') // nothing synchronous
+    vi.advanceTimersByTime(0)
+    expect(now()).toBe('3') // one repaint, the latest value
+    syncStatus.progress = { phase: 'push', done: 4, total: 10 }
+    scheduleSyncLinePatch(root)
+    syncStatus.progress = { phase: 'push', done: 5, total: 10 }
+    scheduleSyncLinePatch(root)
+    vi.advanceTimersByTime(99)
+    expect(now()).toBe('3') // still inside the 100 ms window
+    vi.advanceTimersByTime(1)
+    expect(now()).toBe('5')
   })
 })
 
