@@ -55,7 +55,8 @@ export function familyMenuHtml({ family, info = null, payments, now = new Date()
     row('devices', smartphoneIcon, t('family.devices'), { pill: devicesText(fam?.devices, fam?.deviceLimit ?? family.deviceLimit) }),
     row('invite', userPlusIcon, t('family.invite')),
     row('slot', plusIcon, t('family.slot'), { pill: payments ? t('family.slotPrice') : '' }),
-    row('code', ticketIcon, t('family.haveCode')), // a bought or manual seat code works with payments on or off
+    // Only extra-seat codes work here; a bought or manual one works with payments on or off.
+    row('code', ticketIcon, t('family.haveSlotCode')),
     row('kit', keyIcon, t('family.kit')),
     leaveRow(),
   ].join('')

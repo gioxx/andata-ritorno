@@ -10,7 +10,8 @@ import { reportError, askCategory } from './dialogs.js'
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { keepFocus, noteActivator } from './focus.js'
-import { renderSyncLine } from './syncLine.js'
+import { renderSyncLine, paintSyncLine } from './syncLine.js'
+import { syncStatus } from '../sync/engine.js'
 
 /** Later tasks assign their actions here. */
 export const hooks = {
@@ -66,22 +67,24 @@ function section(loc, title, cls, list, categories) {
       : `<div class="empty">${t('render.empty')}</div>`}</div></section>`
 }
 
-/** Pills for the categories used in this tab (category order), then "Senza categoria"; none when nothing is categorised. */
+/**
+ * Pills for the categories used in this tab (category order), then "Senza categoria"; a hint on an
+ * empty tab. Nothing while no category exists (categories are global, the row is on every tab).
+ */
 function tagRow(tabItems, s) {
+  if (!s.showTags || !(s.categories ?? []).length) return ''
+  if (!tabItems.length) return `<nav class="tags" aria-label="${t('render.tags')}"><span class="tagsicon" aria-hidden="true">${filterIcon}</span><span class="tagshint">${t('render.tagsEmptyTab')}</span></nav>`
   const used = usableFilters(tabItems, knownCategoryIds(s))
   const cats = (s.categories ?? []).filter((c) => used.has(c.id))
-  if (!cats.length) return ''
-  if (!s.showTags) return ''
   const filter = s.filter ?? new Set()
   const pill = (id, label, cls = '') => `<button class="chip tag${cls}${filter.has(id) ? ' on' : ''}" data-tag="${esc(id)}" aria-pressed="${filter.has(id)}">${label}</button>`
   return `<nav class="tags" aria-label="${t('render.tags')}"><span class="tagsicon" aria-hidden="true">${filterIcon}</span>${filter.size ? `<button class="chip tag clear" data-tagclear="1">${t('render.tagsAll')}</button>` : ''}${
     cats.map((c) => pill(c.id, esc(categoryName(c)))).join('')}${used.has(UNCATEGORISED) ? pill(UNCATEGORISED, t('render.tagsNone'), ' none') : ''}</nav>`
 }
 
-/** Show/hide button for the category row, only when the tab has something to filter by. */
-function tagToggle(tabItems, s) {
-  const known = knownCategoryIds(s)
-  if (!tabItems.some((i) => effectiveCategory(i, known))) return ''
+/** Show/hide button for the category row: on every tab once a category exists. */
+function tagToggle(s) {
+  if (!(s.categories ?? []).length) return ''
   return `<button class="menu tagtoggle${s.showTags ? ' on' : ''}" data-act="toggleTags" aria-pressed="${!!s.showTags}" aria-label="${t('render.tagsToggle')}">${filterIcon}</button>`
 }
 
@@ -108,20 +111,22 @@ export function renderApp(root, s = store) {
   const tabItems = s.items.filter((i) => i.tabId === s.currentTabId)
   const items = visibleItems(tabItems, s.filter, knownCategoryIds(s))
   const sel = [...s.selected].map((id) => s.items.find((i) => i.id === id)).filter(Boolean)
-  const n = s.unsaved
+  // The counter keeps counting, but in an active family the server holds a copy: no nag.
+  const n = syncStatus.member ? 0 : s.unsaved
   const cats = s.categories ?? []
   const banner = n
     ? `<div class="unsaved"><span>⚠ ${t('render.unsaved', { n })}</span><button data-act="export">${t('render.export')}</button></div>`
     : ''
   keepFocus(root, () => { root.innerHTML = `<header>
-      <div class="row1"><h1>${t('app.name')}</h1>${tagToggle(tabItems, s)}<button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
+      <div class="row1"><h1>${t('app.name')}</h1>${tagToggle(s)}<button class="menu" data-act="menu" aria-label="${t('render.menu')}">${menuIcon}</button></div>
       <nav class="chips" aria-label="${t('render.tabs')}">${s.tabs.map((tb) => `<button class="chip${tb.id === s.currentTabId ? ' on' : ''}" data-tab="${esc(tb.id)}"${tb.id === s.currentTabId ? ' aria-current="true"' : ''}>${esc(tb.name)}</button>`).join('')}<button class="chip add" data-act="addTab" aria-label="${t('render.addTab')}">+</button></nav>${tagRow(tabItems, s)}
-    </header>
-    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}${renderSyncLine()}</main>
+    </header>${renderSyncLine()}
+    <main>${banner}${section('school', `🏫 ${t('loc.school')}`, 'school', items.filter((i) => i.location === 'school'), cats)}${section('home', `🏠 ${t('loc.home')}`, 'home', items.filter((i) => i.location === 'home'), cats)}</main>
     <footer class="bar">${bar(sel, cats.length > 0)}</footer>` })
   root.querySelector('.chips').scrollLeft = chipsScroll
   const tags = root.querySelector('.tags')
   if (tags) tags.scrollLeft = tagsScroll
+  paintSyncLine(root)
 
   lastLocation = new Map(s.items.map((i) => [i.id, i.location]))
   revokeGone()

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
-import { openDb, putTab, addItems, loadAll, setSyncTracking } from '../src/db.js'
+import { openDb, putTab, addItems, loadAll, setSyncTracking, readOutbox } from '../src/db.js'
+import { createSyncEngine } from '../src/sync/engine.js'
+import { store, load } from '../src/store.js'
 import { createApi } from '../src/sync/api.js'
 import { getFamily, setFamily, createFamily, inviteLink, parseInvite, resumePending, restartFromLicence } from '../src/sync/family.js'
 import { initFamilyUi, openJoin, leaveBeforeWipe, familyHooks, openCodeDialog, openLicenceRestart, openInvite } from '../src/ui/familyDialogs.js'
@@ -276,5 +278,63 @@ describe('invite screen', () => {
     await openInvite()
     await until(() => dlg()?.querySelector('.qr'))
     expect(dlg().textContent).toContain('Posto 2 di 4')
+  })
+})
+
+describe('code from the welcome screen', () => {
+  it('a phone with no tabs gets one default tab before the first upload, and the family starts with it', async () => {
+    const p = await phone()
+    await load(p.db)
+    expect(store.tabs).toHaveLength(0)
+    let atEntry = null
+    const onEntered = vi.fn(async () => { atEntry = { tabs: (await loadAll(p.db)).tabs, outbox: await readOutbox(p.db) } })
+    initFamilyUi({ ...p, onEntered, onLeft: vi.fn(), onExport: vi.fn() })
+    server.addCode(CODE)
+    await familyHooks.onHaveCode()
+    expect(dlg().querySelector('#famName')).not.toBeNull() // the create form, not the extra-seat one
+    dlg().querySelector('#famCode').value = CODE
+    dlg().querySelector('[data-go]').click()
+    await until(() => onEntered.mock.calls.length === 1 && atEntry)
+    expect(atEntry.tabs).toHaveLength(1)
+    const [tab] = atEntry.tabs
+    expect(tab.name).toBe('Scheda')
+    expect(store.tabs.map((x) => x.id)).toEqual([tab.id]) // the app leaves the welcome screen
+    expect(store.currentTabId).toBe(tab.id)
+    expect(atEntry.outbox.map((e) => `${e.kind}:${e.id}`)).toContain(`tab:${tab.id}`)
+    expect(document.querySelector('dialog[open] .kitText')).not.toBeNull() // the kit, as after any code
+    // The first sync uploads it.
+    const engine = createSyncEngine({ db: p.db, api: p.api })
+    await engine.syncNow('start')
+    const meta = await getFamily(p.db)
+    expect([...server.families.get(meta.familyId).records.keys()]).toContain(tab.id)
+    expect((await loadAll(p.db)).tabs).toHaveLength(1)
+  })
+
+  it('a phone that already has tabs gets none added', async () => {
+    const p = await phone()
+    await seed(p.db, 0)
+    await load(p.db)
+    const onEntered = vi.fn()
+    initFamilyUi({ ...p, onEntered, onLeft: vi.fn(), onExport: vi.fn() })
+    server.addCode(CODE)
+    await familyHooks.onHaveCode()
+    dlg().querySelector('#famCode').value = CODE
+    dlg().querySelector('[data-go]').click()
+    await until(() => onEntered.mock.calls.length === 1)
+    expect((await loadAll(p.db)).tabs.map((x) => x.id)).toEqual(['tab-local'])
+  })
+
+  it('a refused code adds no tab and keeps the welcome screen', async () => {
+    const p = await phone()
+    await load(p.db)
+    const onEntered = vi.fn()
+    initFamilyUi({ ...p, onEntered, onLeft: vi.fn(), onExport: vi.fn() })
+    await familyHooks.onHaveCode()
+    dlg().querySelector('#famCode').value = 'AR-ZZZZ-ZZZZ-ZZZZ'
+    dlg().querySelector('[data-go]').click()
+    await until(() => dlg().querySelector('.err').textContent !== '')
+    expect(onEntered).not.toHaveBeenCalled()
+    expect((await loadAll(p.db)).tabs).toHaveLength(0)
+    expect(store.tabs).toHaveLength(0)
   })
 })

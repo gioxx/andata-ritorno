@@ -35,3 +35,14 @@ describe('deleted categories', () => {
     expect(usableFilters([{ category: 'gone' }, {}], new Set()).size).toBe(0)
   })
 })
+
+describe('usableFilters', () => {
+  it('offers "Senza categoria" for a tab whose items are all uncategorised, once categories exist', () => {
+    expect([...usableFilters([{ id: 1 }, { id: 2 }], known)]).toEqual([UNCATEGORISED])
+    expect(usableFilters([{ id: 1 }], new Set()).size).toBe(0) // no categories at all: nothing to filter by
+  })
+  it('no "Senza categoria" when every item has a category; nothing for an empty tab', () => {
+    expect([...usableFilters([{ category: 'c1' }, { category: 'c2' }], known)].sort()).toEqual(['c1', 'c2'])
+    expect(usableFilters([], known).size).toBe(0)
+  })
+})

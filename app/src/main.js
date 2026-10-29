@@ -5,8 +5,8 @@ import './styles.css';
 import { openDb, setVersionChangeHandler } from './db.js';
 import { getFamily } from './sync/family.js';
 import { createApi } from './sync/api.js';
-import { initSync, syncNow, subscribeSync } from './sync/engine.js';
-import { enableSyncLine, initPullToRefresh } from './ui/syncLine.js';
+import { initSync, syncNow, subscribeSync, isProgressOnly } from './sync/engine.js';
+import { enableSyncLine, initPullToRefresh, scheduleSyncLinePatch } from './ui/syncLine.js';
 import { store, load, subscribe, addTab } from './store.js';
 import { renderApp, hooks } from './ui/render.js';
 import { renderWelcome } from './ui/welcome.js';
@@ -61,6 +61,7 @@ async function startApp() {
         onImport: (file) => { persist(); Promise.resolve(hooks.onImportFile(file)).catch(reportError) },
         onInvite: () => { persist(); Promise.resolve(familyHooks.onJoinInvite()).catch(reportError) },
         onRestore: () => { persist(); Promise.resolve(familyHooks.onRestore()).catch(reportError) },
+        onHaveCode: () => { persist(); Promise.resolve(familyHooks.onHaveCode()).catch(reportError) },
       })
     }
   }
@@ -109,7 +110,12 @@ async function startApp() {
       await initSync({ db, api });
       if (!wired) {
         wired = true;
-        subscribeSync(() => { document.documentElement.classList.toggle('in-family', inFamily); draw(); });
+        subscribeSync((_s, patch) => {
+          // A counter tick repaints the status bar only (throttled), never the whole screen.
+          if (isProgressOnly(patch)) return scheduleSyncLinePatch(root);
+          document.documentElement.classList.toggle('in-family', inFamily);
+          draw();
+        });
         initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
       }

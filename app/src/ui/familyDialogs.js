@@ -7,9 +7,9 @@ import { openModal, reportError } from './dialogs.js'
 import { familyError } from './familyMenu.js'
 import { ago, enableSyncLine } from './syncLine.js'
 import { scanButton, scanQr } from './scan.js'
-import { syncStatus, syncNow, subscribeSync } from '../sync/engine.js'
+import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { loadAll } from '../db.js'
-import { load, runExclusive } from '../store.js'
+import { load, runExclusive, store, addTab } from '../store.js'
 import { parseLicenceLink } from '../routes.js'
 import {
   getFamily, createFamily, resumePending, leaveFamily, kitOf, inviteLink, parseInvite, parseKit,
@@ -25,6 +25,7 @@ export const familyHooks = {
   onJoinInvite: (link) => openHaveInvite(link),
   onRestore: (o) => openRestore(o),
   onLicence: (linkToken) => openLicenceLink(linkToken),
+  onHaveCode: () => openCodeDialog({ fromWelcome: true }),
 }
 
 /** @type {{ db:any, api:any, onEntered:()=>Promise<void>|void, onLeft:()=>void, onExport:()=>Promise<boolean> }} */
@@ -90,10 +91,14 @@ async function busy(d, fn) {
 
 // ---- Code: unlock a family, or add a seat when already in one -----------------------------
 
-export async function openCodeDialog() {
+/**
+ * @param {{fromWelcome?: boolean}} [o] fromWelcome: a phone with no tabs yet gets a default one once
+ *   the family exists, before its first upload, so the family starts with it and the app opens.
+ */
+export async function openCodeDialog({ fromWelcome = false } = {}) {
   const meta = await getFamily(ctx.db)
   const inFamily = !!meta && !meta.pending
-  const d = show(`<form method="dialog"><h3>${t(inFamily ? 'family.slotCode.title' : 'family.code.title')}</h3>
+  const d = show(`<form method="dialog"><h3>${t(inFamily ? 'family.haveSlotCode' : 'family.code.title')}</h3>
     <p class="plain">${t(inFamily ? 'family.slotCode.body' : 'family.code.body')}</p>
     <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
     ${inFamily ? '' : `<input type="text" id="famName" aria-label="${t('family.code.name')}" placeholder="${esc(t('family.code.nameHint'))}" maxlength="60" autocomplete="off">
@@ -120,6 +125,8 @@ export async function openCodeDialog() {
     else if (stored?.pending?.op === 'redeem') await resumePending(ctx.db, ctx.api)
     else if (!code) return
     else await createFamily(ctx.db, ctx.api, { code, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') })
+    // Tracking is on now: the new tab is queued with everything else for the first sync.
+    if (fromWelcome && store.db === ctx.db && !(await loadAll(ctx.db)).tabs.length) await addTab(t('sync.defaultTab'))
     // The family exists now: show the kit first, then start syncing; failures here have no form to show them.
     d.close()
     openKit({ first: true }).catch(reportError)
@@ -147,7 +154,8 @@ export function openDevices() {
   const body = d.querySelector('#famDevBody')
   const draw = () => { body.innerHTML = devicesBody() }
   draw()
-  const off = subscribeSync(draw) // the list refreshes when the sync below (or a later one) lands
+  // The list refreshes when the sync below (or a later one) lands; progress ticks change nothing here.
+  const off = subscribeSync((_s, patch) => { if (!isProgressOnly(patch)) draw() })
   d.addEventListener('close', off, { once: true })
   syncNow('menu')
   body.addEventListener('click', (e) => {

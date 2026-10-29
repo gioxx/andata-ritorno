@@ -43,6 +43,16 @@ describe('familyMenuHtml', () => {
     expect(acts(familyMenuHtml({ family, info, payments: false, now: NOW }))).toContain('code') // manual seat codes always work
   })
 
+  it('the code row says what it takes: any code when locked, an extra-seat code when active', () => {
+    const codeRow = (html) => new DOMParser().parseFromString(html, 'text/html').querySelector('[data-menu="code"]').textContent
+    const info = { state: 'idle', lastSyncAt: null, family: { name: 'F', deviceLimit: 4, devices: [] } }
+    expect(codeRow(familyMenuHtml({ family: null, payments: false }))).toBe('Ho già un codice')
+    expect(codeRow(familyMenuHtml({ family, info, payments: false, now: NOW }))).toBe('Ho un codice per un posto in più')
+    setLang('en')
+    expect(codeRow(familyMenuHtml({ family: null, payments: false }))).toBe('I already have a code')
+    expect(codeRow(familyMenuHtml({ family, info, payments: false, now: NOW }))).toBe('I have an extra-seat code')
+  })
+
   it('active before the first sync: no name or count yet, never throws', () => {
     const html = familyMenuHtml({ family, info: null, payments: false, now: NOW })
     expect(html).toContain('Ultima sync: mai')

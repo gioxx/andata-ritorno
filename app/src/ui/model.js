@@ -3,14 +3,19 @@ import { t, getLang } from '../i18n.js'
 import { esc } from './esc.js'
 
 /** "N capi · ultimo backup: <date>|mai" */
-export function backupInfoLine(count, lastBackupAt) {
+/** @param {boolean} [synced] in an active family: the server keeps an encrypted copy, no backup nag */
+export function backupInfoLine(count, lastBackupAt, synced = false) {
+  if (synced) return t('info.synced')
   const when = lastBackupAt ? new Date(lastBackupAt).toLocaleString(getLang() === 'it' ? 'it-IT' : 'en-GB') : t('common.never')
   return t('info.backup', { n: count, when })
 }
 
-/** @param {boolean|null} persisted null = the browser cannot say (no line) */
-export function persistLine(persisted) {
-  if (persisted === null) return ''
+/**
+ * @param {boolean|null} persisted null = the browser cannot say (no line)
+ * @param {boolean} [synced] in an active family: no "back up often" warning
+ */
+export function persistLine(persisted, synced = false) {
+  if (persisted === null || (synced && !persisted)) return ''
   return t(persisted ? 'info.protected' : 'info.unprotected')
 }
 

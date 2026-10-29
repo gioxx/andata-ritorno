@@ -19,8 +19,12 @@ import { t } from '../i18n.js'
 /**
  * @typedef {{ state:'idle'|'syncing'|'offline'|'removed'|'error', lastSyncAt:string|null, pending:number,
  *   lastChanges:{count:number, by:string|null}, movedOrphans:number, movedOrphansTab:string|null, errorCode:string|null,
- *   deviceNames:Map<string,string|null>,
+ *   member:boolean, deviceNames:Map<string,string|null>, progress:SyncProgress|null, photoDownloads:{done:number, total:number}|null,
  *   family:{name:string|null, deviceLimit:number, devices:{id:string, name:string|null, createdAt:string, lastSeenAt:string, isThis:boolean}[]}|null }} SyncStatus
+ */
+/**
+ * Where a run is: `total` null while it is not known yet (pull pages before the last one).
+ * @typedef {{ phase:'upload-photos'|'push'|'pull', done:number, total:number|null }} SyncProgress
  */
 
 const BATCH = 200 // records per push (server limit)
@@ -30,6 +34,7 @@ const PHOTO_PARALLEL = 3
 const ORPHAN_MS = 30 * 24 * 60 * 60 * 1000
 const RETRY_MS = 60 * 1000 // after a 429: the server's limits are per minute
 const ID = /^[A-Za-z0-9_-]{8,64}$/
+const DECODE_STEP = 50 // pulled records decoded between two progress reports
 // Push order: a device pulling between two batches never sees an item before its tab, nor a tab
 // deletion before the deletions of its items (it would move them to another tab, reviving them).
 const PUT_RANK = { [KIT_KIND]: 0, tab: 0, category: 1, item: 2 }
@@ -41,8 +46,13 @@ class MembershipChanged extends Error {}
 /** @returns {SyncStatus} */
 const freshStatus = () => ({
   state: 'idle', lastSyncAt: null, pending: 0, lastChanges: { count: 0, by: null }, movedOrphans: 0, movedOrphansTab: null, errorCode: null,
-  deviceNames: new Map(), family: null,
+  deviceNames: new Map(), family: null, progress: null, photoDownloads: null,
+  member: false, // in an active family (set up, not pending, not removed): the server keeps a copy
 })
+
+/** True for a status change that only moves a progress counter (the UI repaints the bar, not the screen). */
+export const isProgressOnly = (patch) =>
+  !!patch && Object.keys(patch).length > 0 && Object.keys(patch).every((k) => k === 'progress' || k === 'photoDownloads')
 
 const photoAad = (familyId, pid) => `${familyId}:photo:${pid}`
 const enc = new TextEncoder()
@@ -117,8 +127,10 @@ export function createSyncEngine({
 
   function emit(patch) {
     Object.assign(status, patch)
-    for (const fn of [...listeners]) fn(status)
+    for (const fn of [...listeners]) fn(status, patch)
   }
+  /** Report where the run is: once per photo, batch or page, never per record written. */
+  const progress = (phase, done, total) => emit({ progress: { phase, done, total } })
   const outboxSize = async () => (await readOutbox(db)).length
 
   /**
@@ -132,20 +144,25 @@ export function createSyncEngine({
   async function pull(api, key, meta) {
     const raw = []
     let cursor = meta.cursor ?? 0
+    // The server does not say how many records wait: no total until the last page is in.
+    progress('pull', 0, null)
     for (;;) {
       const page = await api.pull(cursor)
       raw.push(...page.records)
       cursor = page.next
       if (!page.more) break
+      progress('pull', raw.length, null)
     }
     const remote = []
-    for (const r of raw) {
+    for (const [i, r] of raw.entries()) {
+      if (i % DECODE_STEP === 0) progress('pull', i, raw.length)
       try {
         remote.push(await decodeRecord(key, meta.familyId, r))
       } catch (e) {
         console.warn('sync: skipped a record that could not be read', r.rid, e?.message)
       }
     }
+    if (raw.length) progress('pull', raw.length, raw.length)
     // The kit record is not wardrobe data: it never reaches the merge. The newest one wins.
     let secret = null
     const wardrobe = []
@@ -173,17 +190,22 @@ export function createSyncEngine({
     if (!wanted.size) return []
     const { photos } = await api.listPhotos()
     for (const p of photos) wanted.delete(p.pid)
+    if (!wanted.size) return []
     const refused = []
+    let done = 0
+    progress('upload-photos', 0, wanted.size)
     for (const pid of wanted) {
       const photo = ID.test(pid) && (await getPhotoRecord(db, pid))
-      if (!photo) continue // not on this device (yet): the device that has it uploads it
-      try {
-        await api.putPhoto(pid, await sealPhoto(key, meta.familyId, photo))
-      } catch (e) {
-        if (e?.status !== 413) throw e
-        console.warn('sync: photo refused', pid, e.code)
-        refused.push(e.code)
+      if (photo) { // not on this device (yet): the device that has it uploads it
+        try {
+          await api.putPhoto(pid, await sealPhoto(key, meta.familyId, photo))
+        } catch (e) {
+          if (e?.status !== 413) throw e
+          console.warn('sync: photo refused', pid, e.code)
+          refused.push(e.code)
+        }
       }
+      progress('upload-photos', ++done, wanted.size)
     }
     return refused
   }
@@ -217,6 +239,7 @@ export function createSyncEngine({
 
     // Photos before the records that reference them.
     const refused = await uploadPhotos(api, key, meta, jobs.filter((j) => j.value && j.e.kind === 'item').map((j) => j.value))
+    if (jobs.length) progress('push', 0, jobs.length)
     for (let i = 0; i < jobs.length; i += BATCH) {
       const records = []
       const done = []
@@ -231,6 +254,7 @@ export function createSyncEngine({
       }
       if (records.length) await api.push(records)
       await clearOutbox(db, done)
+      progress('push', Math.min(i + BATCH, jobs.length), jobs.length)
     }
     return refused
   }
@@ -240,21 +264,32 @@ export function createSyncEngine({
     const have = await getPhotoIds(db)
     const missing = new Map()
     for (const it of items) if (it.photoId && !have.has(it.photoId) && ID.test(it.photoId)) missing.set(it.photoId, it.id)
+    if (!missing.size) return 0
     let stored = 0
-    await pool([...missing], PHOTO_PARALLEL, async ([pid, itemId]) => {
-      let data
-      try {
-        data = await api.getPhoto(pid)
-      } catch (e) {
-        if (e?.status === 404) return // not uploaded yet: next sync
-        throw e
-      }
-      try {
-        if (await putSyncedPhoto(db, itemId, await openPhoto(key, meta.familyId, pid, data))) stored++
-      } catch (e) {
-        console.warn('sync: skipped a photo that could not be read', pid, e?.message)
-      }
-    })
+    // A light counter of its own: the run may be over (idle) while these still come in.
+    let done = 0
+    const total = missing.size
+    const tick = () => emit({ photoDownloads: { done: ++done, total } })
+    emit({ photoDownloads: { done, total } })
+    try {
+      await pool([...missing], PHOTO_PARALLEL, async ([pid, itemId]) => {
+        let data
+        try {
+          data = await api.getPhoto(pid)
+        } catch (e) {
+          if (e?.status === 404) return tick() // not uploaded yet: next sync
+          throw e
+        }
+        try {
+          if (await putSyncedPhoto(db, itemId, await openPhoto(key, meta.familyId, pid, data))) stored++
+        } catch (e) {
+          console.warn('sync: skipped a photo that could not be read', pid, e?.message)
+        }
+        tick()
+      })
+    } finally {
+      emit({ photoDownloads: null })
+    }
     return stored
   }
 
@@ -350,7 +385,7 @@ export function createSyncEngine({
     const lastSyncAt = now()
     if (!(await updateFamily(db, meta, { lastSyncAt, deviceLimit: view.deviceLimit }))) throw new MembershipChanged()
     emit({
-      state: refused.length ? 'error' : 'idle', errorCode: refused[0] ?? null, lastSyncAt, pending,
+      state: refused.length ? 'error' : 'idle', errorCode: refused[0] ?? null, lastSyncAt, pending, progress: null, member: true,
       lastChanges: plan ? summarise(plan.changesBy) : { count: 0, by: null },
       movedOrphans: plan?.movedOrphans ?? 0, movedOrphansTab: plan?.movedOrphansTab ?? null,
       family: view, deviceNames: new Map(view.devices.map((d) => [d.id, d.name])),
@@ -362,12 +397,12 @@ export function createSyncEngine({
     let meta = await getFamily(db)
     inFamily = !!meta
     if (!meta) {
-      if (status.family || status.state !== 'idle') emit(freshStatus())
+      if (status.family || status.state !== 'idle' || status.member) emit(freshStatus())
       return
     }
     if (meta.removed) {
       setSyncTracking(false)
-      emit({ state: 'removed' })
+      emit({ state: 'removed', member: false })
       return
     }
     emit({ state: 'syncing' })
@@ -375,6 +410,7 @@ export function createSyncEngine({
       if (meta.pending) meta = await resumePending(db, api)
       await syncFamily(meta)
     } catch (e) {
+      status.progress = null // the emit below (every branch has one) tells the listeners
       const membershipError = e instanceof MembershipChanged || e?.status === 401
       const cur = membershipError ? await getFamily(db) : null
       const stillOurs = sameMembership(cur, meta) && cur.token === meta.token
@@ -386,7 +422,7 @@ export function createSyncEngine({
         // No longer in the family: keep everything local, stop syncing until the user acts.
         setSyncTracking(false)
         await updateFamily(db, meta, { removed: true })
-        emit({ state: 'removed', errorCode: null })
+        emit({ state: 'removed', errorCode: null, member: false })
       } else if (e?.status === 0) {
         emit({ state: 'offline', pending: await outboxSize() })
       } else if (e?.status === 429) {
@@ -414,11 +450,11 @@ export function createSyncEngine({
       if (!meta || meta.pending) return
       if (meta.removed) {
         setSyncTracking(false)
-        emit({ state: 'removed' })
+        emit({ state: 'removed', member: false })
         return
       }
       setSyncTracking(true)
-      emit({ lastSyncAt: meta.lastSyncAt ?? null, pending: await outboxSize() })
+      emit({ lastSyncAt: meta.lastSyncAt ?? null, pending: await outboxSize(), member: true })
     },
     /**
      * Start a run, or (while one runs) schedule exactly one more after it. Never rejects.

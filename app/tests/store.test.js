@@ -440,14 +440,14 @@ describe('edit item', () => {
       expect(store.filter.size).toBe(0)
     })
 
-    it('the uncategorised filter turns itself off once no item of the tab has a category', async () => {
+    it('the uncategorised filter stays on when every item of the tab is uncategorised (categories still exist)', async () => {
       const { UNCATEGORISED } = await import('../src/ui/filter.js')
       setCurrentTab('A') // tab A mixes categorised and uncategorised items
       toggleFilter(UNCATEGORISED)
       await editItem('a1', { category: null })
       expect(store.filter.size).toBe(1)
       await editItem('a2', { category: null })
-      expect(store.filter.size).toBe(0)
+      expect([...store.filter]).toEqual([UNCATEGORISED])
     })
 
     it('a filter category that no item of the tab uses any more is dropped', async () => {

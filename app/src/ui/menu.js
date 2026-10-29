@@ -65,9 +65,11 @@ function renderLangSeg() {
 async function refresh() {
   const todo = (await getMeta(db, 'todo')) ?? []
   const last = await getMeta(db, 'lastBackupAt')
-  dlg.querySelector('#backupInfo').textContent = backupInfoLine(store.items.length, last)
-  dlg.querySelector('#persistInfo').textContent = ''
   const family = await getFamily(db)
+  // In an active family the server keeps an encrypted copy: no backup reminders (export stays).
+  const synced = !!family && !family.pending && !family.removed && syncStatus.state !== 'removed'
+  dlg.querySelector('#backupInfo').textContent = backupInfoLine(store.items.length, last, synced)
+  dlg.querySelector('#persistInfo').textContent = ''
   // Backups made in a family carry its recovery kit (backup.json is plain text).
   dlg.querySelector('#kitInfo').textContent = family && !family.pending ? t('family.backupHasKit') : ''
   const todoBtn = dlg.querySelector('#todoBtn')
@@ -76,7 +78,7 @@ async function refresh() {
   renderThemeSeg()
   renderLangSeg()
   await renderFamily()
-  persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p) })
+  persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p, synced) })
 }
 
 async function openMenu() {

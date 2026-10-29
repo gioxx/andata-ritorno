@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { syncLineText, renderSyncLine, enableSyncLine, initPullToRefresh } from '../src/ui/syncLine.js'
+import { syncLineText, renderSyncLine, enableSyncLine, initPullToRefresh, syncProgress, progressText, paintSyncLine, patchSyncLine } from '../src/ui/syncLine.js'
 import { setLang } from '../src/i18n.js'
 import { store } from '../src/store.js'
 import { syncStatus } from '../src/sync/engine.js'
@@ -75,6 +75,98 @@ describe('renderSyncLine', () => {
       enableSyncLine(false)
       Object.assign(syncStatus, saved)
     }
+  })
+})
+
+describe('progress bar', () => {
+  let saved
+  beforeEach(() => { saved = { ...syncStatus }; document.body.innerHTML = '' })
+  afterEach(() => { enableSyncLine(false); Object.assign(syncStatus, saved); setLang('it'); document.body.innerHTML = '' })
+  const draw = () => {
+    const root = document.createElement('div')
+    root.innerHTML = renderSyncLine()
+    document.body.append(root)
+    paintSyncLine(root)
+    return root
+  }
+
+  it('phase texts in both languages', () => {
+    const p = (phase, done, total) => progressText({ phase, done, total })
+    setLang('it')
+    expect(p('upload-photos', 2, 5)).toBe('Invio foto 2 di 5')
+    expect(p('push', 200, 201)).toBe('Invio modifiche 200 di 201')
+    expect(p('pull', 3, 9)).toBe('Ricezione modifiche 3 di 9')
+    expect(p('pull', 4, null)).toBe('Ricezione modifiche…')
+    expect(p('download-photos', 1, 3)).toBe('Foto 1 di 3')
+    setLang('en')
+    expect(p('upload-photos', 2, 5)).toBe('Sending photos 2 of 5')
+    expect(p('push', 200, 201)).toBe('Sending changes 200 of 201')
+    expect(p('pull', 3, 9)).toBe('Receiving changes 3 of 9')
+    expect(p('pull', 4, null)).toBe('Receiving changes…')
+    expect(p('download-photos', 1, 3)).toBe('Photos 1 of 3')
+  })
+
+  it('the run wins over the background photo counter; nothing when neither', () => {
+    expect(syncProgress({ progress: null, photoDownloads: null })).toBeNull()
+    expect(syncProgress({ progress: null, photoDownloads: { done: 1, total: 3 } })).toEqual({ phase: 'download-photos', done: 1, total: 3 })
+    expect(syncProgress({ progress: { phase: 'push', done: 0, total: 4 }, photoDownloads: { done: 1, total: 3 } })).toEqual({ phase: 'push', done: 0, total: 4 })
+  })
+
+  it('determinate: a progressbar with its values and width, the phase text under it', () => {
+    Object.assign(syncStatus, { state: 'syncing', progress: { phase: 'upload-photos', done: 1, total: 4 }, photoDownloads: null })
+    enableSyncLine(true)
+    const root = draw()
+    const bar = root.querySelector('[role="progressbar"]')
+    expect(bar.getAttribute('aria-valuemin')).toBe('0')
+    expect(bar.getAttribute('aria-valuemax')).toBe('4')
+    expect(bar.getAttribute('aria-valuenow')).toBe('1')
+    expect(bar.classList.contains('indeterminate')).toBe(false)
+    expect(bar.firstElementChild.style.width).toBe('25%')
+    expect(root.querySelector('.syncphase').textContent).toBe('Invio foto 1 di 4')
+    expect(root.querySelector('.syncbar').getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('indeterminate: no values, the animated class', () => {
+    Object.assign(syncStatus, { state: 'syncing', progress: { phase: 'pull', done: 0, total: null }, photoDownloads: null })
+    enableSyncLine(true)
+    const bar = draw().querySelector('[role="progressbar"]')
+    expect(bar.classList.contains('indeterminate')).toBe(true)
+    expect(bar.hasAttribute('aria-valuenow')).toBe(false)
+    expect(bar.hasAttribute('aria-valuemax')).toBe(false)
+  })
+
+  it('no bar when idle, and nothing at all outside a family', () => {
+    Object.assign(syncStatus, { state: 'idle', lastSyncAt: new Date().toISOString(), progress: null, photoDownloads: null })
+    enableSyncLine(true)
+    const root = draw()
+    expect(root.querySelector('.syncline')).not.toBeNull()
+    expect(root.querySelector('[role="progressbar"]')).toBeNull()
+    expect(root.querySelector('.syncbar').getAttribute('aria-busy')).toBe('false')
+    enableSyncLine(false)
+    Object.assign(syncStatus, { progress: { phase: 'push', done: 1, total: 2 } })
+    expect(renderSyncLine()).toBe('')
+  })
+
+  it('a patch moves the bar in place and announces phase changes only', () => {
+    Object.assign(syncStatus, { state: 'syncing', progress: { phase: 'upload-photos', done: 0, total: 3 }, photoDownloads: null })
+    enableSyncLine(true)
+    const root = draw()
+    const live = document.querySelector('[aria-live="polite"]')
+    const button = root.querySelector('.syncline')
+    expect(live.textContent).toBe('Invio foto 0 di 3')
+    Object.assign(syncStatus, { progress: { phase: 'upload-photos', done: 2, total: 3 } })
+    patchSyncLine(root)
+    expect(root.querySelector('.syncline')).toBe(button) // the button (and its focus) survives
+    expect(root.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('2')
+    expect(root.querySelector('.syncphase').textContent).toBe('Invio foto 2 di 3')
+    expect(live.textContent).toBe('Invio foto 0 di 3') // same phase: not announced again
+    Object.assign(syncStatus, { progress: { phase: 'push', done: 0, total: 5 } })
+    patchSyncLine(root)
+    expect(live.textContent).toBe('Invio modifiche 0 di 5')
+    Object.assign(syncStatus, { state: 'idle', progress: null })
+    patchSyncLine(root)
+    expect(root.querySelector('[role="progressbar"]')).toBeNull()
+    expect(root.querySelector('.syncbar').getAttribute('aria-busy')).toBe('false')
   })
 })
 

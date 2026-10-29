@@ -4,7 +4,7 @@ import {
   getTombstones, getMeta,
 } from '../src/db.js'
 import { createApi, ApiError } from '../src/sync/api.js'
-import { createSyncEngine } from '../src/sync/engine.js'
+import { createSyncEngine, isProgressOnly } from '../src/sync/engine.js'
 import {
   getFamily, createFamily, joinFamily, recoverFamily, restartFromLicence, leaveFamily, resumePending,
   kitOf, parseKit, parseInvite, inviteLink, familyKey,
@@ -881,5 +881,119 @@ describe('final review fixes', () => {
     const cMeta = await getFamily(c.db)
     const key = await familyKey(cMeta)
     for (const r of intoC) await expect(decodeRecord(key, cMeta.familyId, r)).resolves.toBeTruthy()
+  })
+})
+
+describe('progress', () => {
+  /** Every progress the engine reported, in order (copies: the status object is reused). */
+  const watch = (p) => {
+    const runs = []
+    const photos = []
+    p.engine.subscribe((s) => {
+      if (s.progress) runs.push({ ...s.progress })
+      photos.push(s.photoDownloads ? { ...s.photoDownloads } : null)
+    })
+    return { runs, photos, of: (phase) => runs.filter((r) => r.phase === phase) }
+  }
+
+  it('photo uploads one by one, then the push, and nothing left once idle', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01', 'item-a02', 'item-a03'])
+    await familyOf(a)
+    const seen = watch(a)
+    await a.sync()
+    expect(seen.of('upload-photos')).toEqual([0, 1, 2, 3].map((done) => ({ phase: 'upload-photos', done, total: 3 })))
+    // 3 items + the tab + the kit record, one batch.
+    expect(seen.of('push')).toEqual([{ phase: 'push', done: 0, total: 5 }, { phase: 'push', done: 5, total: 5 }])
+    // Phases in run order: pull, then photos, then the records.
+    const order = seen.runs.map((r) => r.phase).filter((ph, i, all) => all[i - 1] !== ph)
+    expect(order).toEqual(['pull', 'upload-photos', 'push'])
+    expect(a.engine.status.state).toBe('idle')
+    expect(a.engine.status.progress).toBeNull()
+    expect(a.engine.status.photoDownloads).toBeNull()
+  })
+
+  it('the push counts records batch by batch (200 per batch)', async () => {
+    const a = await phone()
+    const ids = Array.from({ length: 199 }, (_, i) => `item-b${String(i).padStart(3, '0')}`)
+    await seed(a, 'tab-home-a', ids)
+    await familyOf(a)
+    const seen = watch(a)
+    await a.sync()
+    expect(seen.of('push')).toEqual([0, 200, 201].map((done) => ({ phase: 'push', done, total: 201 })))
+  })
+
+  it('pull pages have no total, decoding counts n of m; background photos count on their own', async () => {
+    server = createFakeServer({ clock: () => clockMs, pageSize: 2 })
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01', 'item-a02', 'item-a03'])
+    await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    await join(a, b)
+    const seen = watch(b)
+    await b.sync()
+    const pull = seen.of('pull')
+    // tab + 3 items + kit = 5 records in pages of 2: unknown total while pages come in.
+    expect(pull.filter((p) => p.total === null)).toEqual([0, 2, 4].map((done) => ({ phase: 'pull', done, total: null })))
+    expect(pull.filter((p) => p.total !== null).at(-1)).toEqual({ phase: 'pull', done: 5, total: 5 })
+    expect(pull.findIndex((p) => p.total !== null)).toBeGreaterThan(pull.findLastIndex((p) => p.total === null))
+    // The photo queue: 0..3 of 3 (any completion order), then cleared.
+    const counts = seen.photos.filter(Boolean)
+    expect(counts[0]).toEqual({ done: 0, total: 3 })
+    expect(counts.at(-1)).toEqual({ done: 3, total: 3 })
+    expect(counts.map((c) => c.done)).toEqual([0, 1, 2, 3])
+    expect(seen.photos.at(-1)).toBeNull()
+    expect(b.engine.status.progress).toBeNull()
+    expect(b.engine.status.photoDownloads).toBeNull()
+  })
+
+  it('a failed run clears the progress too', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    server.failNext('POST', '/api/sync', 500, 'internal', { act: false })
+    await a.sync()
+    expect(a.engine.status.state).toBe('error')
+    expect(a.engine.status.progress).toBeNull()
+  })
+
+  it('listeners get the patch: progress ticks are told apart from other changes', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    const patches = []
+    a.engine.subscribe((_s, patch) => patches.push(patch))
+    await a.sync()
+    expect(patches.some((p) => isProgressOnly(p))).toBe(true)
+    expect(patches.some((p) => p && 'state' in p && !isProgressOnly(p))).toBe(true)
+  })
+})
+
+describe('active membership flag', () => {
+  it('on once in a family, off after leaving, off when removed; never on while a redeem is pending', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    server.addCode(CODE)
+    server.offline = true
+    await expect(createFamily(a.db, a.api, { code: CODE, familyName: 'F', deviceName: 'Telefono 1' })).rejects.toMatchObject({ status: 0 })
+    await a.engine.init()
+    expect(a.engine.status.member).toBe(false)
+    server.offline = false
+    await a.sync()
+    expect(a.engine.status.member).toBe(true)
+    await leaveFamily(a.db, a.api)
+    await a.sync()
+    expect(a.engine.status.member).toBe(false)
+
+    const b = await phone()
+    await seed(b, 'tab-home-b', ['item-b01'])
+    await familyOf(b)
+    await b.engine.init()
+    expect(b.engine.status.member).toBe(true)
+    server.removeDevice((await getFamily(b.db)).deviceId)
+    await b.sync()
+    expect(b.engine.status.state).toBe('removed')
+    expect(b.engine.status.member).toBe(false)
   })
 })

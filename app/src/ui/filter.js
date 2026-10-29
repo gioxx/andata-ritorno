@@ -19,12 +19,13 @@ export function visibleItems(items, filterIds, knownIds) {
 }
 
 /**
- * Filter ids that make sense for these items: the categories in use, plus UNCATEGORISED
- * when some items have a category and some don't.
+ * Filter ids that make sense for these items: the categories in use, plus UNCATEGORISED when
+ * some items have no category and categories exist (even if no item here uses one: filtering
+ * them, then selecting all, categorises them in one go).
  * @param {{category?:string}[]} items @param {Set<string>} knownIds @returns {Set<string>}
  */
 export function usableFilters(items, knownIds) {
   const used = new Set(items.map((i) => effectiveCategory(i, knownIds)).filter(Boolean))
-  if (used.size && items.some((i) => !effectiveCategory(i, knownIds))) used.add(UNCATEGORISED)
+  if (knownIds.size && items.some((i) => !effectiveCategory(i, knownIds))) used.add(UNCATEGORISED)
   return used
 }
