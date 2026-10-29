@@ -5,7 +5,7 @@
 // runs (or touches the network) for a device outside a family.
 import {
   loadAll, readOutbox, clearOutbox, getTombstones, applySyncPlan, getMeta, setMeta, getPhotoIds, getPhotoRecord,
-  putSyncedPhoto, setSyncTracking,
+  putSyncedPhoto, setSyncTracking, deleteMeta, dropEmptyTabs,
 } from '../db.js'
 import { encodeRecord, encodeTombstone, decodeRecord } from './records.js'
 import { mergeRemote } from './merge.js'
@@ -317,6 +317,15 @@ export function createSyncEngine({
     }
   }
 
+  /** A joined phone's empty tabs go once the first pull is in (they were never uploaded, no tombstone). */
+  async function discardEmptyTabs() {
+    const ids = await getMeta(db, 'emptyTabsToDrop')
+    if (!ids) return 0
+    const dropped = await exclusive(() => dropEmptyTabs(db, ids))
+    await deleteMeta(db, 'emptyTabsToDrop')
+    return dropped
+  }
+
   async function syncFamily(meta) {
     const api = pinned(meta)
     const key = await familyKey(meta)
@@ -326,7 +335,8 @@ export function createSyncEngine({
     const kit = secret && secret !== meta.recoverySecret ? { recoverySecret: secret } : {}
     meta = await updateFamily(db, meta, { cursor, ...kit })
     if (!meta) throw new MembershipChanged()
-    if (plan && changesLocal(plan)) await onApplied()
+    const droppedTabs = await discardEmptyTabs()
+    if ((plan && changesLocal(plan)) || droppedTabs) await onApplied()
 
     const refused = await push(api, key, meta)
     const { items } = await loadAll(db)

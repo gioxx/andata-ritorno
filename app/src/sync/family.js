@@ -100,8 +100,15 @@ const newMeta = ({ familyId, deviceId, keyRaw, recoverySecret }) => ({
   familyId, deviceId, token: null, keyRaw, recoverySecret, cursor: 0, lastSyncAt: null, licenceKind: 'family',
 })
 
-/** Store the family and start tracking: from here every local change is queued for upload. */
-async function enter(db, meta, { token, deviceLimit }) {
+/** Meta key: ids of empty local tabs a joining phone keeps (hidden from upload) until its first pull. */
+export const EMPTY_TABS_META = 'emptyTabsToDrop'
+
+/**
+ * Store the family and start tracking: from here every local change is queued for upload.
+ * `dropEmptyTabs` (join/recover): tabs without items are not queued; the engine deletes them
+ * after the first successful pull, so the phone never shows the welcome screen in between.
+ */
+async function enter(db, meta, { token, deviceLimit }, { dropEmptyTabs = false } = {}) {
   const { pending: _p, removed: _r, ...rest } = meta
   const done = { ...rest, token, deviceLimit }
   await setFamily(db, done)
@@ -109,7 +116,9 @@ async function enter(db, meta, { token, deviceLimit }) {
   // Tracking first, then queue everything: an edit in between is covered either way.
   setSyncTracking(true)
   await clearSyncStores(db)
-  await markAllDirty(db)
+  const empty = await markAllDirty(db, { skipEmptyTabs: dropEmptyTabs })
+  if (empty.length) await setMeta(db, EMPTY_TABS_META, empty)
+  else await deleteMeta(db, EMPTY_TABS_META)
   if (done.recoverySecret) await queueOutbox(db, KIT_KIND, KIT_RID) // lets invited devices show the kit
   return done
 }
@@ -199,7 +208,7 @@ export async function joinFamily(db, api, { inviteToken, familyId, keyRaw, devic
   const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
   const res = await withRetry(() => api.join({ inviteToken, deviceId, deviceNameEnc }))
   if (mode === 'replace') await clearWardrobe(db)
-  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret: null }), res)
+  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret: null }), res, { dropEmptyTabs: true })
 }
 
 /**
@@ -219,7 +228,7 @@ export async function recoverFamily(db, api, kit, deviceName) {
     if (e?.code === 'family-full' && Array.isArray(e.extra?.devices)) e.extra.devices = await openDevices(key, familyId, e.extra.devices, null)
     throw e
   }
-  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret }), res)
+  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret }), res, { dropEmptyTabs: true })
 }
 
 /**
@@ -242,6 +251,7 @@ export async function leaveFamily(db, api, { timeoutMs } = {}) {
   setSyncTracking(false)
   await clearFamily(db)
   await deleteMeta(db, 'orphanSeen')
+  await deleteMeta(db, EMPTY_TABS_META)
   await clearSyncStores(db)
   return { purged }
 }

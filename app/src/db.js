@@ -112,13 +112,46 @@ export async function queueOutbox(db, kind, id) {
   await withTx(db, ['outbox'], (tx, track) => putOutbox(tx, track, kind, id))
 }
 
-/** Queue every local tab, category and item for upload (a device entering a family). */
-export async function markAllDirty(db) {
+/**
+ * Queue every local tab, category and item for upload (a device entering a family). With
+ * `skipEmptyTabs`, tabs holding no item are left out of the queue.
+ * @returns {Promise<string[]>} ids of the tabs left out
+ */
+export async function markAllDirty(db, { skipEmptyTabs = false } = {}) {
+  const skipped = []
   await withTx(db, ['tabs', 'categories', 'items', 'outbox'], async (tx, track) => {
+    const used = new Set((await tx.objectStore('items').getAll()).map((it) => it.tabId))
     for (const [store, kind] of [['tabs', 'tab'], ['categories', 'category'], ['items', 'item']]) {
-      for (const id of await tx.objectStore(store).getAllKeys()) putOutbox(tx, track, kind, id)
+      for (const id of await tx.objectStore(store).getAllKeys()) {
+        if (skipEmptyTabs && kind === 'tab' && !used.has(id)) skipped.push(id)
+        else putOutbox(tx, track, kind, id)
+      }
     }
   })
+  return skipped
+}
+
+/**
+ * Delete these tabs if they are still empty and not the last tab: no tombstone, no outbox entry
+ * (they never reached the server). A tab that got items meanwhile, or is the last one, is kept and queued for upload.
+ * @returns {Promise<number>} how many were deleted
+ */
+export async function dropEmptyTabs(db, ids) {
+  let dropped = 0
+  await withTx(db, ['tabs', 'items', 'outbox'], async (tx, track) => {
+    for (const id of ids) {
+      if (!(await tx.objectStore('tabs').get(id))) continue
+      const keep = (await tx.objectStore('items').index('tabId').count(id)) || (await tx.objectStore('tabs').count()) <= 1
+      if (keep) {
+        putOutbox(tx, track, 'tab', id)
+      } else {
+        await tx.objectStore('tabs').delete(id)
+        await tx.objectStore('outbox').delete(`tab:${id}`)
+        dropped++
+      }
+    }
+  })
+  return dropped
 }
 
 /** @returns {Promise<Set<string>>} ids of the photo blobs on this device */
