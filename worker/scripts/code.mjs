@@ -2,7 +2,7 @@
 // Owner tool, run with the owner's Wrangler login (no admin endpoint on the internet):
 //   node scripts/code.mjs family|slot [--remote]   new manual code (Ko-fi, Satispay, PayPal, gifts)
 //   node scripts/code.mjs recover <code> [--remote] licence link for the licence that code belongs to
-// Without --remote it works on the local D1 used by `wrangler dev`.
+// Without --remote it works on the local D1 used by `wrangler dev`. Add --test for the ar-test.gioxx.org copy.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -10,25 +10,27 @@ import { newCode, hashCode, normaliseCode } from '../src/codes.js';
 import { randomToken, sha256Hex } from '../src/auth.js';
 
 const LINK_TTL_MS = 30 * 60 * 1000;
-const APP_ORIGIN = process.env.APP_ORIGIN || 'https://ar.gioxx.org';
+const args = process.argv.slice(2);
+const test = args.includes('--test');
+const APP_ORIGIN = process.env.APP_ORIGIN || (test ? 'https://ar-test.gioxx.org' : 'https://ar.gioxx.org');
+const DB_NAME = test ? 'andata-ritorno-test' : 'andata-ritorno';
 const workerDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const args = process.argv.slice(2);
 const where = args.includes('--remote') ? '--remote' : '--local';
-const [cmd, arg] = args.filter((a) => a !== '--remote');
+const [cmd, arg] = args.filter((a) => a !== '--remote' && a !== '--test');
 
 /** Run one SQL statement through wrangler and return its result rows. Values are generated or hex-validated locally. */
 function d1(sql) {
   const out = execFileSync(
     'npx',
-    ['wrangler', 'd1', 'execute', 'andata-ritorno', where, '--config', 'wrangler.app.toml', '--json', '--command', sql],
+    ['wrangler', 'd1', 'execute', DB_NAME, where, '--config', 'wrangler.app.toml', ...(test ? ['--env', 'test'] : []), '--json', '--command', sql],
     { cwd: workerDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
   );
   return JSON.parse(out)[0]?.results ?? [];
 }
 
 function usage() {
-  console.error('usage: node scripts/code.mjs family|slot [--remote]\n       node scripts/code.mjs recover <code> [--remote]');
+  console.error('usage: node scripts/code.mjs family|slot [--remote] [--test]\n       node scripts/code.mjs recover <code> [--remote] [--test]');
   process.exit(2);
 }
 

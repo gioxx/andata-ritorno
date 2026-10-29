@@ -46,3 +46,33 @@ simple = { limit = 600, period = 60 }
 
 # Secrets (wrangler secret put): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 # EMAIL_HMAC_KEY, CODE_HMAC_KEY, RESEND_API_KEY.
+
+# Test copy on its own origin, database and bucket: `--env test`. Payments stay off there.
+# Bindings, vars and routes are not inherited by environments, so they are repeated.
+[env.test]
+routes = [{ pattern = "ar-test.gioxx.org", custom_domain = true }]
+
+[env.test.vars]
+APP_ORIGIN = "https://ar-test.gioxx.org"
+PRICE_FAMILY = ""
+PRICE_SLOT = ""
+MAX_TOTAL_PHOTO_BYTES = "500000000"
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "andata-ritorno-test"
+database_id = "63986218-f8b9-4ac4-86d2-4650fe8e7ebd"
+
+[[env.test.r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "andata-ritorno-test-photos"
+
+[[env.test.ratelimits]]
+name = "RL_STRICT"
+namespace_id = "1003"
+simple = { limit = 10, period = 60 }
+
+[[env.test.ratelimits]]
+name = "RL_API"
+namespace_id = "1004"
+simple = { limit = 600, period = 60 }
