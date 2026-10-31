@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import worker from '../src/index.js';
 import { sha256Hex } from '../src/auth.js';
 import { newCode, hashCode } from '../src/codes.js';
@@ -14,6 +14,10 @@ const send = (method, path, body, token) =>
 const get = (path, token) => send('GET', path, undefined, token);
 const post = (path, body, token) => send('POST', path, body, token);
 const del = (path, token) => send('DELETE', path, undefined, token);
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const rid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
@@ -186,6 +190,7 @@ describe('photos', () => {
     expect((await put(`/api/photos/${pid}`, bytes(10), f.token)).status).toBe(204);
     const list = await (await get('/api/photos', f.token)).json();
     expect(list.photos).toEqual([{ pid, size: 10, uploadedAt: expect.any(String) }]);
+    expect(new Date(list.photos[0].uploadedAt).toISOString()).toBe(list.photos[0].uploadedAt); // the time only, never the nonce
     const res = await get(`/api/photos/${pid}`, f.token);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/octet-stream');
@@ -415,7 +420,27 @@ describe('photos', () => {
     expect(res.status).toBe(413);
   });
 
-  it('listing reclaims reservations abandoned for over an hour: rows, bytes and objects', async () => {
+  it('a failed upload never undoes another upload of the same photo made in the same millisecond', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T10:00:00Z'));
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    // A reserves first, then its R2 write fails only after B (same pid, size, time) has finished.
+    const failing = { ...env.PHOTOS, put: async () => { await gate; throw new Error('r2 down'); }, get: (k) => env.PHOTOS.get(k), delete: (k) => env.PHOTOS.delete(k) };
+    const reqOf = () => ({ method: 'PUT', headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${f.token}` }, body: bytes(10) });
+    const a = call(`/api/photos/${pid}`, reqOf(), { PHOTOS: failing });
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await call(`/api/photos/${pid}`, reqOf())).status).toBe(204);
+    release();
+    expect((await a).status).toBe(500);
+    const list = await (await get('/api/photos', f.token)).json();
+    expect(list.photos.map((p) => p.pid)).toEqual([pid]);
+    expect((await get(`/api/photos/${pid}`, f.token)).status).toBe(200);
+  });
+
+  it('listing reclaims reservations abandoned for over an hour: rows and bytes, never R2 objects', async () => {
     const f = await newFamily();
     const total = async () => (await env.DB.prepare("SELECT bytes FROM usage WHERE key = 'photo_bytes'").first())?.bytes ?? 0;
     expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204); // seeds the usage row
@@ -431,7 +456,8 @@ describe('photos', () => {
     expect(await total()).toBe(base + 7);
     const pids = (await env.DB.prepare('SELECT pid FROM photos WHERE family_id = ? AND ready = 0').bind(f.familyId).all()).results.map((r) => r.pid);
     expect(pids).toEqual(['fresh-0000']);
-    expect(await env.PHOTOS.get(`${f.familyId}/stale-0000`)).toBeNull();
+    // The object is left alone: a retry of the same photo may have just written it.
+    expect(await env.PHOTOS.get(`${f.familyId}/stale-0000`)).not.toBeNull();
   });
 
   it('caps a family at 2 000 photos; replacing does not count twice', async () => {

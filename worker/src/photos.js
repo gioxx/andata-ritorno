@@ -1,5 +1,5 @@
 import { HttpError, json, readBody } from './http.js';
-import { requireApiDevice } from './auth.js';
+import { randomToken, requireApiDevice } from './auth.js';
 import { ID } from './validate.js';
 
 const MAX_PHOTO = 3 * 1024 * 1024;
@@ -34,7 +34,10 @@ async function put(req, env, ctx, { pid }) {
   // written, so an interrupted upload is re-sent by the next sync instead of leaving a dangling row.
   // The R2 write comes after the reservation, so a refusal never leaves an object behind.
   const size = body.byteLength;
-  const token = new Date().toISOString(); // this request's uploaded_at: marks the row as its own
+  // This request's uploaded_at, which marks the row as its own: the time plus a nonce, so two
+  // uploads of the same photo in the same millisecond never take each other's row for their own.
+  // Listing shows the time part only (the first 24 characters).
+  const token = `${new Date().toISOString()}~${randomToken()}`;
   const delta = '(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))';
   const fits = '(EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)';
   const results = await env.DB.batch([
@@ -102,25 +105,27 @@ async function get(req, env, ctx, { pid }) {
   return new Response(obj.body, { headers: { 'content-type': 'application/octet-stream', 'cache-control': 'private, no-store' } });
 }
 
-/** Drop this family's abandoned reservations: rows, bytes in the total, and any object left in R2. */
+/** Drop this family's abandoned reservations: their rows and their bytes in the total. */
 async function reclaimStale(env, familyId) {
   const before = new Date(Date.now() - STALE_MS).toISOString();
   const stale = 'family_id = ?1 AND ready = 0 AND uploaded_at < ?2';
-  const [, gone] = await env.DB.batch([
+  await env.DB.batch([
     env.DB.prepare(`UPDATE usage SET bytes = MAX(0, bytes - (SELECT COALESCE(SUM(size), 0) FROM photos WHERE ${stale})) WHERE ${USAGE}`).bind(
       familyId,
       before,
     ),
-    env.DB.prepare(`DELETE FROM photos WHERE ${stale} RETURNING pid`).bind(familyId, before),
+    env.DB.prepare(`DELETE FROM photos WHERE ${stale}`).bind(familyId, before),
   ]);
-  if (gone.results.length) await env.PHOTOS.delete(gone.results.map((r) => `${familyId}/${r.pid}`));
+  // R2 is left alone: a retry of the same photo may already have written a new object under the
+  // same key, which a delete here would destroy. An object left behind by a reclaimed reservation
+  // is replaced by the next upload of that photo (or by none: a few bytes, outside the total).
 }
 
 async function list(req, env) {
   const { familyId } = await requireApiDevice(env, req);
   // Every sync lists the photos first, so a family's abandoned uploads never outlive its phones' use.
   await reclaimStale(env, familyId);
-  const { results } = await env.DB.prepare('SELECT pid, size, uploaded_at AS uploadedAt FROM photos WHERE family_id = ? AND ready = 1 ORDER BY uploaded_at, pid')
+  const { results } = await env.DB.prepare('SELECT pid, size, substr(uploaded_at, 1, 24) AS uploadedAt FROM photos WHERE family_id = ? AND ready = 1 ORDER BY uploaded_at, pid')
     .bind(familyId)
     .all();
   return json({ photos: results });

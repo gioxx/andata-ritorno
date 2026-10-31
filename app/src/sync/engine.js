@@ -33,6 +33,8 @@ const DEBOUNCE_MS = 2000
 const PHOTO_PARALLEL = 3
 const ORPHAN_MS = 30 * 24 * 60 * 60 * 1000
 const RETRY_MS = 60 * 1000 // after a 429: the server's limits are per minute
+const REFUSED_RETRY_MS = 60 * 60 * 1000 // a photo the server refused (413) is offered again after this
+const REFUSED = 'photosRefused' // meta: {[pid]: {code, at}} photos refused by the server, still owed
 const ID = /^[A-Za-z0-9_-]{8,64}$/
 const DECODE_STEP = 50 // pulled records decoded between two progress reports
 // Push order: a device pulling between two batches never sees an item before its tab, nor a tab
@@ -187,12 +189,24 @@ export function createSyncEngine({
     })
   }
 
-  /** Upload the photos of these items that the server lacks; a photo refused for its size is skipped. */
+  /**
+   * Upload the photos of these items that the server lacks, plus the ones it refused (413) at least
+   * REFUSED_RETRY_MS ago: a refused photo is remembered, its item still goes out (the others see
+   * it without a photo), and it is offered again later instead of being forgotten.
+   */
   async function uploadPhotos(api, key, meta, items) {
     const wanted = new Set(items.map((it) => it.photoId).filter(Boolean))
+    const held = (await getMeta(db, REFUSED)) ?? {}
+    const at = now()
+    for (const [pid, r] of Object.entries(held)) if (Date.parse(at) - Date.parse(r.at) >= REFUSED_RETRY_MS) wanted.add(pid)
     if (!wanted.size) return []
     const { photos } = await api.listPhotos()
-    for (const p of photos) wanted.delete(p.pid)
+    let changed = false
+    for (const p of photos) {
+      wanted.delete(p.pid)
+      if (held[p.pid]) { delete held[p.pid]; changed = true } // stored meanwhile (another phone)
+    }
+    if (changed) await setMeta(db, REFUSED, held)
     if (!wanted.size) return []
     const refused = []
     let done = 0
@@ -202,10 +216,13 @@ export function createSyncEngine({
       if (photo) { // not on this device (yet): the device that has it uploads it
         try {
           await api.putPhoto(pid, await sealPhoto(key, meta.familyId, photo))
+          if (held[pid]) { delete held[pid]; await setMeta(db, REFUSED, held) }
         } catch (e) {
           if (e?.status !== 413) throw e
           console.warn('sync: photo refused', pid, e.code)
           refused.push(e.code)
+          held[pid] = { code: e.code, at }
+          await setMeta(db, REFUSED, held)
         }
       }
       progress('upload-photos', ++done, wanted.size)
@@ -216,7 +233,7 @@ export function createSyncEngine({
   /** @returns {Promise<string[]>} codes of what could not be sent (photos the server refused, records too large) */
   async function push(api, key, meta) {
     const entries = await readOutbox(db)
-    if (!entries.length) return []
+    if (!entries.length) return uploadPhotos(api, key, meta, []) // refused photos still come due
     const { tabs, categories, items } = await loadAll(db)
     const local = {
       tab: new Map(tabs.map((x) => [x.id, x])),
@@ -360,6 +377,19 @@ export function createSyncEngine({
     }
   }
 
+  /** Forget refused photos no item uses any more; returns the code of one still owed, or null. */
+  async function pruneRefused(items) {
+    const held = await getMeta(db, REFUSED)
+    if (!held) return null
+    const used = new Set(items.map((it) => it.photoId))
+    const left = Object.fromEntries(Object.entries(held).filter(([pid]) => used.has(pid)))
+    if (Object.keys(left).length !== Object.keys(held).length) {
+      if (Object.keys(left).length) await setMeta(db, REFUSED, left)
+      else await deleteMeta(db, REFUSED)
+    }
+    return Object.values(left)[0]?.code ?? null
+  }
+
   /** A joined phone's empty tabs go once the first pull is in (they were never uploaded, no tombstone). */
   async function discardEmptyTabs(remote) {
     const stored = await getMeta(db, 'emptyTabsToDrop')
@@ -386,6 +416,7 @@ export function createSyncEngine({
 
     const refused = await push(api, key, meta)
     const { items } = await loadAll(db)
+    const owed = await pruneRefused(items)
     const pending = await outboxSize()
     if (!pending) await sweepOrphans(api, items)
 
@@ -393,7 +424,8 @@ export function createSyncEngine({
     const lastSyncAt = now()
     if (!(await updateFamily(db, meta, { lastSyncAt, deviceLimit: view.deviceLimit }))) throw new MembershipChanged()
     emit({
-      state: refused.length ? 'error' : 'idle', errorCode: refused[0] ?? null, lastSyncAt, pending, progress: null, member: true,
+      // A refused photo still owed keeps the error showing between its retries.
+      state: refused.length || owed ? 'error' : 'idle', errorCode: refused[0] ?? owed ?? null, lastSyncAt, pending, progress: null, member: true,
       lastChanges: plan ? summarise(plan.changesBy) : { count: 0, by: null },
       movedOrphans: plan?.movedOrphans ?? 0, movedOrphansTab: plan?.movedOrphansTab ?? null,
       family: view, deviceNames: new Map(view.devices.map((d) => [d.id, d.name])),

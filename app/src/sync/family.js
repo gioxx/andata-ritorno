@@ -121,6 +121,7 @@ async function enter(db, meta, { token, deviceLimit }, { dropEmptyTabs = false }
   const { pending: _p, removed: _r, ...rest } = meta
   const done = { ...rest, token, deviceLimit }
   await deleteMeta(db, 'orphanSeen')
+  await deleteMeta(db, 'photosRefused')
   // Tracking first, then queue everything: an edit in between is covered either way.
   setSyncTracking(true)
   await clearSyncStores(db)
@@ -302,6 +303,7 @@ export async function leaveFamily(db, api, { timeoutMs } = {}) {
   setSyncTracking(false)
   await clearFamily(db)
   await deleteMeta(db, 'orphanSeen')
+  await deleteMeta(db, 'photosRefused')
   await deleteMeta(db, EMPTY_TABS_META)
   await clearSyncStores(db)
   return { purged }

@@ -830,7 +830,7 @@ describe('sync engine (two phones)', () => {
     expect(server.families.get(meta.familyId).records.has('item-a01')).toBe(true)
   })
 
-  it('a photo refused because server storage is full follows the same path, with no retry', async () => {
+  it('a photo refused because server storage is full: item pushed, error kept, photo offered again an hour later', async () => {
     const a = await phone()
     await seed(a, 'tab-home-a', ['item-a01'])
     const meta = await familyOf(a)
@@ -839,6 +839,29 @@ describe('sync engine (two phones)', () => {
     expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'limit-storage', pending: 0 })
     expect(server.families.get(meta.familyId).records.has('item-a01')).toBe(true)
     expect(server.families.get(meta.familyId).photos.size).toBe(0)
+    // A sync soon after does not try again, and the error stays visible.
+    tick(60 * 1000)
+    const puts = () => server.requests.filter((r) => r.method === 'PUT').length
+    const before = puts()
+    await a.sync()
+    expect(puts()).toBe(before)
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'limit-storage' })
+    // An hour later it goes up, and the error clears.
+    tick(60 * 60 * 1000)
+    await a.sync()
+    expect(server.families.get(meta.familyId).photos.size).toBe(1)
+    expect(a.engine.status).toMatchObject({ state: 'idle', errorCode: null })
+  })
+
+  it('a refused photo is forgotten once no item uses it', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    server.failNext('PUT', '/api/photos/ph-item-a01', 413, 'limit-storage', { act: false })
+    await a.sync()
+    await deleteItems(a.db, ['item-a01'], tick())
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'idle', errorCode: null })
   })
 
   it('after a sync the family view and device names are decrypted (Ruling 3)', async () => {
