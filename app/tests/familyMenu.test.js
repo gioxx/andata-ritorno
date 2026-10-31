@@ -22,8 +22,10 @@ describe('familyMenuHtml', () => {
     expect(on).toContain('Condivisione famiglia')
     expect(on).toContain('Stesso guardaroba su più telefoni, cifrato')
     expect(on).toContain('4,99 €')
+    expect(familyMenuHtml({ family: null, payments: true })).toContain('Prezzo per i primi utenti') // a real early price, no made-up crossed-out one
     const off = familyMenuHtml({ family: null, payments: false })
     expect(off).not.toContain('4,99')
+    expect(off).not.toContain('primi utenti')
     expect(off).not.toContain('badge')
   })
 

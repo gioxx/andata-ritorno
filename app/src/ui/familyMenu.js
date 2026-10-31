@@ -38,7 +38,7 @@ export function familyMenuHtml({ family, info = null, payments, now = new Date()
   // A redeem still waiting for its answer is not a family yet: the code row stays available.
   if (!family || family.pending) {
     return [
-      row('unlock', usersIcon, t('family.unlock'), { sub: t('family.unlockSub'), pill: payments ? t('family.price') : '' }),
+      row('unlock', usersIcon, t('family.unlock'), { sub: payments ? `${t('family.unlockSub')} · ${t('family.earlyPrice')}` : t('family.unlockSub'), pill: payments ? t('family.price') : '' }),
       row('code', ticketIcon, t('family.haveCode')),
       row('invite-have', userPlusIcon, t('family.haveInvite')),
       row('restore', lifeBuoyIcon, t('family.restore')),

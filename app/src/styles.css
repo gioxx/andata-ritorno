@@ -143,6 +143,7 @@ dialog .note { margin: 8px 0 0; font-size: 0.75rem; color: var(--muted); text-al
 dialog select { width: 100%; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
 dialog #editRotate, dialog #editPhoto { display: block; width: 100%; margin-bottom: 12px; }
 dialog #editRotate { display: flex; align-items: center; justify-content: center; gap: 6px; }
+dialog button[data-buy] small { display: block; margin-top: 2px; font-size: 0.75rem; font-weight: 500; opacity: .8; }
 #viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; flex-direction: column; }
 #viewer[hidden] { display: none; }
 #viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); }

@@ -265,6 +265,7 @@ export default {
   'family.unlockSub': 'Stesso guardaroba su più telefoni, cifrato',
   'family.price': '4,99 €',
   'family.slotPrice': '1,99 €',
+  'family.earlyPrice': 'Prezzo per i primi utenti',
   'family.haveCode': 'Ho già un codice',
   'family.haveInvite': 'Ho un invito',
   'family.restore': 'Ripristina famiglia',

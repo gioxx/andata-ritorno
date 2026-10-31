@@ -118,7 +118,7 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
   const buy = inFamily && buyLink
   const d = show(`<form method="dialog"><h3>${t(inFamily ? 'family.slot' : 'family.code.title')}</h3>
     <p class="plain">${t(inFamily ? (buy ? 'family.slotCode.bodyBuy' : 'family.slotCode.body') : 'family.code.body')}</p>
-    ${buy ? `<button type="button" data-buy>${t('family.slotCode.buy', { price: t('family.slotPrice') })}</button>` : ''}
+    ${buy ? `<button type="button" data-buy>${t('family.slotCode.buy', { price: t('family.slotPrice') })}<small>${t('family.earlyPrice')}</small></button>` : ''}
     <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
     ${inFamily ? '' : `<input type="text" id="famName" aria-label="${t('family.code.name')}" placeholder="${esc(t('family.code.nameHint'))}" maxlength="60" autocomplete="off">
     <input type="text" id="famDevice" aria-label="${t('family.code.device')}" placeholder="${esc(t('family.code.deviceHint'))}" maxlength="40" autocomplete="off">`}

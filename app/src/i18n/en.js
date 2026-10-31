@@ -264,6 +264,7 @@ export default {
   'family.unlockSub': 'Same wardrobe on several phones, encrypted',
   'family.price': '€4.99',
   'family.slotPrice': '€1.99',
+  'family.earlyPrice': 'Early adopter price',
   'family.haveCode': 'I already have a code',
   'family.haveInvite': 'I have an invite',
   'family.restore': 'Restore family',
