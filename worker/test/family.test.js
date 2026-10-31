@@ -130,6 +130,23 @@ describe('invites and join', () => {
     expect(await count('devices', fam.familyId)).toBe(2);
   });
 
+  it('a used invite is replayed for the device that used it even after its TTL, for 30 days only', async () => {
+    const fam = await newFamily();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T10:00:00Z'));
+    const body = joinBody(await invite(fam.token));
+    expect((await post('/api/join', body)).status).toBe(200) // answer lost
+    vi.setSystemTime(new Date('2030-01-02T10:00:00Z'));
+    await invite(fam.token) // cleanup of expired invites keeps a used one in its window
+    const retry = await post('/api/join', body);
+    expect(retry.status).toBe(200);
+    expect((await get('/api/family', (await retry.json()).token)).status).toBe(200);
+    expect((await post('/api/join', joinBody(body.inviteToken))).status).toBe(410); // another device: no
+    expect(await count('devices', fam.familyId)).toBe(2);
+    vi.setSystemTime(new Date('2030-02-01T10:00:01Z'));
+    expect((await post('/api/join', body)).status).toBe(410);
+  });
+
   it('refuses an invite after 10 minutes', async () => {
     const fam = await newFamily();
     vi.useFakeTimers({ toFake: ['Date'] });

@@ -259,6 +259,63 @@ describe('family orchestration', () => {
     expect([...server.devices.values()].filter((d) => d.familyId === owner.familyId)).toHaveLength(2)
   })
 
+  it('a start interrupted before everything is queued stays pending and queues it all on the next start', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const owner = await familyOf(a)
+    await a.sync()
+    const { token } = await a.api.createInvite()
+    const inv = parseInvite(inviteLink(token, owner, 'https://ar.example'))
+    const b = await phone()
+    await seed(b, 'tab-home-b', ['item-b01'])
+    // The page "closes" while the local data is being queued (the server already accepted).
+    const transaction = b.db.transaction.bind(b.db)
+    b.db.transaction = (stores, ...rest) => {
+      if ([].concat(stores).includes('outbox') && [].concat(stores).includes('items')) {
+        b.db.transaction = transaction
+        throw new Error('closed')
+      }
+      return transaction(stores, ...rest)
+    }
+    await expect(joinFamily(b.db, b.api, { ...inv, deviceName: 'Telefono 2' })).rejects.toThrow('closed')
+    expect((await getFamily(b.db)).pending).toMatchObject({ op: 'join' })
+    await b.sync()
+    expect((await getFamily(b.db)).pending).toBeUndefined()
+    await a.sync()
+    expect((await snapshot(a)).items.map((i) => i.id)).toEqual(['item-a01', 'item-b01'])
+  })
+
+  it('opening another invite first finishes an unanswered join: no device is left behind', async () => {
+    const a = await phone()
+    const owner = await familyOf(a)
+    const invOf = async () => parseInvite(inviteLink((await a.api.createInvite()).token, owner, 'https://ar.example'))
+    const first = await invOf()
+    const b = await phone()
+    server.failNext('POST', '/api/join', 503, 'internal')
+    await expect(joinFamily(b.db, b.api, { ...first, deviceName: 'Telefono 2' })).rejects.toMatchObject({ status: 503 })
+    const pending = await getFamily(b.db)
+    // Another invite: the first join went through, so the phone is in that family now.
+    await expect(joinFamily(b.db, b.api, { ...(await invOf()), deviceName: 'Telefono 2' })).rejects.toMatchObject({ code: 'already-in-family' })
+    const meta = await getFamily(b.db)
+    expect(meta.pending).toBeUndefined()
+    expect(meta.deviceId).toBe(pending.deviceId)
+    expect(server.devices.get(meta.deviceId).token).toBe(meta.token)
+    expect([...server.devices.values()].filter((d) => d.familyId === owner.familyId)).toHaveLength(2)
+  })
+
+  it('an unanswered join refused for good does not block another invite', async () => {
+    const a = await phone()
+    const owner = await familyOf(a)
+    const invOf = async () => parseInvite(inviteLink((await a.api.createInvite()).token, owner, 'https://ar.example'))
+    const b = await phone()
+    server.failNext('POST', '/api/join', 503, 'internal', { act: false })
+    await expect(joinFamily(b.db, b.api, { ...(await invOf()), deviceName: 'Telefono 2' })).rejects.toMatchObject({ status: 503 })
+    server.failNext('POST', '/api/join', 410, 'invite-expired', { act: false }) // the first one, replayed
+    await joinFamily(b.db, b.api, { ...(await invOf()), deviceName: 'Telefono 2' })
+    expect((await getFamily(b.db)).pending).toBeUndefined()
+    expect([...server.devices.values()].filter((d) => d.familyId === owner.familyId)).toHaveLength(2)
+  })
+
   it('updateFamily racing a leave never brings the membership back', async () => {
     const a = await phone()
     const meta = await familyOf(a)

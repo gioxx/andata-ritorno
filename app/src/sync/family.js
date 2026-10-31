@@ -111,14 +111,15 @@ const newMeta = ({ familyId, deviceId, keyRaw, recoverySecret }) => ({
 export const EMPTY_TABS_META = 'emptyTabsToDrop'
 
 /**
- * Store the family and start tracking: from here every local change is queued for upload.
+ * Start tracking, queue everything, then store the family: from here every local change is queued
+ * for upload. The membership is written last, so until the queue is complete the stored attempt
+ * stays pending and an interrupted start is replayed (and queued again) on the next one.
  * `dropEmptyTabs` (join/recover): tabs without items are not queued; the engine deletes them
  * after the first successful pull, so the phone never shows the welcome screen in between.
  */
 async function enter(db, meta, { token, deviceLimit }, { dropEmptyTabs = false } = {}) {
   const { pending: _p, removed: _r, ...rest } = meta
   const done = { ...rest, token, deviceLimit }
-  await setFamily(db, done)
   await deleteMeta(db, 'orphanSeen')
   // Tracking first, then queue everything: an edit in between is covered either way.
   setSyncTracking(true)
@@ -127,6 +128,7 @@ async function enter(db, meta, { token, deviceLimit }, { dropEmptyTabs = false }
   if (empty.length) await setMeta(db, EMPTY_TABS_META, empty)
   else await deleteMeta(db, EMPTY_TABS_META)
   if (done.recoverySecret) await queueOutbox(db, KIT_KIND, KIT_RID) // lets invited devices show the kit
+  await setFamily(db, done)
   return done
 }
 
@@ -183,6 +185,22 @@ async function resumeOnce(db, api) {
   return enter(db, meta, res, { dropEmptyTabs: op === 'join' || op === 'recover' })
 }
 
+/**
+ * Another attempt is still unanswered: finish it before starting a new one, since its stored device
+ * id is the only way to reach a device the server may already have added. Refused for good, it is
+ * forgotten and the new attempt goes ahead; accepted, this phone is in that family now
+ * (ApiError-like `already-in-family`); no answer again, the new attempt waits (that error).
+ */
+async function settlePrevious(db, api) {
+  try {
+    await resumePending(db, api)
+  } catch (e) {
+    if (definitive(e)) return
+    throw e
+  }
+  throw Object.assign(new Error('already-in-family'), { code: 'already-in-family' })
+}
+
 /** Change the stored pending attempt (same membership), e.g. the join mode chosen on a retry. */
 async function updatePending(db, pending) {
   const cur = await getFamily(db)
@@ -225,6 +243,7 @@ export async function joinFamily(db, api, { inviteToken, familyId, keyRaw, devic
     await updatePending(db, { ...prev, mode })
     return resumePending(db, api)
   }
+  if (prev) await settlePrevious(db, api)
   const key = await importKey(b64url.decode(keyRaw))
   const deviceId = crypto.randomUUID()
   const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
@@ -246,6 +265,7 @@ export async function recoverFamily(db, api, kit, deviceName) {
   // The same kit tried before with no answer: same device id, so the server gives it a new token
   // instead of adding another device.
   if (!(prev?.op === 'recover' && prev.body.familyId === familyId && prev.body.recoverySecret === recoverySecret)) {
+    if (prev) await settlePrevious(db, api)
     const deviceId = crypto.randomUUID()
     const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
     await setFamily(db, { ...newMeta({ familyId, deviceId, keyRaw, recoverySecret }), pending: { op: 'recover', body: { familyId, recoverySecret, deviceId, deviceNameEnc } } })

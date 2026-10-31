@@ -291,6 +291,7 @@ export default {
   'family.err.code-is-family': 'This is a family code, not an extra seat.',
   'family.err.code-is-slot': 'This is an extra-seat code: use it from a family that is already active.',
   'family.err.code-used': 'Code already used.',
+  'family.err.already-in-family': 'An earlier attempt went through: this phone is already in a family. To join another one, leave first: Menu → Family → Leave the family.',
   'family.err.family-full': 'The family already has the maximum number of phones.',
   'family.err.invite-expired': 'Invite expired. Ask for a new one.',
   'family.err.link-expired': 'Link expired. Request a new one.',

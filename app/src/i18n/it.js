@@ -292,6 +292,7 @@ export default {
   'family.err.code-is-family': 'Questo è un codice famiglia, non un posto extra.',
   'family.err.code-is-slot': 'Questo è un codice per un posto extra: usalo da una famiglia già attiva.',
   'family.err.code-used': 'Codice già usato.',
+  'family.err.already-in-family': 'Un tentativo precedente è andato a buon fine: questo telefono è già in una famiglia. Per entrare in un’altra, prima esci: Menu → Famiglia → Esci dalla famiglia.',
   'family.err.family-full': 'La famiglia ha già il numero massimo di telefoni.',
   'family.err.invite-expired': 'Invito scaduto. Chiedine uno nuovo.',
   'family.err.link-expired': 'Link scaduto. Richiedine uno nuovo.',

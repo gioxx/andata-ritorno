@@ -4,6 +4,10 @@ import { deviceLimit, purgePhotos, purgeStatements } from './store.js';
 import { ENC, ID, isSecret } from './validate.js';
 
 const INVITE_TTL_MS = 10 * 60 * 1000;
+// A used invite stays this long so the device that used it can still get its token if the answer
+// was lost and the phone only comes back later (a family member could remove a device anyway).
+const REPLAY_MS = 30 * 24 * 60 * 60 * 1000;
+const replaySince = () => new Date(Date.now() - REPLAY_MS).toISOString();
 
 // SQL fragments over a family `f` joined to its licence `l`.
 const LIMIT = 'l.base_limit + l.extra_slots';
@@ -55,9 +59,14 @@ async function createInvite(req, env) {
   if (row.used >= row.lim) throw new HttpError(409, 'family-full');
   const token = randomToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
-  // Expired invites are dead weight: each new one clears the family's old ones.
+  // Expired invites are dead weight: each new one clears the family's old ones (a used one only
+  // once its replay window is over).
   await env.DB.batch([
-    env.DB.prepare('DELETE FROM invites WHERE family_id = ? AND expires_at <= ?').bind(familyId, new Date().toISOString()),
+    env.DB.prepare('DELETE FROM invites WHERE family_id = ? AND expires_at <= ? AND (used_at IS NULL OR used_at <= ?)').bind(
+      familyId,
+      new Date().toISOString(),
+      replaySince(),
+    ),
     env.DB.prepare('INSERT INTO invites (hash, family_id, expires_at) VALUES (?, ?, ?)').bind(await sha256Hex(token), familyId, expiresAt),
   ]);
   return json({ token, expiresAt, used: row.used, limit: row.lim });
@@ -85,8 +94,9 @@ async function join(req, env) {
   const hash = await sha256Hex(inviteToken);
   const at = nowIso();
   const inv = await env.DB.prepare('SELECT family_id, expires_at, used_at FROM invites WHERE hash = ?').bind(hash).first();
+  // A used invite goes to the device-bound replay first, even past its TTL.
+  if (inv?.used_at) return replayJoin(env, inv, deviceId);
   if (!inv || inv.expires_at <= at) inviteExpired();
-  if (inv.used_at) return replayJoin(env, inv, deviceId);
 
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
@@ -103,18 +113,20 @@ async function join(req, env) {
   ]);
   if (results[0].meta.changes !== 1) {
     const latest = await env.DB.prepare('SELECT family_id, expires_at, used_at FROM invites WHERE hash = ?').bind(hash).first();
+    if (latest?.used_at) return replayJoin(env, latest, deviceId);
     if (!latest || latest.expires_at <= at) inviteExpired();
-    if (latest.used_at) return replayJoin(env, latest, deviceId);
     throw new HttpError(409, 'family-full');
   }
   return json({ token, deviceLimit: await deviceLimit(env, await licenceOf(env, inv.family_id)) });
 }
 
 /**
- * A used invite still inside its TTL, retried by the device that used it (its response was lost):
- * that device, created at the moment the invite was used, gets a fresh token. Anything else → 410.
+ * A used invite retried by the device that used it (its response was lost), within REPLAY_MS of
+ * that use: the device, created at the moment the invite was used, gets a fresh token. Anything
+ * else → 410.
  */
 async function replayJoin(env, inv, deviceId) {
+  if (inv.used_at <= replaySince()) inviteExpired();
   const token = randomToken();
   const { meta } = await rotateToken(env, inv.family_id, deviceId, await sha256Hex(token), nowIso(), 'created_at = ?', [inv.used_at]).run();
   if (meta.changes !== 1) inviteExpired();

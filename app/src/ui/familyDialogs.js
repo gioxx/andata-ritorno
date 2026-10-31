@@ -58,6 +58,18 @@ function enterGoes(d) {
   })
 }
 
+/**
+ * An earlier join or recovery, finished on the way, put this phone in a family: start syncing it,
+ * then let the dialog say so (the error goes on).
+ */
+async function enteredEarlier(e) {
+  if (e?.code === 'already-in-family') {
+    await load(ctx.db)
+    Promise.resolve(ctx.onEntered()).catch(reportError)
+  }
+  throw e
+}
+
 /** Fill `input` from a scanned QR code when the dialog has a scan button. */
 function wireScan(d, input) {
   d.querySelector('[data-scan]')?.addEventListener('click', async () => {
@@ -360,7 +372,7 @@ export async function openJoin(invite) {
     await runExclusive(async () => {
       await joinFamily(ctx.db, ctx.api, { ...invite, deviceName, mode })
       if (mode === 'replace') await load(ctx.db)
-    })
+    }).catch(enteredEarlier)
     d.close()
     Promise.resolve(ctx.onEntered()).catch(reportError)
   }))
@@ -390,7 +402,7 @@ export async function openRestore({ kit = '' } = {}) {
     const deviceName = d.querySelector('#famRestDevice').value.trim() || t('family.code.deviceHint')
     full.innerHTML = ''
     try {
-      await runExclusive(() => recoverFamily(ctx.db, ctx.api, parsed, deviceName))
+      await runExclusive(() => recoverFamily(ctx.db, ctx.api, parsed, deviceName)).catch(enteredEarlier)
     } catch (e) {
       if (e?.code !== 'family-full' || !Array.isArray(e.extra?.devices)) throw e
       // Full: the kit may free a seat, so the user picks a phone that is gone for good.
