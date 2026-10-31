@@ -1,8 +1,9 @@
 # Security headers for every response served from the static assets (Cloudflare Workers).
 # style-src has no 'unsafe-inline': the app sets styles only through CSSOM (el.style.x), which CSP allows.
 # font-src data:: Vite inlines the smallest font subsets into the CSS as data: URIs.
+# camera=(self): the in-app QR scan (invites, recovery kits) reads the rear camera.
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()

@@ -9,7 +9,7 @@ import { t } from '../i18n.js'
 /** @typedef {import('../types.js').Incoming} Incoming */
 /** @typedef {import('../types.js').ImportPlan} ImportPlan */
 /** @typedef {{ added:number, updated:number, failed:number,
- *   perTab:Array<{ tabName:string, school:number, home:number }> }} Summary */
+ *   perTab:Array<{ tabName:string, school:number, home:number }>, familyKit:string|null }} Summary */
 
 /** Thrown when the file has invalid items and the user did not choose a partial import. */
 export class ImportBlocked extends Error {
@@ -98,7 +98,8 @@ export async function commitImport(db, { incoming, plan }, { partial }) {
     const school = mine.filter((i) => i.location === 'school').length
     perTab.push({ tabName: tab.name, school, home: mine.length - school })
   }
-  return { added: plan.added, updated: plan.updated, failed: failures.length, perTab }
+  // A backup made in a family carries its recovery kit: the UI offers to restore the family.
+  return { added: plan.added, updated: plan.updated, failed: failures.length, perTab, familyKit: incoming.familyKit ?? null }
 }
 
 /** @param {Summary} s */

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy · Andata e Ritorno</title>
+<meta name="description" content="Informativa sulla privacy di Andata e Ritorno (A/R) / Privacy policy of Andata e Ritorno (A/R).">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f15">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<link rel="stylesheet" href="/privacy.css">
+</head>
+<body>
+<main>
+<nav class="langs" aria-label="Lingua / Language">
+  <a href="#it" hreflang="it">Italiano</a>
+  <a href="#en" hreflang="en">English</a>
+</nav>
+
+<section id="it" lang="it" aria-labelledby="it-h">
+<h1 id="it-h">Informativa sulla privacy</h1>
+<p class="meta">Andata e Ritorno (A/R) · ar.gioxx.org · aggiornata a ottobre 2026 (versione 3.0.0)</p>
+
+<h2>In breve</h2>
+<p>Se usi A/R da sola, tutto resta sul tuo telefono e a noi non arriva nulla. Se attivi la condivisione in famiglia, capi e foto vengono caricati su un server in forma cifrata, e solo i telefoni della tua famiglia possono leggerli. Nessun tracciamento, nessuna analisi, nessuna pubblicità.</p>
+
+<h2>Uso gratuito: tutto sul dispositivo</h2>
+<p>Schede, capi, foto, categorie e preferenze sono salvati nella memoria del browser del tuo telefono (IndexedDB). Non c'è nessun account e questi dati non vengono inviati a nessuno. Il sito si limita a consegnarti i file dell'app. I backup <code>.zip</code> li crei e li conservi tu.</p>
+
+<h2>Condivisione in famiglia (a pagamento)</h2>
+<p>Solo se inserisci un codice di sblocco e crei una famiglia, i dati vengono sincronizzati tra i telefoni tramite Cloudflare (database D1 e archivio R2). Prima di partire dal telefono, capi, schede, categorie, foto, nome della famiglia e nomi dei telefoni sono cifrati (AES-GCM 256 bit) con una chiave generata sul tuo telefono. Quella chiave e il segreto del kit di recupero non vengono mai inviati al server in chiaro: chi gestisce il servizio non può leggere i tuoi dati.</p>
+<p>Il server vede invece questi metadati: identificatori casuali (famiglia, telefono, record, foto), numeri di sequenza, dimensioni, orari di caricamento delle foto, numero di telefoni collegati e, per ogni telefono, quando è stato aggiunto e quando è stato attivo l'ultima volta. Conserva inoltre solo l'impronta (hash) dei codici e dei token di accesso, non i valori.</p>
+<p>La sede fisica dei dati è decisa da Cloudflare (UE o USA, secondo la sua infrastruttura).</p>
+<p><strong>Attenzione:</strong> se perdi tutti i telefoni e anche il kit di recupero, la copia sul server non si può più leggere, nemmeno da noi. Per questo conserva il kit e fai ogni tanto un backup. I backup fatti mentre sei in una famiglia contengono il kit di recupero e non sono cifrati: tienili al sicuro.</p>
+
+<h2>Pagamento e indirizzo email</h2>
+<ul>
+<li><strong>Stripe</strong> incassa il pagamento ed è il venditore (merchant of record, tramite Managed Payments). Dati di carta e di pagamento li tratta Stripe secondo la propria informativa; A/R non li riceve.</li>
+<li>L'indirizzo email indicato al pagamento serve a due cose: spedirti il codice di sblocco e, conservato <em>solo come hash con chiave segreta (HMAC)</em>, riconoscere la tua licenza se devi recuperarla. Non conserviamo l'indirizzo in chiaro e non lo usiamo per altro (niente newsletter, niente marketing).</li>
+<li><strong>Resend</strong> spedisce le email (codice di sblocco e link di recupero licenza) dall'indirizzo noreply@ar.gioxx.org e vede quindi l'indirizzo del destinatario e il testo del messaggio.</li>
+<li>I codici che ti diamo a mano (senza pagamento online) non hanno nessun indirizzo email associato.</li>
+</ul>
+
+<h2>Chi tratta i dati</h2>
+<ul>
+<li><strong>Cloudflare</strong>: hosting del sito, database D1 e archivio R2. Come ogni fornitore di rete può trattare dati tecnici di connessione (come l'indirizzo IP) per far funzionare e proteggere il servizio; usiamo l'indirizzo IP solo per limitare gli abusi.</li>
+<li><strong>Stripe</strong>: pagamenti, come sopra.</li>
+<li><strong>Resend</strong>: invio delle email, come sopra.</li>
+</ul>
+<p>Non vendiamo né cediamo dati a nessun altro.</p>
+
+<h2>Per quanto tempo</h2>
+<ul>
+<li>Quando l'ultimo telefono esce dalla famiglia, o quando riparti da zero con il recupero della licenza, i dati cifrati e le foto di quella famiglia vengono cancellati dal server.</li>
+<li>Le foto non più usate da nessun capo vengono cancellate dal server dopo 30 giorni.</li>
+<li>Il record della licenza (tipo, numero di telefoni, hash del codice, hash dell'email e, per i codici acquistati online, l'identificativo della sessione di pagamento Stripe come riferimento del pagamento) resta, per poter onorare l'acquisto anche se cambi telefono.</li>
+<li>Uscire dalla famiglia o usare "Elimina tutti i dati" non cancella i dati degli altri telefoni. I dati sul tuo telefono li cancelli tu, dal menu.</li>
+</ul>
+
+<h2>I tuoi diritti</h2>
+<p>Puoi chiedere accesso, rettifica o cancellazione dei dati che ci riguardano (in pratica: il record della licenza e l'hash dell'email) e puoi proporre reclamo al Garante per la protezione dei dati personali. I dati cifrati della famiglia li cancelli da solo uscendo dalla famiglia con l'ultimo telefono. Per ogni richiesta scrivi a <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</p>
+
+<h2>Cookie e tracciamento</h2>
+<p>Nessun cookie, nessuno strumento di analisi, nessuna pubblicità, nessun contenuto di terzi incorporato. Il codice dell'app è pubblico (licenza AGPL-3.0) su <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, quindi quanto scritto qui è verificabile.</p>
+
+<p class="meta">Se cambieremo qualcosa di sostanziale, aggiorneremo questa pagina e la data in alto.</p>
+<a class="back" href="/">Torna ad A/R</a>
+</section>
+
+<section id="en" lang="en" aria-labelledby="en-h">
+<h1 id="en-h">Privacy policy</h1>
+<p class="meta">Andata e Ritorno (A/R) · ar.gioxx.org · updated October 2026 (version 3.0.0)</p>
+
+<h2>In short</h2>
+<p>If you use A/R on its own, everything stays on your phone and nothing reaches us. If you turn on family sharing, items and photos are uploaded to a server in encrypted form, and only your family's phones can read them. No tracking, no analytics, no ads.</p>
+
+<h2>Free use: everything on the device</h2>
+<p>Tabs, items, photos, categories and preferences are saved in your phone's browser storage (IndexedDB). There is no account, and this data is not sent to anyone. The site only delivers the app's files. You create and keep the <code>.zip</code> backups yourself.</p>
+
+<h2>Family sharing (paid)</h2>
+<p>Only if you enter an unlock code and create a family is data synced between phones, through Cloudflare (D1 database and R2 storage). Before it leaves the phone, items, tabs, categories, photos, the family name and the phone names are encrypted (AES-GCM, 256-bit) with a key generated on your phone. That key and the recovery kit secret are never sent to the server in plaintext: whoever runs the service cannot read your data.</p>
+<p>The server does see this metadata: random identifiers (family, phone, record, photo), sequence numbers, sizes, photo upload times, how many phones are connected and, for each phone, when it was added and when it was last active. It also keeps only hashes of codes and access tokens, never the values themselves.</p>
+<p>Where the data physically sits is decided by Cloudflare (EU or US, depending on its infrastructure).</p>
+<p><strong>Note:</strong> if you lose every phone and the recovery kit too, the server copy can no longer be read, not even by us. Keep the kit safe and make a backup now and then. Backups made while you are in a family contain the recovery kit and are not encrypted: store them safely.</p>
+
+<h2>Payment and email address</h2>
+<ul>
+<li><strong>Stripe</strong> takes the payment and is the seller (merchant of record, through Managed Payments). Stripe handles card and payment data under its own privacy policy; A/R never receives it.</li>
+<li>The email address given at checkout is used for two things: sending you the unlock code and, kept <em>only as a keyed hash (HMAC)</em>, recognising your licence if you need to recover it. We do not store the address in plaintext and do not use it for anything else (no newsletters, no marketing).</li>
+<li><strong>Resend</strong> sends the emails (unlock code and licence-recovery link) from noreply@ar.gioxx.org, so it sees the recipient's address and the message text.</li>
+<li>Codes we hand out manually (no online payment) have no email address attached.</li>
+</ul>
+
+<h2>Who processes the data</h2>
+<ul>
+<li><strong>Cloudflare</strong>: hosting of the site, D1 database and R2 storage. Like any network provider it may process technical connection data (such as the IP address) to run and protect the service; we use the IP address only to limit abuse.</li>
+<li><strong>Stripe</strong>: payments, as above.</li>
+<li><strong>Resend</strong>: email delivery, as above.</li>
+</ul>
+<p>We do not sell or share data with anyone else.</p>
+
+<h2>How long we keep it</h2>
+<ul>
+<li>When the last phone leaves the family, or when you start over through licence recovery, that family's encrypted data and photos are deleted from the server.</li>
+<li>Photos no longer used by any item are deleted from the server after 30 days.</li>
+<li>The licence record (kind, number of phones, code hash, email hash and, for codes bought online, the Stripe Checkout session id as the payment reference) is kept so the purchase is honoured if you change phone.</li>
+<li>Leaving the family or using "Delete all data" does not delete the other phones' data. Data on your own phone is deleted by you, from the menu.</li>
+</ul>
+
+<h2>Your rights</h2>
+<p>You can ask for access, correction or deletion of the data we hold about you (in practice: the licence record and the email hash), and you may lodge a complaint with your data protection authority. You delete the family's encrypted data yourself by leaving the family with the last phone. For any request write to <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</p>
+
+<h2>Cookies and tracking</h2>
+<p>No cookies, no analytics, no ads, no embedded third-party content. The app's code is public (AGPL-3.0 licence) on <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, so what is written here can be checked.</p>
+
+<p class="meta">If something substantial changes, we will update this page and the date at the top.</p>
+<a class="back" href="/">Back to A/R</a>
+</section>
+</main>
+</body>
+</html>

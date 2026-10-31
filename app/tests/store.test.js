@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { openDb, putTab, addItems, getMeta, loadAll, getPhoto } from '../src/db.js'
-import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected, setShowTags } from '../src/store.js'
+import { openDb, putTab, addItems, getMeta, loadAll, getPhoto, setSyncTracking } from '../src/db.js'
+import { store, load, selectToggle, selectSection, clearSelection, move, deleteSelected, runExclusive, addPhotos, subscribe, addTab, renameTab, reorderTabs, removeTab, editItem, rotateAndEdit, prepareReplacement, addCategory, removeCategory, renameCategory, addDefaultCategories, toggleFilter, clearFilter, setCurrentTab, categorizeSelected, setShowTags, reloadFromDb } from '../src/store.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
 const tab = (id, order) => ({ id, name: id, order, createdAt: T0, updatedAt: T0 })
@@ -340,6 +340,44 @@ describe('edit item', () => {
     expect(store.unsaved).toBe(before.unsaved + 1)
   })
 
+  describe('category deleted while syncing (stale id stays on items)', () => {
+    let cid
+    beforeEach(async () => {
+      await addCategory('Costumi')
+      cid = store.categories[0].id
+      await editItem('a1', { category: cid })
+      await addCategory('Maglie')
+      await editItem('a2', { category: store.categories[1].id })
+      setSyncTracking(true)
+      try { await removeCategory(cid) } finally { setSyncTracking(false) }
+    })
+
+    it('memory matches the database: the item keeps the id and its updatedAt', async () => {
+      const mem = store.items.find((i) => i.id === 'a1')
+      const stored = (await loadAll(db)).items.find((i) => i.id === 'a1')
+      expect(mem.category).toBe(cid)
+      expect(mem).toEqual(stored)
+    })
+
+    it('filters and selection treat it as uncategorised', () => {
+      toggleFilter('')
+      expect([...store.filter]).toEqual([''])
+      selectSection('school')
+      expect([...store.selected]).toEqual(['a1'])
+    })
+
+    it('choosing "none" or saving an untouched edit writes nothing; a real edit clears the id', async () => {
+      const before = store.unsaved
+      selectToggle('a1')
+      await categorizeSelected(null)
+      await editItem('a1', { label: 'a1', tabId: 'A', category: null })
+      expect(store.unsaved).toBe(before)
+      expect(store.items.find((i) => i.id === 'a1').category).toBe(cid)
+      await editItem('a1', { label: 'nuovo', tabId: 'A', category: null })
+      expect('category' in store.items.find((i) => i.id === 'a1')).toBe(false)
+    })
+  })
+
   it('removeCategory on an unknown id throws not-found and counts nothing', async () => {
     await expect(removeCategory('ghost')).rejects.toThrow('not-found')
     expect(store.unsaved).toBe(0)
@@ -402,14 +440,14 @@ describe('edit item', () => {
       expect(store.filter.size).toBe(0)
     })
 
-    it('the uncategorised filter turns itself off once no item of the tab has a category', async () => {
+    it('the uncategorised filter stays on when every item of the tab is uncategorised (categories still exist)', async () => {
       const { UNCATEGORISED } = await import('../src/ui/filter.js')
       setCurrentTab('A') // tab A mixes categorised and uncategorised items
       toggleFilter(UNCATEGORISED)
       await editItem('a1', { category: null })
       expect(store.filter.size).toBe(1)
       await editItem('a2', { category: null })
-      expect(store.filter.size).toBe(0)
+      expect([...store.filter]).toEqual([UNCATEGORISED])
     })
 
     it('a filter category that no item of the tab uses any more is dropped', async () => {
@@ -457,5 +495,32 @@ describe('categorize selection', () => {
     selectToggle('a1'); selectToggle('a2')
     await expect(categorizeSelected('nope')).rejects.toThrow('not-found')
     expect([...store.selected].sort()).toEqual(['a1', 'a2'])
+  })
+})
+
+describe('reloadFromDb', () => {
+  it('picks up writes made behind the store, keeping tab and still-valid selection, after queued mutations', async () => {
+    setCurrentTab('A')
+    selectToggle('a1')
+    selectToggle('a2')
+    await db.delete('items', 'a2') // as a sync plan would
+    await db.put('items', { ...item('a9', 'A', 'home') })
+    const order = []
+    const queued = runExclusive(async () => { order.push('mutation') })
+    const reloaded = reloadFromDb().then(() => order.push('reload'))
+    await Promise.all([queued, reloaded])
+    expect(order).toEqual(['mutation', 'reload'])
+    expect(store.currentTabId).toBe('A')
+    expect(store.items.map((i) => i.id).sort()).toEqual(['a1', 'a3', 'a9', 'b1'])
+    expect([...store.selected]).toEqual(['a1'])
+  })
+
+  it('falls back to the first tab when the current one is gone', async () => {
+    setCurrentTab('B')
+    selectToggle('b1')
+    await db.delete('tabs', 'B')
+    await reloadFromDb()
+    expect(store.currentTabId).toBe('A')
+    expect(store.selected.size).toBe(0)
   })
 })

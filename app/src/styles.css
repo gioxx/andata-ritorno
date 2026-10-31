@@ -45,6 +45,24 @@ h1 { margin: 0; font-size: 1.375rem; font-weight: 700; letter-spacing: -.01em; }
 .chip { flex: none; min-height: 44px; display: inline-flex; align-items: center; padding: 7px 14px; border-radius: var(--r-pill); font-size: 0.8125rem; font-weight: 700; background: var(--chip); color: var(--muted); white-space: nowrap; }
 .chip.on { background: var(--accent-strong); color: var(--bg); }
 .chip.add { background: transparent; border: 1.5px dashed var(--muted); color: var(--muted); padding: 5.5px 12px; }
+html.in-family { overscroll-behavior-y: contain; } /* pull-to-refresh is ours, not the browser's */
+/* Sync status bar: right under the tabs, stuck to the top (below the status bar) while the list scrolls.
+   The header stays above it while both are on screen; ::before fills the safe area once it is stuck. */
+header { position: relative; z-index: 4; }
+.syncbar { position: sticky; top: env(safe-area-inset-top); z-index: 3; padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); background: var(--surface); }
+.syncbar::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: env(safe-area-inset-top); background: var(--surface); }
+.syncline { display: block; width: 100%; padding: 6px 4px 8px; font-size: 0.75rem; color: var(--muted); text-align: center; background: none; }
+.syncprog { padding: 0 4px 8px; }
+.syncprog .track { position: relative; height: 4px; border-radius: var(--r-pill); background: var(--chip); overflow: hidden; }
+.syncprog .track > i { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: inherit; background: var(--accent-strong); transition: width .2s ease-out; }
+.syncprog .track.indeterminate > i { width: 35%; animation: sync-indeterminate 1.2s ease-in-out infinite; }
+@keyframes sync-indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.syncphase { display: block; margin-top: 4px; font-size: 0.6875rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .syncprog .track > i { transition: none; }
+  .syncprog .track.indeterminate > i { width: 100%; animation: none; opacity: .5; }
+}
+.syncline.removed { color: var(--fg); font-weight: 700; }
 main { flex: 1; padding: 8px max(12px, env(safe-area-inset-right)) calc(6rem + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
 section { border-radius: var(--r-section); padding: 12px; margin-bottom: 10px; }
 section.school { background: var(--school); box-shadow: inset 3px 0 0 var(--school-stripe); }
@@ -85,6 +103,10 @@ section h2 { display: flex; justify-content: space-between; align-items: center;
 /* ---- Dialogs (add flow) ---- */
 dialog { max-height: calc(90dvh - env(safe-area-inset-bottom)); overflow-y: auto; border: 0; border-radius: var(--r-section); padding: 18px; background: var(--surface); color: var(--fg); width: min(92vw, 360px); font-family: var(--font); }
 dialog::backdrop { background: rgba(0,0,0,.45); }
+/* An open dialog keeps the scroll to itself: the page under it does not move. */
+dialog { overscroll-behavior: contain; }
+html:has(dialog[open]) { overflow: hidden; }
+dialog h3[tabindex="-1"]:focus { outline: none; } /* focused on open only to keep the keyboard down */
 dialog h3 { margin: 0 0 12px; font-size: 1.0625rem; font-weight: 700; }
 dialog .row { display: flex; gap: 8px; }
 dialog button { flex: 1; min-height: 44px; padding: 13px; border-radius: var(--r-pill); font-weight: 700; font-size: 0.875rem; background: var(--chip); }
@@ -120,6 +142,8 @@ dialog .note { margin: 8px 0 0; font-size: 0.75rem; color: var(--muted); text-al
 /* ---- Edit dialog & viewer ---- */
 dialog select { width: 100%; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
 dialog #editRotate, dialog #editPhoto { display: block; width: 100%; margin-bottom: 12px; }
+dialog #editRotate { display: flex; align-items: center; justify-content: center; gap: 6px; }
+dialog button[data-buy] small { display: block; margin-top: 2px; font-size: 0.75rem; font-weight: 500; opacity: .8; }
 #viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; flex-direction: column; }
 #viewer[hidden] { display: none; }
 #viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); }
@@ -160,6 +184,9 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .menuItem .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--holder); color: var(--accent); }
 #menu .menuItem .badge { margin-left: auto; padding: 2px 9px; border-radius: var(--r-pill); background: var(--accent-strong); color: var(--bg); font-size: 0.75rem; font-weight: 700; }
 #menu .menuItem[hidden] { display: none; }
+#menu .menuItem .txt { display: flex; flex-direction: column; min-width: 0; }
+#menu .menuItem .txt small { font-size: 0.75rem; font-weight: 400; color: var(--muted); }
+#menu .menuItem .badge { white-space: nowrap; }
 #menu .menuItem.danger { color: var(--danger); }
 #menu .menuItem.danger .ic { color: var(--danger); }
 .seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); }
@@ -185,10 +212,13 @@ dialog .row + .cancel { margin-top: 8px; }
 .tags .chip.tag { background: transparent; border: 1.5px solid var(--muted); padding: 5.5px 12.5px; }
 .tags .chip.tag.on { border-color: var(--accent-strong); color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-strong); }
 .tags .chip.tag.none:not(.on) { border-style: dashed; }
+.tags .tagshint { align-self: center; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
 .tags .tagsicon { flex: none; display: flex; align-items: center; padding: 0 2px; color: var(--muted); }
 /* Wraps (no scroller): every category must be visible and tappable. */
 dialog .catpick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
 dialog .catpick .chip { flex: none; width: auto; padding: 7px 14px; }
+/* Many categories scroll inside the box (two rows and a half show: the cut row says there is more). */
+dialog #newCat, dialog #editCat { max-height: 126px; overflow-y: auto; overscroll-behavior: contain; padding: 5px; margin: -5px -5px 7px; } /* 5px: room for the focus ring */
 dialog .catpick .hint { flex: none; font-size: 0.8125rem; color: var(--muted); }
 dialog .catpick .linkbtn { flex: none; width: auto; padding: 10px 12px; background: none; color: var(--accent-strong); text-decoration: underline; }
 /* The list scrolls, which clips anything drawn outside it: 5px of room (3px outline + 2px offset) keeps the focus ring whole. */
@@ -264,3 +294,34 @@ dialog .wipe-actions { display: flex; flex-direction: column; gap: 8px; }
 .update-toast .up-go { background: var(--accent-strong); color: var(--bg); }
 .update-toast .up-go:disabled { opacity: .5; }
 .update-toast .up-x { background: none; color: inherit; font-size: 1.125rem; }
+
+/* ---- Family dialogs ---- */
+dialog .qr svg { display: block; width: 100%; max-width: 240px; margin: 12px auto; border-radius: 12px; }
+dialog .err:empty { display: none; }
+dialog .kitText { width: 100%; margin-bottom: 8px; padding: 10px 12px; border: 1.5px solid var(--chip); border-radius: 12px; background: var(--tile); color: var(--fg); font: 0.75rem/1.4 ui-monospace, monospace; word-break: break-all; resize: none; }
+dialog .famDevices { list-style: none; margin: 0 0 8px; padding: 0; }
+dialog .famDevices li { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+dialog .famDevices .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+dialog .famDevices small { color: var(--muted); font-size: 0.75rem; }
+dialog .famDevices .tag { font-size: 0.6875rem; padding: 1px 8px; border-radius: var(--r-pill); background: var(--chip); }
+dialog .famDevices button.danger { width: auto; padding: 8px 12px; }
+dialog button.primary { display: block; width: 100%; margin-top: 8px; }
+dialog input[type="email"] { width: 100%; margin-bottom: 8px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
+dialog [data-scan], dialog [data-link] { display: block; width: 100%; margin-bottom: 12px; }
+dialog [data-link] { margin-top: -4px; }
+dialog label.choice { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 0.875rem; font-weight: 600; }
+dialog label.choice input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); }
+dialog p.note { color: var(--muted); font-size: 0.8125rem; }
+dialog .scanVideo { display: block; width: 100%; max-height: 55vh; margin-bottom: 12px; border-radius: 12px; background: #000; object-fit: cover; }
+#menu .kitInfo:not(:empty) { display: block; margin-top: 4px; }
+
+/* ---- Pages reached from outside the app (/unlock, iOS hand-off) ---- */
+.page { max-width: 460px; margin: 0 auto; text-align: center; }
+.page p { margin: 0; line-height: 1.5; }
+.page .unlockCode { padding: 16px 8px; border-radius: var(--r-tile); background: var(--tile); font: 700 1.5rem/1.2 ui-monospace, monospace; letter-spacing: .04em; word-break: break-all; user-select: all; }
+.page .pageNote:empty { display: none; }
+.page .pageNote, .page .err { font-weight: 600; }
+.page .err { color: var(--danger); }
+.page #unlockBody { display: flex; flex-direction: column; gap: 12px; }
+.page .pageLink { color: var(--accent-strong); font-weight: 700; padding: 12px; }
+dialog p.plain a { color: var(--accent-strong); font-weight: 600; }

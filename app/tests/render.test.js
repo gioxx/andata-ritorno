@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderApp, hooks } from '../src/ui/render.js'
 import { store } from '../src/store.js'
+import { enableSyncLine } from '../src/ui/syncLine.js'
 
 const tab = { id: 'A', name: 'A', order: 0, createdAt: '', updatedAt: '' }
 
@@ -42,10 +43,14 @@ describe('tag row', () => {
   const mk = (id, category) => ({ id, tabId: 'A', location: 'school', label: id, photoId: 'p' + id, ...(category ? { category } : {}) })
   const state = (items, filter = new Set(), showTags = true) => ({ tabs: [tab], items, categories: cats, filter, showTags, currentTabId: 'A', selected: new Set(), unsaved: 0 })
 
-  it('the show/hide button appears only when the tab has categorised items', () => {
+  it('the show/hide button is on every tab once a category exists, even with no categorised item there', () => {
     const root = document.createElement('div')
+    renderApp(root, { ...state([mk('x')], new Set(), false), categories: [] })
+    expect(root.querySelector('[data-act="toggleTags"]')).toBeNull() // no categories at all
     renderApp(root, state([mk('x')], new Set(), false))
-    expect(root.querySelector('[data-act="toggleTags"]')).toBeNull()
+    expect(root.querySelector('[data-act="toggleTags"]')).not.toBeNull()
+    renderApp(root, state([], new Set(), false))
+    expect(root.querySelector('[data-act="toggleTags"]')).not.toBeNull()
     renderApp(root, state([mk('x', 'c1')], new Set(), false))
     const btn = root.querySelector('[data-act="toggleTags"]')
     expect(btn.getAttribute('aria-pressed')).toBe('false')
@@ -55,10 +60,33 @@ describe('tag row', () => {
     expect(root.querySelector('.tags')).not.toBeNull()
   })
 
-  it('is absent when no item of the tab has a category', () => {
+  it('a tab with only uncategorised items offers "Senza categoria", which filters, selects and categorises as usual', () => {
     const root = document.createElement('div')
-    renderApp(root, state([mk('x')]))
+    renderApp(root, state([mk('x'), mk('y')]))
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Senza categoria'])
+    renderApp(root, state([mk('x'), mk('y')], new Set([''])))
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti ✕', 'Senza categoria'])
+    expect(root.querySelectorAll('.item')).toHaveLength(2)
+  })
+
+  it('an empty tab shows a hint instead of pills, in both languages', async () => {
+    const { setLang } = await import('../src/i18n.js')
+    const root = document.createElement('div')
+    renderApp(root, state([]))
+    expect(root.querySelectorAll('.tags .chip')).toHaveLength(0)
+    expect(root.querySelector('.tags').textContent).toContain('Nessun capo in questo tab')
+    setLang('en')
+    try {
+      renderApp(root, state([]))
+      expect(root.querySelector('.tags').textContent).toContain('No items in this tab')
+    } finally { setLang('it') }
+  })
+
+  it('no row and no button when no category exists at all', () => {
+    const root = document.createElement('div')
+    renderApp(root, { ...state([mk('x')]), categories: [] })
     expect(root.querySelector('.tags')).toBeNull()
+    expect(root.querySelector('[data-act="toggleTags"]')).toBeNull()
   })
 
   it('lists only the used categories, filters the grid and shows "Tutti ✕" first', () => {
@@ -75,7 +103,7 @@ describe('tag row', () => {
     expect(root.querySelector('.count').textContent).toBe('2')
   })
 
-  it('"Senza categoria" comes last, only when the tab mixes categorised and uncategorised items', () => {
+  it('"Senza categoria" comes last, only when the tab has uncategorised items', () => {
     const root = document.createElement('div')
     renderApp(root, state([mk('x', 'c1'), mk('y', 'c1')]))
     expect(root.querySelector('.tags .none')).toBeNull()
@@ -111,6 +139,17 @@ describe('tag row', () => {
     root.querySelector('[data-tagclear]').click()
     expect(st.filter.size).toBe(0)
   })
+
+  it('an item whose category was deleted elsewhere renders as uncategorised', () => {
+    const root = document.createElement('div')
+    renderApp(root, state([mk('x', 'gone')], new Set(), false))
+    expect(root.querySelector('[data-act="toggleTags"]')).not.toBeNull() // categories exist
+    expect(root.querySelector('.item[data-id="x"] .pick').getAttribute('aria-label')).toContain('senza categoria')
+    const items = [mk('x', 'c1'), mk('y', 'gone')]
+    renderApp(root, state(items, new Set([''])))
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti ✕', 'Maglie', 'Senza categoria'])
+    expect([...root.querySelectorAll('.item')].map((n) => n.dataset.id)).toEqual(['y'])
+  })
 })
 
 describe('categorize button', () => {
@@ -142,5 +181,45 @@ describe('category row preference', () => {
     expect(localStorage.getItem('ar-tags')).toBeNull()
     await load(await openDb('ar-pref-' + crypto.randomUUID()))
     expect(st.showTags).toBe(false)
+  })
+})
+
+describe('sync status line', () => {
+  afterEach(() => enableSyncLine(false))
+  const state = () => ({ tabs: [tab], items: [], currentTabId: 'A', selected: new Set(), unsaved: 0 })
+  it('sits right under the tabs, before the list, and nothing stays at the bottom', () => {
+    enableSyncLine(true)
+    const root = document.createElement('div')
+    renderApp(root, state())
+    const line = root.querySelector('.syncbar')
+    expect(line).not.toBeNull()
+    expect(line.previousElementSibling.tagName).toBe('HEADER')
+    expect(line.nextElementSibling.tagName).toBe('MAIN')
+    expect(root.querySelector('main .syncline')).toBeNull()
+  })
+  it('is not rendered outside a family', () => {
+    enableSyncLine(false)
+    const root = document.createElement('div')
+    renderApp(root, state())
+    expect(root.querySelector('.syncbar, .syncline')).toBeNull()
+    expect(root.querySelector('header').nextElementSibling.tagName).toBe('MAIN')
+  })
+})
+
+describe('unsaved-changes banner', () => {
+  const state = () => ({ tabs: [tab], items: [], currentTabId: 'A', selected: new Set(), unsaved: 4 })
+  afterEach(async () => { const { syncStatus } = await import('../src/sync/engine.js'); syncStatus.member = false })
+  it('is hidden on a device in an active family and back once it is not', async () => {
+    const { syncStatus } = await import('../src/sync/engine.js')
+    const root = document.createElement('div')
+    syncStatus.member = false
+    renderApp(root, state())
+    expect(root.querySelector('.unsaved')).not.toBeNull()
+    syncStatus.member = true
+    renderApp(root, state())
+    expect(root.querySelector('.unsaved')).toBeNull()
+    syncStatus.member = false // left, or removed
+    renderApp(root, state())
+    expect(root.querySelector('.unsaved')).not.toBeNull()
   })
 })

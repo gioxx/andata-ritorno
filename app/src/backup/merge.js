@@ -1,24 +1,37 @@
 // Per-field last-writer-wins merge. Pure: no I/O. ISO strings compare lexicographically.
 
-/** Merge two versions of one item; ties keep `a` (the local / first-seen side). */
-function mergeItem(a, b) {
-  const move = b.movedAt > a.movedAt ? b : a // location travels with movedAt
-  const edit = b.updatedAt > a.updatedAt ? b : a // everything else with updatedAt
+/**
+ * Merge two versions of one item; ties keep `a` (the local / first-seen side).
+ * `breakTies` (sync only): on an exact tie the field group with the greater JSON wins instead,
+ * so two devices merging each other's version end up with the same item.
+ */
+export function mergeItem(a, b, { breakTies = false } = {}) {
+  const wins = (at, val) => at(b) > at(a) || (breakTies && at(b) === at(a) && JSON.stringify(val(b)) > JSON.stringify(val(a)))
+  const move = wins((x) => x.movedAt, (x) => x.location) ? b : a // location travels with movedAt
+  const edit = wins((x) => x.updatedAt, (x) => [x.label, x.tabId, x.category ?? null]) ? b : a // everything else with updatedAt
+  // The photo has its own clock: a label edit must not drag an older photo along (or lose a newer one).
+  // An item from before photoAt existed still has its first photo: a side with a photo clock wins
+  // over it whatever its updatedAt says (a later label edit is not a photo change). Only when
+  // neither side has one (an old backup against old data) does updatedAt decide.
+  const legacy = a.photoAt === undefined && b.photoAt === undefined
+  const photo = wins((x) => x.photoAt ?? (legacy ? x.updatedAt : ''), (x) => [x.photoId, x.photoAt ?? null]) ? b : a
   const out = {
     ...a,
     location: move.location,
     movedAt: move.movedAt,
     label: edit.label,
     tabId: edit.tabId,
-    photoId: edit.photoId,
+    photoId: photo.photoId,
     updatedAt: edit.updatedAt,
   }
+  if (photo.photoAt === undefined) delete out.photoAt
+  else out.photoAt = photo.photoAt
   if (edit.category === undefined) delete out.category
   else out.category = edit.category
   return out
 }
 
-const FIELDS = ['tabId', 'location', 'label', 'category', 'photoId', 'movedAt', 'updatedAt']
+const FIELDS = ['tabId', 'location', 'label', 'category', 'photoId', 'photoAt', 'movedAt', 'updatedAt']
 const same = (a, b) => FIELDS.every((f) => a[f] === b[f])
 
 /**

@@ -20,6 +20,7 @@ Take a photo of each item once; from then on every item is either *a scuola* or 
 - **Works offline** and installs like an app (PWA).
 - Light, dark or automatic theme.
 - **App menu**: an *Install app* button (native prompt where the browser offers it, steps otherwise), *How to uninstall* instructions, and *Delete all data* (two steps, with an optional backup first and a typed confirmation).
+- **Family sharing** (optional, paid): keep the same wardrobe in sync on up to four phones, end-to-end encrypted (see Privacy). Without it the app never talks to a server.
 - Security headers on the served app.
 
 ## Installing on iPhone
@@ -28,7 +29,9 @@ Open <https://ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**. Ins
 
 ## Privacy
 
-Everything stays on your device, in the browser's storage (IndexedDB). There is no account and no server-side storage: the site only serves the app's static files. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
+**Free use:** everything stays on your device, in the browser's storage (IndexedDB). There is no account and nothing is sent to a server: the site only serves the app's static files. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
+
+**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://ar.gioxx.org/privacy.html> and linked from the app menu.
 
 ## Development
 
@@ -58,7 +61,7 @@ Change the `routes` pattern in `worker/wrangler.app.toml` to deploy it on your o
 
 ```
 app/       the app (src/, tests/, public/ icons and manifest)
-worker/    Cloudflare config for the app, plus an unused API Worker (see below)
+worker/    the Cloudflare Worker: app hosting and the `/api/*` family sharing API
 legacy/    the first single-file prototype, kept only as reference for its backup format
 docs/      design notes and the implementation plan
 ```
@@ -74,19 +77,41 @@ Backups exported from the old prototype (`andata-ritorno-AAAA-MM-GG.json`) can s
 - [x] Optional categories and a quick filter
 - [x] Photo rotation, Italian/English, iPhone support
 - [ ] Per-item movement history
-- [ ] Family sharing between phones
+- [x] Family sharing between phones
+- [x] Privacy policy (public app, premium data on the server)
+- [ ] Landing site andata-ritorno.gioxx.org (docs, guide for parents and guardians, privacy policy)
 
-## Unused API Worker
+## Worker and API deploy notes
 
-`worker/src` and `worker/schema.sql` (D1 + R2) are an early skeleton for a future sync/sharing feature. The app does not use them and they are not deployed. `/api/*` has **no authentication of its own**: never deploy `worker/wrangler.toml` without putting Cloudflare Access (or equivalent) in front of it. Setup order, for reference:
+`worker/` holds the Cloudflare Worker that serves the app (static assets) and the family sharing API under `/api/*` (D1 + R2). One-time setup, in this order:
 
 ```bash
 cd worker && npm install
-npx wrangler d1 create andata-ritorno          # paste the id into wrangler.toml
+npx wrangler d1 create andata-ritorno            # paste the id into wrangler.app.toml (database_id)
 npx wrangler r2 bucket create andata-ritorno-photos
-npm run db:init
-npm run deploy
+npm run db:init                                  # applies schema.sql to the remote database
+# Secrets (interactive prompt; never commit values):
+npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.app.toml
+npx wrangler secret put STRIPE_WEBHOOK_SECRET --config wrangler.app.toml
+npx wrangler secret put EMAIL_HMAC_KEY --config wrangler.app.toml
+npx wrangler secret put CODE_HMAC_KEY --config wrangler.app.toml
+npx wrangler secret put RESEND_API_KEY --config wrangler.app.toml
+npm run deploy:app
 ```
+
+Then:
+
+1. **Resend**: the domain `ar.gioxx.org` must be verified in Resend (DNS records); unlock-code and licence-recovery emails are sent from `noreply@ar.gioxx.org`.
+2. **Stripe**: enable Managed Payments, then create two Payment Links, each with a single price and quantity fixed to 1: the family unlock (4,99 €) and the extra device slot (1,99 €). On both, set the success URL to `https://ar.gioxx.org/unlock?session_id={CHECKOUT_SESSION_ID}`.
+3. **Stripe webhook**: add an endpoint `https://ar.gioxx.org/api/stripe/webhook` listening to `checkout.session.completed` and `checkout.session.async_payment_succeeded`; its signing secret is `STRIPE_WEBHOOK_SECRET`.
+4. Put the two Stripe price ids in `PRICE_FAMILY` and `PRICE_SLOT` in `[vars]` of `wrangler.app.toml`.
+5. **Build-time environment** for the app (read by Vite at `npm run deploy:app`, e.g. in the shell or `app/.env.production`, not committed if you prefer): `VITE_PAYMENTS=1` shows the purchase buttons (leave it unset to keep them hidden: manual codes work either way), `VITE_STRIPE_LINK_FAMILY` and `VITE_STRIPE_LINK_SLOT` are the two Payment Link URLs.
+6. **Photo storage cap**: `MAX_TOTAL_PHOTO_BYTES` in `[vars]` of `wrangler.app.toml` (default 9 000 000 000 when unset) is the most photo bytes the server stores across all families, to stay inside R2's free 10 GB. Past it, new photos get `413 limit-storage` (items keep syncing, existing photos stay readable); deleting photos or purging a family frees space. The running total lives in the `usage` table (row `photo_bytes`), created and seeded by `schema.sql`. Photo rows have a `ready` flag: a row is written (not ready, hidden from list and get) when the bytes are reserved and turns ready once the R2 object exists, so an interrupted upload is simply re-sent by the next sync. The total counts every row, ready or not.
+
+   A database created before the `usage` table and `ready` column existed needs, once: `ALTER TABLE photos ADD COLUMN ready INTEGER NOT NULL DEFAULT 1; CREATE TABLE usage (key TEXT PRIMARY KEY, bytes INTEGER NOT NULL); INSERT INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos;`. If the total ever drifts (for example after a manual cleanup), reconcile it with `UPDATE usage SET bytes = (SELECT COALESCE(SUM(size), 0) FROM photos) WHERE key = 'photo_bytes';` (all rows, ready or not).
+7. **Manual codes** (Ko-fi, Satispay, PayPal, gifts), run with your Wrangler login from the repository root: `node worker/scripts/code.mjs family --remote` (or `slot`); `node worker/scripts/code.mjs recover <code> --remote` prints a licence-recovery link for a licence with no email on file.
+
+The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the API simply does not rate-limit. Never commit secret values. Tests: `npm --prefix worker test`.
 
 ## In italiano
 
@@ -97,7 +122,7 @@ npm run deploy
 - **Android**: apri il sito in Chrome e scegli "Installa app" / "Aggiungi a schermata Home".
 - **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
 - **Menu App**: *Installa app*, *Come disinstallare* ed *Elimina tutti i dati* (con backup facoltativo e conferma scritta).
-- **Privacy**: tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server.
+- **Privacy**: senza condivisione in famiglia tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server. Con la condivisione (facoltativa, a pagamento) capi e foto sono cifrati sul telefono e il server non può leggerli. Informativa completa: <https://ar.gioxx.org/privacy.html>.
 - **Backup**: esporta un file `.zip` con le foto; ogni backup viene riletto e controllato prima del salvataggio. I backup sono una tua responsabilità.
 
 ## License

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPlan } from '../src/backup/merge.js'
+import { buildPlan, mergeItem } from '../src/backup/merge.js'
 
 const d = (n) => `2026-01-${String(n).padStart(2, '0')}T00:00:00.000Z`
 const tab = (id, over = {}) => ({ id, name: id, order: 0, createdAt: d(1), updatedAt: d(1), ...over })
@@ -162,5 +162,34 @@ describe('buildPlan', () => {
     const local = { tabs: [], items: [], categories: [cat('c1')] }
     const plan = buildPlan(local, withCats(incoming([item('a', { category: 'c1' })]), []))
     expect(plan.itemsPut[0].category).toBe('c1')
+  })
+})
+
+describe('mergeItem photoAt', () => {
+  it('photoId follows photoAt, not updatedAt', () => {
+    const local = item('a', { photoId: 'p2', photoAt: d(2), label: 'a', updatedAt: d(2) })
+    const inc = item('a', { photoId: 'p1', photoAt: d(1), label: 'b', updatedAt: d(3) })
+    const m = mergeItem(local, inc)
+    expect(m.photoId).toBe('p2')
+    expect(m.photoAt).toBe(d(2))
+    expect(m.label).toBe('b')
+  })
+
+  it('an item from before photoAt: a later label edit does not beat a replaced photo (either side)', () => {
+    const replaced = item('a', { photoId: 'p-new', photoAt: d(2), updatedAt: d(2) })
+    const edited = item('a', { photoId: 'p-old', label: 'nuovo', updatedAt: d(3) })
+    for (const m of [mergeItem(replaced, edited, { breakTies: true }), mergeItem(edited, replaced, { breakTies: true })]) {
+      expect(m.photoId).toBe('p-new')
+      expect(m.photoAt).toBe(d(2))
+      expect(m.label).toBe('nuovo')
+    }
+  })
+
+  it('missing photoAt on both sides falls back to updatedAt', () => {
+    const local = item('a', { photoId: 'p-old', updatedAt: d(2) })
+    const inc = item('a', { photoId: 'p-new', updatedAt: d(3) })
+    const m = mergeItem(local, inc)
+    expect(m.photoId).toBe('p-new')
+    expect('photoAt' in m).toBe(false)
   })
 })

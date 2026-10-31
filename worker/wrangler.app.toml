@@ -1,5 +1,6 @@
-# v2 public app: static assets only, no API.
+# Public app (static assets) plus the family sharing API under /api/*.
 name = "andata-ritorno-app"
+main = "src/index.js"
 compatibility_date = "2026-10-01"
 # One origin only: IndexedDB is per-origin, so a second hostname would show an empty app.
 workers_dev = false
@@ -8,4 +9,72 @@ routes = [{ pattern = "ar.gioxx.org", custom_domain = true }]
 
 [assets]
 directory = "../app/dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
+# Only /api/* runs the Worker first; everything else is served straight from the assets.
+run_worker_first = ["/api/*"]
+
+[vars]
+APP_ORIGIN = "https://ar.gioxx.org"
+# Stripe price ids (not secret); set the real ones at deploy time.
+PRICE_FAMILY = ""
+PRICE_SLOT = ""
+# Global cap on stored photo bytes across all families (R2 free tier is 10 GB; default 9 GB when unset).
+MAX_TOTAL_PHOTO_BYTES = "9000000000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "andata-ritorno"
+# Placeholder: create the database (`wrangler d1 create andata-ritorno`) and paste its id here.
+database_id = "REPLACE_WITH_D1_ID"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "andata-ritorno-photos"
+
+# Optional at runtime: the code skips limiting when these are not bound.
+[[ratelimits]]
+name = "RL_STRICT"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "RL_API"
+namespace_id = "1002"
+# Per device on token routes (a first sync makes one call per photo), per IP elsewhere.
+simple = { limit = 600, period = 60 }
+
+# Secrets (wrangler secret put): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+# EMAIL_HMAC_KEY, CODE_HMAC_KEY, RESEND_API_KEY.
+
+# Test copy on its own origin, database and bucket: `--env test` (`npm run deploy:test`), with
+# Stripe in test mode.
+# Bindings, vars and routes are not inherited by environments, so they are repeated.
+[env.test]
+routes = [{ pattern = "ar-test.gioxx.org", custom_domain = true }]
+
+[env.test.vars]
+APP_ORIGIN = "https://ar-test.gioxx.org"
+# Stripe test-mode prices (sandbox): payments here never charge a real card.
+PRICE_FAMILY = "price_1UWe5sJJ2mHf0AIxwSIQJuEI"
+PRICE_SLOT = "price_1UWe5tJJ2mHf0AIx75U0N5eR"
+MAX_TOTAL_PHOTO_BYTES = "500000000"
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "andata-ritorno-test"
+database_id = "63986218-f8b9-4ac4-86d2-4650fe8e7ebd"
+
+[[env.test.r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "andata-ritorno-test-photos"
+
+[[env.test.ratelimits]]
+name = "RL_STRICT"
+namespace_id = "1003"
+simple = { limit = 10, period = 60 }
+
+[[env.test.ratelimits]]
+name = "RL_API"
+namespace_id = "1004"
+simple = { limit = 600, period = 60 }

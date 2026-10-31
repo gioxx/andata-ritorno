@@ -67,3 +67,33 @@ describe('Enter in the confirmation input', () => {
     expect(alertSpy).toHaveBeenCalled()
   })
 })
+
+describe('erasing in a family', () => {
+  it('leaves the family first, then wipes', async () => {
+    const leave = vi.fn(async () => { order.push('leave'); return 'left' })
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    await eraseEverything({ db: {}, reload: () => order.push('reload'), leave })
+    expect(order).toEqual(['leave', 'wipe', 'wiped', 'reload'])
+    expect(alertSpy).not.toHaveBeenCalled()
+  })
+  it('offline: still wipes, and says to remove the phone from another device', async () => {
+    const leave = vi.fn(async () => 'failed')
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    const reload = vi.fn()
+    await eraseEverything({ db: {}, reload, leave })
+    expect(order).toEqual(['wipe', 'wiped'])
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('rimuovilo da un altro telefono'))
+    expect(reload).toHaveBeenCalled()
+  })
+  it('the flow hands its leave step to the eraser', () => {
+    const erase = vi.fn(async () => {})
+    const leave = async () => 'none'
+    openWipeFlow({ db: {}, onExport: async () => {}, leave, erase })
+    document.querySelector('[data-wipe="continue"]').click()
+    const input = document.querySelector('#wipeWord')
+    input.value = 'ELIMINA'
+    input.dispatchEvent(new Event('input'))
+    document.querySelector('#wipeGo').click()
+    expect(erase).toHaveBeenCalledWith({ db: {}, leave })
+  })
+})
