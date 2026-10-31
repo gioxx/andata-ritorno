@@ -103,6 +103,10 @@ section h2 { display: flex; justify-content: space-between; align-items: center;
 /* ---- Dialogs (add flow) ---- */
 dialog { max-height: calc(90dvh - env(safe-area-inset-bottom)); overflow-y: auto; border: 0; border-radius: var(--r-section); padding: 18px; background: var(--surface); color: var(--fg); width: min(92vw, 360px); font-family: var(--font); }
 dialog::backdrop { background: rgba(0,0,0,.45); }
+/* An open dialog keeps the scroll to itself: the page under it does not move. */
+dialog { overscroll-behavior: contain; }
+html:has(dialog[open]) { overflow: hidden; }
+dialog h3[tabindex="-1"]:focus { outline: none; } /* focused on open only to keep the keyboard down */
 dialog h3 { margin: 0 0 12px; font-size: 1.0625rem; font-weight: 700; }
 dialog .row { display: flex; gap: 8px; }
 dialog button { flex: 1; min-height: 44px; padding: 13px; border-radius: var(--r-pill); font-weight: 700; font-size: 0.875rem; background: var(--chip); }
@@ -138,6 +142,7 @@ dialog .note { margin: 8px 0 0; font-size: 0.75rem; color: var(--muted); text-al
 /* ---- Edit dialog & viewer ---- */
 dialog select { width: 100%; margin-bottom: 12px; padding: 12px 14px; border: 1.5px solid var(--chip); border-radius: var(--r-pill); background: var(--tile); color: var(--fg); font: inherit; }
 dialog #editRotate, dialog #editPhoto { display: block; width: 100%; margin-bottom: 12px; }
+dialog #editRotate { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #viewer { position: fixed; inset: 0; z-index: 10; background: rgba(15,12,10,.97); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; flex-direction: column; }
 #viewer[hidden] { display: none; }
 #viewer .vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); }
@@ -211,6 +216,8 @@ dialog .row + .cancel { margin-top: 8px; }
 /* Wraps (no scroller): every category must be visible and tappable. */
 dialog .catpick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
 dialog .catpick .chip { flex: none; width: auto; padding: 7px 14px; }
+/* Many categories scroll inside the box (two rows and a half show: the cut row says there is more). */
+dialog #newCat, dialog #editCat { max-height: 126px; overflow-y: auto; overscroll-behavior: contain; padding: 5px; margin: -5px -5px 7px; } /* 5px: room for the focus ring */
 dialog .catpick .hint { flex: none; font-size: 0.8125rem; color: var(--muted); }
 dialog .catpick .linkbtn { flex: none; width: auto; padding: 10px 12px; background: none; color: var(--accent-strong); text-decoration: underline; }
 /* The list scrolls, which clips anything drawn outside it: 5px of room (3px outline + 2px offset) keeps the focus ring whole. */

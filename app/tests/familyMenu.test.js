@@ -34,23 +34,23 @@ describe('familyMenuHtml', () => {
   it('active: name, last sync, devices count, slot price only with payments', () => {
     const info = { state: 'idle', lastSyncAt: '2026-10-25T11:55:00Z', family: { name: 'Famiglia Rossi', deviceLimit: 4, devices: [{ id: 'a' }, { id: 'b' }] } }
     const on = familyMenuHtml({ family, info, payments: true, now: NOW })
-    expect(acts(on)).toEqual(['sync', 'devices', 'invite', 'slot', 'code', 'kit', 'leave'])
+    expect(acts(on)).toEqual(['sync', 'devices', 'invite', 'slot', 'kit', 'leave'])
     expect(on).toContain('Famiglia Rossi')
     expect(on).toContain('Ultima sync: 5 min fa')
     expect(on).toContain('2 / 4')
     expect(on).toContain('1,99 €')
     expect(familyMenuHtml({ family, info, payments: false, now: NOW })).not.toContain('1,99')
-    expect(acts(familyMenuHtml({ family, info, payments: false, now: NOW }))).toContain('code') // manual seat codes always work
+    expect(acts(familyMenuHtml({ family, info, payments: false, now: NOW }))).toContain('slot') // manual seat codes always work
   })
 
-  it('the code row says what it takes: any code when locked, an extra-seat code when active', () => {
-    const codeRow = (html) => new DOMParser().parseFromString(html, 'text/html').querySelector('[data-menu="code"]').textContent
+  it('a code row only when locked; when active, one "add a seat" row takes the extra-seat code', () => {
+    const row = (html, act) => new DOMParser().parseFromString(html, 'text/html').querySelector(`[data-menu="${act}"]`)?.textContent
     const info = { state: 'idle', lastSyncAt: null, family: { name: 'F', deviceLimit: 4, devices: [] } }
-    expect(codeRow(familyMenuHtml({ family: null, payments: false }))).toBe('Ho già un codice')
-    expect(codeRow(familyMenuHtml({ family, info, payments: false, now: NOW }))).toBe('Ho un codice per un posto in più')
+    expect(row(familyMenuHtml({ family: null, payments: false }), 'code')).toBe('Ho già un codice')
+    expect(row(familyMenuHtml({ family, info, payments: false, now: NOW }), 'code')).toBeUndefined()
+    expect(row(familyMenuHtml({ family, info, payments: false, now: NOW }), 'slot')).toBe('Aggiungi un posto')
     setLang('en')
-    expect(codeRow(familyMenuHtml({ family: null, payments: false }))).toBe('I already have a code')
-    expect(codeRow(familyMenuHtml({ family, info, payments: false, now: NOW }))).toBe('I have an extra-seat code')
+    expect(row(familyMenuHtml({ family: null, payments: false }), 'code')).toBe('I already have a code')
   })
 
   it('active before the first sync: no name or count yet, never throws', () => {

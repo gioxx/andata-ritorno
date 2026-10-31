@@ -42,10 +42,12 @@ export function labelDialog(el) {
  * A <dialog> is shown with showModal() and releases itself on `close`; any other element (the
  * viewer) is shown by its caller, which calls the returned release() when it hides.
  * @param {HTMLElement} el
- * @param {{returnFocus?: Element|string|null}} [opts] opener to refocus on close; defaults to the focused control
+ * @param {{returnFocus?: Element|string|null, focus?: HTMLElement|null}} [opts] returnFocus: opener to
+ *   refocus on close, defaults to the focused control; focus: what takes focus instead of the first
+ *   control (a heading, so a text field does not bring up the keyboard before it is needed)
  * @returns {() => void} release()
  */
-export function openModal(el, { returnFocus = null } = {}) {
+export function openModal(el, { returnFocus = null, focus = null } = {}) {
   const isDialog = el instanceof HTMLDialogElement
   // A modal that was just closed (its close event not yet fired) hands its opener on: the menu
   // drawer closes right before the dialog it launches opens.
@@ -63,7 +65,8 @@ export function openModal(el, { returnFocus = null } = {}) {
   }
   if (handed) handed.handedOff = true
   stack.push(entry)
-  firstControl(el)?.focus({ preventScroll: true })
+  if (focus && !focus.matches(FOCUSABLE)) focus.setAttribute('tabindex', '-1')
+  ;(focus ?? firstControl(el))?.focus({ preventScroll: true })
   const onKey = (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented || !isDialog) return
     e.preventDefault() // closed here, through the same path as the native Escape (honours `cancel`)
@@ -145,7 +148,7 @@ function ensureDom() {
     <dialog id="newItem"><form method="dialog">
       <h3 id="newTitle"></h3>
       <div class="preview" id="newPreview"></div>
-      <input type="text" id="newLabel" placeholder="${t('dialogs.labelPlaceholder')}" autocomplete="off">
+      <input type="text" id="newLabel" maxlength="200" placeholder="${t('dialogs.labelPlaceholder')}" autocomplete="off">
       <div class="catpick" id="newCat" role="group" aria-label="${t('dialogs.category')}"></div>
       <div class="row">
         <button value="school" class="primary">🏫 ${t('loc.school')}</button>
@@ -156,7 +159,7 @@ function ensureDom() {
     <dialog id="editItem"><form method="dialog">
       <h3>${t('dialogs.editTitle')}</h3>
       <p class="since" id="editSince"></p>
-      <input type="text" id="editLabel" placeholder="${t('dialogs.label')}" aria-label="${t('dialogs.label')}" autocomplete="off">
+      <input type="text" id="editLabel" maxlength="200" placeholder="${t('dialogs.label')}" aria-label="${t('dialogs.label')}" autocomplete="off">
       <select id="editTab" aria-label="${t('dialogs.tab')}"></select>
       <div class="catpick" id="editCat" role="group" aria-label="${t('dialogs.category')}"></div>
       <img id="editPreview" class="edit-preview" alt="" hidden>
@@ -312,7 +315,8 @@ export function openEditItem(id) {
     // Reading, rotating and saving happen inside the store's queue, so quick saves can't race.
     rotateAndEdit(id, patch, turns, pending).then((rotationError) => { if (rotationError) reportError(rotationError) }).catch(reportError)
   }, { once: true })
-  openModal(d.edit)
+  // Focus on the title: the keyboard comes up only once the label field is tapped.
+  openModal(d.edit, { focus: d.edit.querySelector('h3') })
 }
 
 /** Single place where a failed action reaches the user. */

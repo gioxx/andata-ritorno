@@ -92,14 +92,17 @@ async function busy(d, fn) {
 // ---- Code: unlock a family, or add a seat when already in one -----------------------------
 
 /**
- * @param {{fromWelcome?: boolean}} [o] fromWelcome: a phone with no tabs yet gets a default one once
- *   the family exists, before its first upload, so the family starts with it and the app opens.
+ * @param {{fromWelcome?: boolean, buyLink?: string|null}} [o] fromWelcome: a phone with no tabs yet
+ *   gets a default one once the family exists, before its first upload, so the family starts with it
+ *   and the app opens. buyLink: in a family, the payment link for an extra seat (payments on).
  */
-export async function openCodeDialog({ fromWelcome = false } = {}) {
+export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {}) {
   const meta = await getFamily(ctx.db)
   const inFamily = !!meta && !meta.pending
-  const d = show(`<form method="dialog"><h3>${t(inFamily ? 'family.haveSlotCode' : 'family.code.title')}</h3>
-    <p class="plain">${t(inFamily ? 'family.slotCode.body' : 'family.code.body')}</p>
+  const buy = inFamily && buyLink
+  const d = show(`<form method="dialog"><h3>${t(inFamily ? 'family.slot' : 'family.code.title')}</h3>
+    <p class="plain">${t(inFamily ? (buy ? 'family.slotCode.bodyBuy' : 'family.slotCode.body') : 'family.code.body')}</p>
+    ${buy ? `<button type="button" data-buy>${t('family.slotCode.buy', { price: t('family.slotPrice') })}</button>` : ''}
     <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
     ${inFamily ? '' : `<input type="text" id="famName" aria-label="${t('family.code.name')}" placeholder="${esc(t('family.code.nameHint'))}" maxlength="60" autocomplete="off">
     <input type="text" id="famDevice" aria-label="${t('family.code.device')}" placeholder="${esc(t('family.code.deviceHint'))}" maxlength="40" autocomplete="off">`}
@@ -109,6 +112,7 @@ export async function openCodeDialog({ fromWelcome = false } = {}) {
     <button value="" class="cancel">${t('common.cancel')}</button></form>`)
   const val = (id) => d.querySelector(id)?.value.trim() ?? ''
   enterGoes(d)
+  d.querySelector('[data-buy]')?.addEventListener('click', () => window.open(buyLink, '_blank', 'noopener'))
   d.querySelector('[data-go]').addEventListener('click', () => busy(d, async () => {
     const code = val('#famCode')
     if (inFamily) {

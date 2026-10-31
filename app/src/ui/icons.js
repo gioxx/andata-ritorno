@@ -1,5 +1,5 @@
 // Lucide icon nodes -> inline SVG strings (no DOM needed, so templates stay plain strings).
-import { Menu, Trash2, Check, Pencil, X, Camera, ClipboardPaste, Image, Download, Upload, Layers, ListChecks, Monitor, Sun, Moon, ZoomIn, ExternalLink, ListFilter, Tag, Tags, RotateCw, ChevronLeft, ChevronRight, Smartphone, LogOut, Trash, Users, RefreshCw, KeyRound, UserPlus, Plus, LifeBuoy, Ticket, Mail, ShieldCheck } from 'lucide'
+import { Menu, Trash2, Check, Pencil, X, Camera, ClipboardPaste, Image, Download, Upload, Layers, ListChecks, Monitor, Sun, Moon, ZoomIn, ExternalLink, ListFilter, Tag, Tags, RotateCw, ChevronLeft, ChevronRight, Smartphone, LogOut, PackageX, Trash, Users, RefreshCw, KeyRound, UserPlus, Plus, LifeBuoy, Ticket, Mail, ShieldCheck } from 'lucide'
 
 const svg = (node, size = 20) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${
@@ -31,6 +31,7 @@ export const chevronLeftIcon = svg(ChevronLeft, 24)
 export const chevronRightIcon = svg(ChevronRight, 24)
 export const smartphoneIcon = svg(Smartphone, 18)
 export const logOutIcon = svg(LogOut, 18)
+export const uninstallIcon = svg(PackageX, 18)
 export const eraseIcon = svg(Trash, 18)
 export const usersIcon = svg(Users, 18)
 export const refreshIcon = svg(RefreshCw, 18)
