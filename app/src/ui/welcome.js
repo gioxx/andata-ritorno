@@ -18,7 +18,7 @@ export function renderWelcome(root, { onCreate, onImport, onInvite = () => {}, o
   const install = steps.length ? `<div class="install"><p>${t('welcome.install')}</p><ol>${steps.map((k) => `<li>${t(k)}</li>`).join('')}</ol></div>` : ''
   root.innerHTML = `<div class="welcome">
     <h1>${t('welcome.title')}</h1>
-    <input type="text" id="firstTab" placeholder="${esc(t('welcome.placeholder'))}" aria-label="${esc(t('welcome.hint'))}" autocomplete="off" value="${esc(prev)}">
+    <input type="text" id="firstTab" maxlength="60" placeholder="${esc(t('welcome.placeholder'))}" aria-label="${esc(t('welcome.hint'))}" autocomplete="off" value="${esc(prev)}">
     <label for="firstTab" class="hint">${t('welcome.hint')}</label>
     <button class="primary" id="start" ${prev.trim() ? '' : 'disabled'}>${t('welcome.start')}</button>
     <button class="ghost" id="importBtn">${t('welcome.import')}</button>

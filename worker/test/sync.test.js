@@ -134,6 +134,17 @@ describe('record sync', () => {
     expect((await over.json()).error).toBe('limit-records');
     expect((await post('/api/sync', { records: [{ rid: 'filler-0-xxxx', data: 'ZZZZ' }] }, f.token)).status).toBe(200);
   });
+
+  it('holds the record cap under concurrent pushes', async () => {
+    const f = await newFamily();
+    await seed(f.familyId, 'records', 9700);
+    await env.DB.prepare('UPDATE families SET seq = 9700 WHERE id = ?').bind(f.familyId).run();
+    const batch = () => post('/api/sync', { records: Array.from({ length: 200 }, () => rec()) }, f.token);
+    const statuses = (await Promise.all([batch(), batch()])).map((r) => r.status).sort();
+    expect(statuses).toEqual([200, 413]);
+    const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM records WHERE family_id = ?').bind(f.familyId).first();
+    expect(n).toBe(9900);
+  });
 });
 
 describe('streamed bodies without Content-Length', () => {
@@ -411,5 +422,16 @@ describe('photos', () => {
     expect(res.status).toBe(413);
     expect((await res.json()).error).toBe('limit-photos');
     expect((await put('/api/photos/filler-0-xxxx', bytes(1), f.token)).status).toBe(204);
+  });
+
+  it('holds the photo cap under concurrent uploads', async () => {
+    const f = await newFamily();
+    await seed(f.familyId, 'photos', 1999);
+    const res = await Promise.all([put(`/api/photos/${rid()}`, bytes(1), f.token), put(`/api/photos/${rid()}`, bytes(1), f.token)]);
+    const refused = res.filter((r) => r.status === 413);
+    expect(res.map((r) => r.status).sort()).toEqual([204, 413]);
+    expect((await refused[0].json()).error).toBe('limit-photos');
+    const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM photos WHERE family_id = ?').bind(f.familyId).first();
+    expect(n).toBe(2000);
   });
 });

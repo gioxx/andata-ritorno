@@ -32,6 +32,8 @@ import { t, onLangChange } from './i18n.js';
 // A waiting version is announced, never applied by surprise; ignored, it applies on the next full reopen.
 initUpdateToast((handlers) => registerSW(handlers));
 initInstall(); // the browser may fire beforeinstallprompt before the UI is ready
+// How often an open app looks for the family's changes by itself.
+const POLL_MS = 30 * 1000;
 const root = document.getElementById('app');
 const route = routeOf(location.pathname, location.hash, location.search);
 // iOS Safari outside the installed app: its storage is not the app's.
@@ -119,6 +121,8 @@ async function startApp() {
         });
         initPullToRefresh(document.scrollingElement ?? document.documentElement, () => syncNow('pull'));
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow('visible'); });
+        // While the app is on screen, another phone's changes show up within POLL_MS on their own.
+        setInterval(() => { if (inFamily && document.visibilityState === 'visible' && navigator.onLine !== false) syncNow('poll'); }, POLL_MS);
       }
       draw();
       syncNow('start');

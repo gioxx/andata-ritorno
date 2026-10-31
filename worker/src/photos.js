@@ -23,37 +23,37 @@ async function put(req, env, ctx, { pid }) {
   checkPid(pid);
   const body = await readBody(req, MAX_PHOTO, 'limit-photo-size');
   if (body.byteLength === 0) throw new HttpError(400, 'bad-request');
-  // Replacing an existing photo does not grow the count.
-  const row = await env.DB.prepare(
-    'SELECT (SELECT COUNT(*) FROM photos WHERE family_id = ?1) AS n, EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2) AS known',
-  )
-    .bind(familyId, pid)
-    .first();
-  if (!row.known && row.n >= MAX_PHOTOS) throw new HttpError(413, 'limit-photos');
   // Reserve the bytes in D1 first, in one batch: the total only moves when it stays within the cap
-  // (the delta is computed inside the statement, so concurrent uploads cannot both pass; a photo
-  // that does not grow the total always fits), and the row is written only if that happened. The
+  // and a new photo still fits the family's count (both computed inside the statement, so
+  // concurrent uploads cannot both pass; replacing a photo never grows the count, and one that
+  // does not grow the total always fits), and the row is written only if that happened. The
   // row starts as not ready (invisible to list and get) and turns ready once the R2 object is
   // written, so an interrupted upload is re-sent by the next sync instead of leaving a dangling row.
   // The R2 write comes after the reservation, so a refusal never leaves an object behind.
   const size = body.byteLength;
   const token = new Date().toISOString(); // this request's uploaded_at: marks the row as its own
   const delta = '(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))';
+  const fits = '(EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)';
   const results = await env.DB.batch([
     env.DB.prepare('SELECT size, uploaded_at FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
+    // Which limit refused it, if one did (same snapshot as the reservation below).
+    env.DB.prepare(
+      'SELECT EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?1) < ?3 AS ok',
+    ).bind(familyId, pid, MAX_PHOTOS),
     env.DB.prepare("INSERT OR IGNORE INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos"),
-    env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND (${delta} <= 0 OR bytes + ${delta} <= ?4)`).bind(
+    env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND ${fits} AND (${delta} <= 0 OR bytes + ${delta} <= ?4)`).bind(
       size,
       familyId,
       pid,
       totalCap(env),
+      MAX_PHOTOS,
     ),
     env.DB.prepare(
       `INSERT INTO photos (family_id, pid, size, uploaded_at, ready) SELECT ?1, ?2, ?3, ?4, 0 WHERE changes() = 1
        ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at`,
     ).bind(familyId, pid, size, token),
   ]);
-  if (results[2].meta.changes !== 1) throw new HttpError(413, 'limit-storage');
+  if (results[3].meta.changes !== 1) throw new HttpError(413, results[1].results[0].ok ? 'limit-storage' : 'limit-photos');
   const old = results[0].results[0] ?? null;
   // The statements below only touch the row while it is still this request's own.
   const mine = 'EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2 AND uploaded_at = ?3 AND size = ?4)';

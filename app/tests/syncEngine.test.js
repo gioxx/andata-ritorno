@@ -687,6 +687,29 @@ describe('sync engine (two phones)', () => {
     expect((await snapshot(b)).items.map((i) => i.id)).toEqual(['item-a01'])
   })
 
+  it('a record too large to send stays queued, the others go out, the run ends in error', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01', 'item-a02'])
+    const meta = await familyOf(a)
+    await a.sync()
+    await updateItem(a.db, 'item-a01', { label: 'x'.repeat(70 * 1024) }, tick())
+    await updateItem(a.db, 'item-a02', { label: 'ok' }, tick())
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'limit-record-size', pending: 1 })
+    expect((await readOutbox(a.db)).map((e) => e.id)).toEqual(['item-a01'])
+    const b = await phone()
+    await join(a, b)
+    await b.sync()
+    const labels = Object.fromEntries((await snapshot(b)).items.map((i) => [i.id, i.label]))
+    expect(labels['item-a02']).toBe('ok')
+    expect(labels['item-a01']).not.toMatch(/^x+$/)
+    // Edited down, it goes out with the next sync.
+    await updateItem(a.db, 'item-a01', { label: 'corto' }, tick())
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'idle', pending: 0 })
+    expect(server.families.get(meta.familyId).records.has('item-a01')).toBe(true)
+  })
+
   it('a photo refused because server storage is full follows the same path, with no retry', async () => {
     const a = await phone()
     await seed(a, 'tab-home-a', ['item-a01'])
@@ -987,6 +1010,27 @@ describe('progress', () => {
     await a.sync()
     expect(patches.some((p) => isProgressOnly(p))).toBe(true)
     expect(patches.some((p) => p && 'state' in p && !isProgressOnly(p))).toBe(true)
+  })
+
+  it('a background poll brings in the other phone\'s changes without showing "syncing"', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    await join(a, b)
+    await b.sync()
+    await updateItem(a.db, 'item-a01', { label: 'da A' }, tick())
+    await a.sync()
+    const states = []
+    b.engine.subscribe((s, patch) => { if (patch && 'state' in patch) states.push(patch.state) })
+    await b.engine.syncNow('poll')
+    expect(states).toEqual(['idle'])
+    expect((await snapshot(b)).items.find((i) => i.id === 'item-a01').label).toBe('da A')
+    // A run the user asks for still shows it.
+    states.length = 0
+    await b.engine.syncNow('menu')
+    expect(states[0]).toBe('syncing')
   })
 })
 

@@ -118,6 +118,7 @@ export function createSyncEngine({
 }) {
   let running = null
   let again = false
+  let shown = false // a run that the user asked for (or may be waiting on) shows 'syncing'
   let timer = null
   let inFamily = false
   let photoRun = null
@@ -212,7 +213,7 @@ export function createSyncEngine({
     return refused
   }
 
-  /** @returns {Promise<string[]>} codes of photos the server refused */
+  /** @returns {Promise<string[]>} codes of what could not be sent (photos the server refused, records too large) */
   async function push(api, key, meta) {
     const entries = await readOutbox(db)
     if (!entries.length) return []
@@ -250,9 +251,14 @@ export function createSyncEngine({
         const rec = j.value
           ? await encodeRecord(key, meta.familyId, { kind: j.e.kind, value: j.value, by })
           : await encodeTombstone(key, meta.familyId, { ...j.tomb, by })
-        done.push(j.e)
-        if (rec.data.length > MAX_DATA) console.warn('sync: record too large to send', j.e.kind, j.e.id)
-        else records.push(rec)
+        if (rec.data.length > MAX_DATA) {
+          // Stays queued (and counted as pending) until it is edited down; the run ends in error.
+          console.warn('sync: record too large to send', j.e.kind, j.e.id)
+          if (!refused.includes('limit-record-size')) refused.push('limit-record-size')
+        } else {
+          records.push(rec)
+          done.push(j.e)
+        }
       }
       if (records.length) await api.push(records)
       await clearOutbox(db, done)
@@ -395,7 +401,7 @@ export function createSyncEngine({
     startDownloads()
   }
 
-  async function runOnce() {
+  async function runOnce(show) {
     let meta = await getFamily(db)
     inFamily = !!meta
     if (!meta) {
@@ -407,7 +413,8 @@ export function createSyncEngine({
       emit({ state: 'removed', member: false })
       return
     }
-    emit({ state: 'syncing' })
+    // A background poll stays quiet: the status line only changes when the run ends.
+    if (show) emit({ state: 'syncing' })
     try {
       if (meta.pending) meta = await resumePending(db, api)
       await syncFamily(meta)
@@ -460,9 +467,10 @@ export function createSyncEngine({
     },
     /**
      * Start a run, or (while one runs) schedule exactly one more after it. Never rejects.
-     * @param {'start'|'visible'|'online'|'pull'|'menu'|'line'|'debounce'|'retry'} _reason
+     * @param {'start'|'visible'|'online'|'pull'|'menu'|'line'|'debounce'|'retry'|'poll'} reason
      */
-    syncNow(_reason) {
+    syncNow(reason) {
+      if (reason !== 'poll') shown = true
       if (running) {
         again = true
         return running
@@ -471,7 +479,9 @@ export function createSyncEngine({
         try {
           do {
             again = false
-            await runOnce()
+            const show = shown
+            shown = false
+            await runOnce(show)
           } while (again)
         } finally {
           running = null
@@ -544,5 +554,5 @@ export async function initSync({ db, api, onApplied = reloadFromDb, exclusive = 
   return engine
 }
 
-/** @param {'start'|'visible'|'online'|'pull'|'menu'|'line'|'debounce'|'retry'} reason */
+/** @param {'start'|'visible'|'online'|'pull'|'menu'|'line'|'debounce'|'retry'|'poll'} reason */
 export const syncNow = (reason) => appEngine?.syncNow(reason) ?? Promise.resolve()
