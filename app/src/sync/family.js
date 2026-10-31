@@ -6,11 +6,12 @@ import { generateKeyRaw, importKey, encryptJson, decryptJson, b64url, randomToke
 
 /**
  * keyRaw: the family key, base64url. recoverySecret is null on a device that joined by invite
- * (the invite carries the key only). pending: a redeem/restart sent but not yet answered.
+ * (the invite carries the key only). pending: a redeem/restart/join/recover sent but not yet
+ * answered (mode: how a join treats the local wardrobe).
  * removed: the server no longer knows this device (sync stops until it leaves or rejoins).
  * @typedef {{ familyId:string, deviceId:string, token:string|null, keyRaw:string, recoverySecret:string|null,
  *   cursor:number, lastSyncAt:string|null, licenceKind:'family', deviceLimit?:number,
- *   pending?:{op:'redeem'|'restart', body:object}, removed?:boolean }} FamilyMeta
+ *   pending?:{op:'redeem'|'restart'|'join'|'recover', body:object, mode?:'merge'|'replace'}, removed?:boolean }} FamilyMeta
  */
 
 const META = 'family'
@@ -43,10 +44,16 @@ export const sameMembership = (cur, meta) => !!cur && !!meta && cur.familyId ===
  * @returns {Promise<FamilyMeta|null>}
  */
 export async function updateFamily(db, match, patch) {
-  const cur = await getFamily(db)
-  if (!sameMembership(cur, match)) return null
+  // Read and write in one transaction: a leave (or join) cannot land between them and be undone.
+  const tx = db.transaction('meta', 'readwrite')
+  const cur = (await tx.store.get(META)) ?? null
+  if (!sameMembership(cur, match)) {
+    await tx.done
+    return null
+  }
   const next = { ...cur, ...patch }
-  await setFamily(db, next)
+  await tx.store.put(next, META)
+  await tx.done
   return next
 }
 
@@ -162,15 +169,24 @@ export function resumePending(db, api) {
 async function resumeOnce(db, api) {
   const meta = await getFamily(db)
   if (!meta?.pending) return meta
-  const { op, body } = meta.pending
+  const { op, body, mode } = meta.pending
+  const method = { restart: 'licenceRestart', redeem: 'redeem', join: 'join', recover: 'recover' }[op]
   let res
   try {
-    res = await withRetry(() => (op === 'restart' ? api.licenceRestart(body) : api.redeem(body)))
+    res = await withRetry(() => api[method](body))
   } catch (e) {
     if (definitive(e) && (await getFamily(db))?.familyId === meta.familyId) await clearFamily(db)
     throw e
   }
-  return enter(db, meta, res)
+  // 'replace' empties the local wardrobe only once the server accepted the device.
+  if (op === 'join' && mode === 'replace') await clearWardrobe(db)
+  return enter(db, meta, res, { dropEmptyTabs: op === 'join' || op === 'recover' })
+}
+
+/** Change the stored pending attempt (same membership), e.g. the join mode chosen on a retry. */
+async function updatePending(db, pending) {
+  const cur = await getFamily(db)
+  if (cur?.pending) await setFamily(db, { ...cur, pending })
 }
 
 /** Creating or restarting never replaces a family already set up: its key would be lost. */
@@ -203,12 +219,19 @@ export async function restartFromLicence(db, api, { linkToken, familyName, devic
  * @param {{inviteToken:string, familyId:string, keyRaw:string, deviceName:string, mode:'merge'|'replace'}} p
  */
 export async function joinFamily(db, api, { inviteToken, familyId, keyRaw, deviceName, mode = 'merge' }) {
+  const prev = (await getFamily(db))?.pending
+  // The same invite tried before with no answer: same device id, so the server replays it.
+  if (prev?.op === 'join' && prev.body.inviteToken === inviteToken) {
+    await updatePending(db, { ...prev, mode })
+    return resumePending(db, api)
+  }
   const key = await importKey(b64url.decode(keyRaw))
   const deviceId = crypto.randomUUID()
   const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
-  const res = await withRetry(() => api.join({ inviteToken, deviceId, deviceNameEnc }))
-  if (mode === 'replace') await clearWardrobe(db)
-  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret: null }), res, { dropEmptyTabs: true })
+  // Saved before the call: if the answer is lost (or the page closes), the next try or start
+  // replays it instead of leaving a device in the family that no phone holds.
+  await setFamily(db, { ...newMeta({ familyId, deviceId, keyRaw, recoverySecret: null }), pending: { op: 'join', body: { inviteToken, deviceId, deviceNameEnc }, mode } })
+  return resumePending(db, api)
 }
 
 /**
@@ -219,16 +242,20 @@ export async function joinFamily(db, api, { inviteToken, familyId, keyRaw, devic
 export async function recoverFamily(db, api, kit, deviceName) {
   const { familyId, keyRaw, recoverySecret } = typeof kit === 'string' ? parseKit(kit) : kit
   const key = await importKey(b64url.decode(keyRaw))
-  const deviceId = crypto.randomUUID()
-  const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
-  let res
+  const prev = (await getFamily(db))?.pending
+  // The same kit tried before with no answer: same device id, so the server gives it a new token
+  // instead of adding another device.
+  if (!(prev?.op === 'recover' && prev.body.familyId === familyId && prev.body.recoverySecret === recoverySecret)) {
+    const deviceId = crypto.randomUUID()
+    const deviceNameEnc = await encryptJson(key, deviceAad(familyId, deviceId), deviceName)
+    await setFamily(db, { ...newMeta({ familyId, deviceId, keyRaw, recoverySecret }), pending: { op: 'recover', body: { familyId, recoverySecret, deviceId, deviceNameEnc } } })
+  }
   try {
-    res = await withRetry(() => api.recover({ familyId, recoverySecret, deviceId, deviceNameEnc }))
+    return await resumePending(db, api)
   } catch (e) {
     if (e?.code === 'family-full' && Array.isArray(e.extra?.devices)) e.extra.devices = await openDevices(key, familyId, e.extra.devices, null)
     throw e
   }
-  return enter(db, newMeta({ familyId, deviceId, keyRaw, recoverySecret }), res, { dropEmptyTabs: true })
 }
 
 /**

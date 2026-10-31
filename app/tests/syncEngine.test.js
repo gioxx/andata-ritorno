@@ -6,7 +6,7 @@ import {
 import { createApi, ApiError } from '../src/sync/api.js'
 import { createSyncEngine, isProgressOnly, seedSyncStatus, syncStatus } from '../src/sync/engine.js'
 import {
-  getFamily, createFamily, joinFamily, recoverFamily, restartFromLicence, leaveFamily, resumePending,
+  getFamily, createFamily, joinFamily, recoverFamily, restartFromLicence, leaveFamily, resumePending, updateFamily, clearFamily,
   kitOf, parseKit, parseInvite, inviteLink, familyKey,
 } from '../src/sync/family.js'
 import { decodeRecord } from '../src/sync/records.js'
@@ -217,6 +217,53 @@ describe('family orchestration', () => {
     await c.sync()
     expect(await snapshot(c)).toEqual(await snapshot(a))
     expect((await getFamily(c.db)).recoverySecret).toBe(meta.recoverySecret)
+  })
+
+  it('a join whose answer is lost after the server acted is replayed later with the same device', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const owner = await familyOf(a)
+    await a.sync()
+    const { token } = await a.api.createInvite()
+    const inv = parseInvite(inviteLink(token, owner, 'https://ar.example'))
+    const b = await phone()
+    server.failNext('POST', '/api/join', 503, 'internal')
+    await expect(joinFamily(b.db, b.api, { ...inv, deviceName: 'Telefono 2' })).rejects.toMatchObject({ status: 503 })
+    const pending = await getFamily(b.db)
+    expect(pending.pending).toMatchObject({ op: 'join' })
+    // The next start (the engine) finishes it: no second device, the invite is not spent twice.
+    await b.sync()
+    const meta = await getFamily(b.db)
+    expect(meta.pending).toBeUndefined()
+    expect(meta.deviceId).toBe(pending.deviceId)
+    expect(server.devices.get(meta.deviceId).token).toBe(meta.token)
+    expect([...server.devices.values()].filter((d) => d.familyId === owner.familyId)).toHaveLength(2)
+    expect((await snapshot(b)).items.map((i) => i.id)).toEqual(['item-a01'])
+  })
+
+  it('a recovery whose answer is lost is retried with the same device: no extra device in the family', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const owner = await familyOf(a)
+    await a.sync()
+    const c = await phone()
+    server.failNext('POST', '/api/recover', 503, 'internal')
+    await expect(recoverFamily(c.db, c.api, kitOf(owner), 'Telefono nuovo')).rejects.toMatchObject({ status: 503 })
+    const pending = await getFamily(c.db)
+    expect(pending.pending).toMatchObject({ op: 'recover' })
+    await recoverFamily(c.db, c.api, kitOf(owner), 'Telefono nuovo')
+    const meta = await getFamily(c.db)
+    expect(meta.pending).toBeUndefined()
+    expect(meta.deviceId).toBe(pending.deviceId)
+    expect(server.devices.get(meta.deviceId).token).toBe(meta.token)
+    expect([...server.devices.values()].filter((d) => d.familyId === owner.familyId)).toHaveLength(2)
+  })
+
+  it('updateFamily racing a leave never brings the membership back', async () => {
+    const a = await phone()
+    const meta = await familyOf(a)
+    await Promise.all([updateFamily(a.db, meta, { lastSyncAt: iso() }), clearFamily(a.db)])
+    expect(await getFamily(a.db)).toBeNull()
   })
 
   it('recoverFamily into a full family reports the devices with their names decrypted', async () => {

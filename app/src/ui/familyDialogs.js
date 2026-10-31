@@ -69,11 +69,15 @@ function wireScan(d, input) {
 /**
  * Joining, restoring and licence recovery start a membership: refused while this phone is in a
  * family (it must leave first) or still waiting for a code's answer (that answer would be lost).
+ * A join or recovery still waiting for its answer does not block joining or restoring: trying
+ * again replays it (same invite or kit) or starts over.
+ * @param {{retry?: boolean}} [o] retry: this dialog joins or restores
  * @returns {Promise<boolean>} true when refused (a dialog says why)
  */
-async function refusedByMembership(title) {
+async function refusedByMembership(title, { retry = false } = {}) {
   const meta = await getFamily(ctx.db)
   if (!meta) return false
+  if (retry && (meta.pending?.op === 'join' || meta.pending?.op === 'recover')) return false
   const d = show(`<form method="dialog"><h3>${title}</h3>
     <p class="plain">${t(meta.pending ? 'family.pendingFirst' : 'family.leaveFirst')}</p>
     <button value="" class="cancel">${t('common.close')}</button></form>`)
@@ -294,7 +298,7 @@ export async function openHaveInvite(link = '') {
     try { invite = parseInvite(link) } catch { /* shown below with its error */ }
     if (invite) return openJoin(invite)
   }
-  if (await refusedByMembership(t('family.haveInvite'))) return
+  if (await refusedByMembership(t('family.haveInvite'), { retry: true })) return
   const d = show(`<form method="dialog"><h3>${t('family.haveInvite')}</h3>
     <p class="plain">${t('family.join.pasteBody')}</p>
     <textarea rows="3" class="kitText" id="famInvLink" aria-label="${t('family.join.pasteLabel')}" spellcheck="false" autocapitalize="off">${esc(link)}</textarea>
@@ -319,7 +323,7 @@ export async function openHaveInvite(link = '') {
  * @param {{inviteToken:string, familyId:string, keyRaw:string}} invite
  */
 export async function openJoin(invite) {
-  if (await refusedByMembership(t('family.join.title'))) return
+  if (await refusedByMembership(t('family.join.title'), { retry: true })) return
   const d = show(`<form method="dialog"><h3>${t('family.join.title')}</h3>
     <div id="famJoinBody"><p class="plain">${t('sync.syncing')}</p></div>
     <p class="plain err" role="alert"></p><button value="" class="cancel">${t('common.cancel')}</button></form>`)
@@ -366,7 +370,7 @@ export async function openJoin(invite) {
 
 /** @param {{kit?: string}} [o] kit: prefilled (e.g. found in an imported backup) */
 export async function openRestore({ kit = '' } = {}) {
-  if (await refusedByMembership(t('family.restore'))) return
+  if (await refusedByMembership(t('family.restore'), { retry: true })) return
   const d = show(`<form method="dialog"><h3>${t('family.restore')}</h3>
     <p class="plain">${t('family.restore.body')}</p>
     <textarea rows="4" class="kitText" id="famKitIn" aria-label="${t('family.kit.title')}" spellcheck="false" autocapitalize="off">${esc(kit)}</textarea>
