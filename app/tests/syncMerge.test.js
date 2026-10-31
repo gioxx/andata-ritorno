@@ -236,7 +236,7 @@ describe('mergeRemote: convergence of items', () => {
 
   it('photo clock tie where only one side has photoAt converges', () => {
     const got = converge(item('i1', 'A', { photoAt: T1, updatedAt: T1 }), item('i1', 'A', { updatedAt: T1 }))
-    expect('photoAt' in got).toBe(false) // ["p-i1",null] > ["p-i1","2026-…"]: both devices agree on that
+    expect(got.photoAt).toBe(T1) // the side with a photo clock wins over one without: both devices agree on that
   })
 })
 

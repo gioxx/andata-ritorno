@@ -144,7 +144,7 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
     if (stored && !stored.pending) { /* finished in the background */ }
     else if (stored?.pending?.op === 'redeem') await resumePending(ctx.db, ctx.api)
     else if (!code) return
-    else await createFamily(ctx.db, ctx.api, { code, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') })
+    else await createFamily(ctx.db, ctx.api, { code, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') }).catch(enteredEarlier)
     // Tracking is on now: the new tab is queued with everything else for the first sync.
     if (fromWelcome && store.db === ctx.db && !(await loadAll(ctx.db)).tabs.length) await addTab(t('sync.defaultTab'))
     // The family exists now: show the kit first, then start syncing; failures here have no form to show them.
@@ -495,7 +495,7 @@ export async function openLicenceRestart(linkToken) {
     const stored = await getFamily(ctx.db)
     if (stored && !stored.pending) { /* finished in the background */ }
     else if (stored?.pending?.op === 'restart') await resumePending(ctx.db, ctx.api)
-    else await restartFromLicence(ctx.db, ctx.api, { linkToken, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') })
+    else await restartFromLicence(ctx.db, ctx.api, { linkToken, familyName: val('#famName') || t('family.defaultName'), deviceName: val('#famDevice') || t('family.code.deviceHint') }).catch(enteredEarlier)
     // A new family means a new kit: show it first, as after a code.
     d.close()
     openKit({ first: true }).catch(reportError)

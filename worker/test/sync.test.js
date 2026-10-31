@@ -415,6 +415,25 @@ describe('photos', () => {
     expect(res.status).toBe(413);
   });
 
+  it('listing reclaims reservations abandoned for over an hour: rows, bytes and objects', async () => {
+    const f = await newFamily();
+    const total = async () => (await env.DB.prepare("SELECT bytes FROM usage WHERE key = 'photo_bytes'").first())?.bytes ?? 0;
+    expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204); // seeds the usage row
+    const base = await total();
+    const old = new Date(Date.now() - 61 * 60 * 1000).toISOString();
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, 100, ?, 0)').bind(f.familyId, 'stale-0000', old),
+      env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, 7, ?, 0)').bind(f.familyId, 'fresh-0000', now()),
+      env.DB.prepare("UPDATE usage SET bytes = bytes + 107 WHERE key = 'photo_bytes'"),
+    ]);
+    await env.PHOTOS.put(`${f.familyId}/stale-0000`, bytes(100));
+    expect((await get('/api/photos', f.token)).status).toBe(200);
+    expect(await total()).toBe(base + 7);
+    const pids = (await env.DB.prepare('SELECT pid FROM photos WHERE family_id = ? AND ready = 0').bind(f.familyId).all()).results.map((r) => r.pid);
+    expect(pids).toEqual(['fresh-0000']);
+    expect(await env.PHOTOS.get(`${f.familyId}/stale-0000`)).toBeNull();
+  });
+
   it('caps a family at 2 000 photos; replacing does not count twice', async () => {
     const f = await newFamily();
     await seed(f.familyId, 'photos', 2000);

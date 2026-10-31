@@ -207,16 +207,20 @@ async function updatePending(db, pending) {
   if (cur?.pending) await setFamily(db, { ...cur, pending })
 }
 
-/** Creating or restarting never replaces a family already set up: its key would be lost. */
-async function refuseIfSetUp(db) {
+/**
+ * Creating or restarting never replaces a family already set up (its key would be lost), nor an
+ * attempt still unanswered: that one is finished first (settlePrevious).
+ */
+async function refuseIfSetUp(db, api) {
   await resuming.get(db)?.catch(() => {})
   const cur = await getFamily(db)
-  if (cur && !cur.pending) throw new Error('already-in-family')
+  if (cur?.pending) await settlePrevious(db, api)
+  else if (cur) throw Object.assign(new Error('already-in-family'), { code: 'already-in-family' })
 }
 
 /** Redeem an unlock code: a new family with this device in it. */
 export async function createFamily(db, api, { code, familyName, deviceName }) {
-  await refuseIfSetUp(db)
+  await refuseIfSetUp(db, api)
   const { ids, body } = await newFamily({ familyName, deviceName })
   // Saved before the call: if the answer is lost, the key and secret are not.
   await setFamily(db, { ...newMeta(ids), pending: { op: 'redeem', body: { code, ...body } } })
@@ -225,7 +229,7 @@ export async function createFamily(db, api, { code, familyName, deviceName }) {
 
 /** A licence-recovery link: a fresh family on the same licence (the old one is wiped on the server). */
 export async function restartFromLicence(db, api, { linkToken, familyName, deviceName }) {
-  await refuseIfSetUp(db)
+  await refuseIfSetUp(db, api)
   const { ids, body } = await newFamily({ familyName, deviceName })
   await setFamily(db, { ...newMeta(ids), pending: { op: 'restart', body: { linkToken, ...body } } })
   return resumePending(db, api)

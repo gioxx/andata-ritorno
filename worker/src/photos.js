@@ -10,6 +10,9 @@ function checkPid(pid) {
 }
 
 const USAGE = "key = 'photo_bytes'";
+// A reservation not ready after this long was abandoned (the Worker stopped mid-upload): it is
+// reclaimed so it stops counting toward the caps. A phone that still has the photo uploads it again.
+const STALE_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_TOTAL = 9_000_000_000;
 
 /** Global cap on stored photo bytes (all families), from the MAX_TOTAL_PHOTO_BYTES var. */
@@ -99,8 +102,24 @@ async function get(req, env, ctx, { pid }) {
   return new Response(obj.body, { headers: { 'content-type': 'application/octet-stream', 'cache-control': 'private, no-store' } });
 }
 
+/** Drop this family's abandoned reservations: rows, bytes in the total, and any object left in R2. */
+async function reclaimStale(env, familyId) {
+  const before = new Date(Date.now() - STALE_MS).toISOString();
+  const stale = 'family_id = ?1 AND ready = 0 AND uploaded_at < ?2';
+  const [, gone] = await env.DB.batch([
+    env.DB.prepare(`UPDATE usage SET bytes = MAX(0, bytes - (SELECT COALESCE(SUM(size), 0) FROM photos WHERE ${stale})) WHERE ${USAGE}`).bind(
+      familyId,
+      before,
+    ),
+    env.DB.prepare(`DELETE FROM photos WHERE ${stale} RETURNING pid`).bind(familyId, before),
+  ]);
+  if (gone.results.length) await env.PHOTOS.delete(gone.results.map((r) => `${familyId}/${r.pid}`));
+}
+
 async function list(req, env) {
   const { familyId } = await requireApiDevice(env, req);
+  // Every sync lists the photos first, so a family's abandoned uploads never outlive its phones' use.
+  await reclaimStale(env, familyId);
   const { results } = await env.DB.prepare('SELECT pid, size, uploaded_at AS uploadedAt FROM photos WHERE family_id = ? AND ready = 1 ORDER BY uploaded_at, pid')
     .bind(familyId)
     .all();

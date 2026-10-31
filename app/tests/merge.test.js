@@ -175,7 +175,17 @@ describe('mergeItem photoAt', () => {
     expect(m.label).toBe('b')
   })
 
-  it('missing photoAt falls back to updatedAt', () => {
+  it('an item from before photoAt: a later label edit does not beat a replaced photo (either side)', () => {
+    const replaced = item('a', { photoId: 'p-new', photoAt: d(2), updatedAt: d(2) })
+    const edited = item('a', { photoId: 'p-old', label: 'nuovo', updatedAt: d(3) })
+    for (const m of [mergeItem(replaced, edited, { breakTies: true }), mergeItem(edited, replaced, { breakTies: true })]) {
+      expect(m.photoId).toBe('p-new')
+      expect(m.photoAt).toBe(d(2))
+      expect(m.label).toBe('nuovo')
+    }
+  })
+
+  it('missing photoAt on both sides falls back to updatedAt', () => {
     const local = item('a', { photoId: 'p-old', updatedAt: d(2) })
     const inc = item('a', { photoId: 'p-new', updatedAt: d(3) })
     const m = mergeItem(local, inc)

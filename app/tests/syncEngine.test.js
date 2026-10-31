@@ -316,6 +316,22 @@ describe('family orchestration', () => {
     expect([...server.devices.values()].filter((d) => d.familyId === owner.familyId)).toHaveLength(2)
   })
 
+  it('a code typed while a join is unanswered finishes that join first instead of discarding it', async () => {
+    const a = await phone()
+    const owner = await familyOf(a)
+    const inv = parseInvite(inviteLink((await a.api.createInvite()).token, owner, 'https://ar.example'))
+    const b = await phone()
+    server.failNext('POST', '/api/join', 503, 'internal')
+    await expect(joinFamily(b.db, b.api, { ...inv, deviceName: 'Telefono 2' })).rejects.toMatchObject({ status: 503 })
+    const pending = await getFamily(b.db)
+    server.addCode('AR-ZZZZ-ZZZZ-ZZZZ')
+    await expect(createFamily(b.db, b.api, { code: 'AR-ZZZZ-ZZZZ-ZZZZ', familyName: 'Altra', deviceName: 'T' })).rejects.toMatchObject({ code: 'already-in-family' })
+    const meta = await getFamily(b.db)
+    expect(meta.familyId).toBe(owner.familyId)
+    expect(meta.deviceId).toBe(pending.deviceId)
+    expect(server.devices.get(meta.deviceId).token).toBe(meta.token)
+  })
+
   it('updateFamily racing a leave never brings the membership back', async () => {
     const a = await phone()
     const meta = await familyOf(a)
