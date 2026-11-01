@@ -6,16 +6,43 @@
 <meta name="robots" content="noindex">
 <title>Cruscotto · A/R</title>
 <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
-<link rel="stylesheet" href="/privacy.css">
 <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
+<header class="top">
+  <div class="brand"><img src="/icons/icon.svg" alt="" width="32" height="32"><span>A/R<small>Cruscotto</small></span></div>
+  <p class="meta" id="at" role="status">Caricamento…</p>
+  <button type="button" class="ghost" id="reload">Aggiorna</button>
+</header>
+
 <main>
-<h1>Cruscotto A/R</h1>
-<p class="meta" id="at" role="status">Caricamento…</p>
-<div id="out"></div>
-<button type="button" id="reload">Aggiorna</button>
+  <section class="resources" aria-labelledby="res-h">
+    <h2 id="res-h" class="section-h">Risorse consumate <span class="sub">rispetto ai limiti dei piani gratuiti</span></h2>
+    <div id="res"></div>
+  </section>
+
+  <h2 class="section-h">Utilizzo di A/R</h2>
+  <div class="filters" role="group" aria-label="Filtri">
+    <div class="seg" id="range" role="radiogroup" aria-label="Periodo">
+      <button type="button" role="radio" data-days="7" aria-checked="false">7 giorni</button>
+      <button type="button" role="radio" data-days="30" aria-checked="true">30 giorni</button>
+      <button type="button" role="radio" data-days="90" aria-checked="false">90 giorni</button>
+      <button type="button" role="radio" data-days="365" aria-checked="false">12 mesi</button>
+    </div>
+    <label class="select">Codici
+      <select id="kind">
+        <option value="all">Tutti</option>
+        <option value="family">Famiglia</option>
+        <option value="slot">Posto in più</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="tables"> Mostra tabelle</label>
+  </div>
+
+  <div id="out" aria-live="polite"></div>
 </main>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
 <script type="module" src="/admin/admin.js"></script>
 </body>
 </html>
