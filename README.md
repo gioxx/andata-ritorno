@@ -1,6 +1,8 @@
-# Andata e Ritorno (A/R)
+<p align="center"><img src="app/public/icons/icon.svg" alt="A/R icon" width="96" height="96"></p>
 
-*[Leggi in italiano](README.it.md)*
+<h1 align="center">Andata e Ritorno (A/R)</h1>
+
+<p align="center"><em><a href="README.it.md">Leggi in italiano</a></em> · <a href="https://ar.gioxx.org">ar.gioxx.org</a> · <a href="https://app.ar.gioxx.org">app.ar.gioxx.org</a></p>
 
 A small installable web app to keep track of kids' clothes between **home** and **school** (nursery, kindergarten…).
 Take a photo of each item once; from then on every item is either *a scuola* or *a casa* and moves with a tap — no more copying photos between notes to remember what is where.
@@ -114,6 +116,10 @@ Then:
 7. **Manual codes** (Ko-fi, Satispay, PayPal, gifts), run with your Wrangler login from the repository root: `node worker/scripts/code.mjs family --remote` (or `slot`); `node worker/scripts/code.mjs recover <code> --remote` prints a licence-recovery link for a licence with no email on file.
 
 The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the API simply does not rate-limit. Never commit secret values. Tests: `npm --prefix worker test`.
+
+## Contributing
+
+Ideas, bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and, for vulnerabilities, [SECURITY.md](SECURITY.md). Not on GitHub? Write to hello@ar.gioxx.org. The A/R name and logo are covered by [TRADEMARK.md](TRADEMARK.md).
 
 ## License
 

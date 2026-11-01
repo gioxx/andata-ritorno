@@ -11,7 +11,9 @@ describe('privacy.html', () => {
     expect(html).not.toMatch(/\sstyle=/i)
     expect(html).not.toMatch(/\son\w+=/i)
     expect(headers).toContain("style-src 'self'")
-    for (const m of html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)) expect(m[1]).toBe('https://github.com/gioxx/andata-ritorno')
+    // The canonical link names the page's own address; it loads nothing.
+    const loaded = html.replace(/<link rel="canonical"[^>]*>/, '')
+    for (const m of loaded.matchAll(/(?:src|href)="(https?:[^"]+)"/g)) expect(m[1]).toBe('https://github.com/gioxx/andata-ritorno')
     expect(html).toContain('href="/privacy.css"')
   })
   it('has Italian first, then English, each naming the processors and the contact', () => {

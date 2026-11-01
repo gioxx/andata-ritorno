@@ -1,0 +1,22 @@
+# Weekly dependency updates for the two npm projects (the landing has no dependencies).
+# Minor and patch bumps come grouped in one PR per project; majors stay separate for review.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      app-minor:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /worker
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      worker-minor:
+        update-types: [minor, patch]

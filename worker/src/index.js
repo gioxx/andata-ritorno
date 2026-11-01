@@ -19,22 +19,45 @@ const deviceRoutes = new Set([
   licenceRoutes['POST /api/slot'],
 ]);
 
+// The landing site (SITE_ORIGIN) opens Checkout in a modal: it may call these two routes cross-origin.
+const SITE_ROUTES = new Set(['/api/checkout', '/api/unlock/session']);
+
+function withCors(res, origin) {
+  const out = new Response(res.body, res);
+  out.headers.set('access-control-allow-origin', origin);
+  out.headers.set('vary', 'origin');
+  return out;
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (url.pathname !== '/api' && !url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
-    try {
-      const match = route(req, routes);
-      if (!match || !deviceRoutes.has(match.handler)) {
-        const ip = req.headers.get('cf-connecting-ip') || 'unknown';
-        if (await limited(env.RL_API, ip)) throw new HttpError(429, 'rate-limited');
-      }
-      if (!match) throw new HttpError(404, 'not-found');
-      return await match.handler(req, env, ctx, match.params);
-    } catch (e) {
-      if (e instanceof HttpError) return json({ error: e.code, ...e.extra }, e.status);
-      console.error(e);
-      return json({ error: 'internal' }, 500);
+    const origin = req.headers.get('origin');
+    const site = env.SITE_ORIGIN && origin === env.SITE_ORIGIN && SITE_ROUTES.has(url.pathname) ? origin : null;
+    if (req.method === 'OPTIONS' && site) {
+      return new Response(null, {
+        status: 204,
+        headers: { 'access-control-allow-origin': site, 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400', vary: 'origin' },
+      });
     }
+    const res = await handle(req, env, ctx);
+    return site ? withCors(res, site) : res;
   },
 };
+
+async function handle(req, env, ctx) {
+  try {
+    const match = route(req, routes);
+    if (!match || !deviceRoutes.has(match.handler)) {
+      const ip = req.headers.get('cf-connecting-ip') || 'unknown';
+      if (await limited(env.RL_API, ip)) throw new HttpError(429, 'rate-limited');
+    }
+    if (!match) throw new HttpError(404, 'not-found');
+    return await match.handler(req, env, ctx, match.params);
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.code, ...e.extra }, e.status);
+    console.error(e);
+    return json({ error: 'internal' }, 500);
+  }
+}

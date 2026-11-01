@@ -16,6 +16,8 @@ run_worker_first = ["/api/*"]
 
 [vars]
 APP_ORIGIN = "https://app.ar.gioxx.org"
+# The landing site, allowed to open Checkout (POST /api/checkout) and read the code it produced.
+SITE_ORIGIN = "https://ar.gioxx.org"
 # Stripe price ids (not secret); set the real ones at deploy time.
 PRICE_FAMILY = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
 PRICE_SLOT = "price_1UX1rBCfwq1bSlj7mAr3JtPY"

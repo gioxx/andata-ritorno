@@ -5,28 +5,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Guida · A/R</title>
 <meta name="description" content="Guida ad A/R (Andata e Ritorno): schede, capi, spostamenti, backup, condivisione in famiglia e kit di recupero.">
+<link rel="canonical" href="https://ar.gioxx.org/guida/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="A/R · Andata e Ritorno">
+<meta property="og:locale" content="it_IT">
+<meta property="og:url" content="https://ar.gioxx.org/guida/">
+<meta property="og:title" content="Guida · A/R">
+<meta property="og:description" content="Tutto quello che serve per usare A/R da soli o in famiglia: schede, capi, backup, condivisione e kit di recupero.">
+<meta property="og:image" content="https://ar.gioxx.org/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Anteprima di A/R: la schermata con i capi a scuola e a casa">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f15">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="alternate" hreflang="en" href="https://ar.gioxx.org/en/guide/">
 <link rel="stylesheet" href="/styles.css">
+<script src="/theme.js"></script>
+<script type="module" src="/site.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Vai al contenuto</a>
-<header class="wrap">
-  <nav class="nav" aria-label="Principale">
-    <a class="brand" href="/"><img src="/icon.svg" alt="" width="36" height="36">A/R</a>
-    <ul>
-      <li><a href="/#come-funziona">Come funziona</a></li>
-      <li><a href="/#famiglia">Famiglia</a></li>
-      <li><a href="/guida/" aria-current="page">Guida</a></li>
-      <li><a href="/en/guide/" hreflang="en" lang="en">English</a></li>
-    </ul>
-  </nav>
+<header class="site-header">
+  <div class="wrap">
+    <nav class="nav" aria-label="Principale">
+      <a class="brand" href="/"><img src="/icon.svg" alt="" width="40" height="40"><span>A/R<small>Andata e Ritorno</small></span></a>
+      <ul>
+        <li><a href="/#come-funziona">Come funziona</a></li>
+        <li><a href="/#prezzi">Prezzi</a></li>
+        <li><a href="/#regala">Regala</a></li>
+        <li><a href="/guida/" aria-current="page">Guida</a></li>
+        <li><a href="/en/guide/" hreflang="en" lang="en">EN</a></li>
+        <li><button type="button" class="theme-toggle" data-theme-toggle data-labels='{"auto":"Tema: automatico","light":"Tema: chiaro","dark":"Tema: scuro"}' aria-label="Tema: automatico">
+          <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+          <svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
+        </button></li>
+        <li class="nav-cta-item"><a class="nav-cta" href="https://app.ar.gioxx.org/">Apri l'app</a></li>
+      </ul>
+    </nav>
+  </div>
 </header>
 
 <main id="main" class="wrap">
-  <div class="hero">
+  <div class="page-head">
     <h1>Guida ad A/R</h1>
     <p class="lede">Tutto quello che serve per usare A/R da soli o in famiglia. Se hai fretta, leggi almeno la parte sul <a href="#kit">kit di recupero</a>.</p>
   </div>
@@ -45,6 +68,7 @@
         <li><a href="#posti">Più telefoni</a></li>
         <li><a href="#cambio">Cambio telefono</a></li>
         <li><a href="#domande">Domande frequenti</a></li>
+        <li><a href="#contatti">Idee e problemi</a></li>
       </ol>
     </nav>
 
@@ -59,20 +83,30 @@
       <h2 id="schede">Schede</h2>
       <p>Le schede in alto separano i guardaroba: una per ogni bimbo, o per ogni scuola. Con <strong>Aggiungi scheda</strong> ne crei una nuova; da Menu → <strong>Gestisci scheda corrente</strong> la rinomini, la sposti o la elimini.</p>
 
+      <div class="shots" data-shots="schede"><figure class="shot"><div class="phone on-light"><img src="/shots/it/materna-light.webp" alt="La scheda Materna aperta" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/materna-dark.webp" alt="La scheda Materna aperta" width="390" height="844" loading="lazy"></div><figcaption>Una scheda per bimbo o per scuola.</figcaption></figure></div>
+
       <h2 id="capi">Aggiungere capi</h2>
       <p>Tocca <strong>Aggiungi capi</strong> e scegli <strong>Scatta</strong> o <strong>Galleria</strong>, oppure incolla una foto dagli appunti. Puoi aggiungere una descrizione e una categoria. Le foto vengono ridimensionate per occupare poco spazio. Per correggere qualcosa, apri il capo: descrizione, scheda, categoria e foto si cambiano in ogni momento, e la foto si ruota con un tocco.</p>
+
+      <div class="shots" data-shots="capi"><figure class="shot"><div class="phone on-light"><img src="/shots/it/add-light.webp" alt="Il pannello Aggiungi capi" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/add-dark.webp" alt="Il pannello Aggiungi capi" width="390" height="844" loading="lazy"></div><figcaption>Scatta o scegli dalla galleria.</figcaption></figure><figure class="shot"><div class="phone on-light"><img src="/shots/it/viewer-light.webp" alt="Un capo aperto a schermo intero" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/viewer-dark.webp" alt="Un capo aperto a schermo intero" width="390" height="844" loading="lazy"></div><figcaption>Tieni premuto un capo per vederlo intero.</figcaption></figure></div>
 
       <h2 id="sposta">Spostare i capi</h2>
       <p>Ogni capo è <strong>a scuola</strong> o <strong>a casa</strong>. Tocca i capi per selezionarli (oppure il contatore di una sezione per prenderli tutti), poi <strong>→ Scuola</strong> o <strong>→ Casa</strong>. A/R ricorda da quando ogni capo è dove si trova.</p>
 
+      <div class="shots" data-shots="sposta"><figure class="shot"><div class="phone on-light"><img src="/shots/it/select-light.webp" alt="Due capi selezionati e il pulsante → Scuola" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/select-dark.webp" alt="Due capi selezionati e il pulsante → Scuola" width="390" height="844" loading="lazy"></div><figcaption>Seleziona e sposta in un colpo solo.</figcaption></figure></div>
+
       <h2 id="categorie">Categorie e filtri</h2>
       <p>Le categorie (body, pantaloni, felpe…) sono facoltative. Le gestisci da Menu → <strong>Gestisci categorie</strong>; i filtri in alto mostrano solo le categorie scelte, e <strong>Tutti ✕</strong> li toglie.</p>
+
+      <div class="shots" data-shots="categorie"><figure class="shot"><div class="phone on-light"><img src="/shots/it/filter-light.webp" alt="Il filtro Pantaloni attivo" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/filter-dark.webp" alt="Il filtro Pantaloni attivo" width="390" height="844" loading="lazy"></div><figcaption>I filtri mostrano solo le categorie scelte.</figcaption></figure></div>
 
       <h2 id="backup">Backup</h2>
       <p>Senza famiglia i dati vivono solo sul telefono: se lo perdi o cancelli i dati del browser, spariscono. Da Menu → <strong>Esporta backup</strong> ottieni un unico file <code>.zip</code> con capi e foto; A/R lo rilegge e lo verifica prima di salvarlo. Con <strong>Importa backup</strong> lo riporti su un altro telefono, senza creare doppioni. A/R ti ricorda quando ci sono modifiche non ancora esportate.</p>
 
+      <div class="shots" data-shots="backup"><figure class="shot"><div class="phone on-light"><img src="/shots/it/menu-light.webp" alt="Il menu con le voci di backup" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/menu-dark.webp" alt="Il menu con le voci di backup" width="390" height="844" loading="lazy"></div><figcaption>Esporta e importa dal menu.</figcaption></figure></div>
+
       <h2 id="famiglia">Condivisione in famiglia</h2>
-      <p>Con la condivisione più telefoni vedono e modificano lo stesso guardaroba. Si paga una volta sola e vale per 3 telefoni.</p>
+      <p>Con la condivisione più telefoni vedono e modificano lo stesso guardaroba. Un codice vale per 3 telefoni, e puoi aggiungerne altri.</p>
       <ol>
         <li>Menu → <strong>Condivisione famiglia</strong>: acquisti e ricevi un codice sulla pagina di conferma e per email.</li>
         <li>Menu → <strong>Ho già un codice</strong>: incolli il codice, scegli il nome della famiglia e del telefono.</li>
@@ -80,6 +114,8 @@
         <li>Menu → <strong>Invita un telefono</strong>: sull'altro telefono inquadri il QR o apri il link, poi scegli se unire i capi che ha già o usare quelli della famiglia.</li>
       </ol>
       <p>I telefoni si sincronizzano da soli quando apri l'app e mentre la usi; la riga in alto dice quando è successo l'ultima volta. Capi, foto e nomi sono cifrati sul telefono prima di partire: il server non può leggerli.</p>
+
+      <div class="shots" data-shots="famiglia"><figure class="shot"><div class="phone on-light"><img src="/shots/it/family-menu-light.webp" alt="Il menu Famiglia con dispositivi e inviti" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/family-menu-dark.webp" alt="Il menu Famiglia con dispositivi e inviti" width="390" height="844" loading="lazy"></div><figcaption>La famiglia nel menu.</figcaption></figure><figure class="shot"><div class="phone on-light"><img src="/shots/it/invite-light.webp" alt="L'invito con il QR da inquadrare" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/invite-dark.webp" alt="L'invito con il QR da inquadrare" width="390" height="844" loading="lazy"></div><figcaption>L'invito: un QR valido 10 minuti.</figcaption></figure></div>
 
       <h2 id="kit">Kit di recupero</h2>
       <div class="callout">
@@ -92,6 +128,8 @@
         <li>Per usarlo, su un telefono nuovo: Menu → <strong>Ripristina famiglia</strong> e incolla il kit (o inquadrane il QR).</li>
         <li>Anche i backup fatti in famiglia contengono il kit: tienili al sicuro come il kit stesso.</li>
       </ul>
+
+      <div class="shots" data-shots="kit"><figure class="shot"><div class="phone on-light"><img src="/shots/it/kit-light.webp" alt="Il kit di recupero con QR e testo" width="390" height="844" loading="lazy"></div><div class="phone on-dark"><img src="/shots/it/kit-dark.webp" alt="Il kit di recupero con QR e testo" width="390" height="844" loading="lazy"></div><figcaption>Il kit: QR e testo, da conservare.</figcaption></figure></div>
 
       <h2 id="posti">Più telefoni</h2>
       <p>La famiglia parte con 3 posti. Menu → <strong>Dispositivi</strong> mostra chi c'è e permette di togliere un telefono che non usi più, liberando il posto. Ti serve un telefono in più? Menu → <strong>Aggiungi un posto</strong>: acquisti il posto e incolli lì il codice che ricevi.</p>
@@ -118,23 +156,40 @@
       </details>
       <details>
         <summary>Posso avere un rimborso?</summary>
-        <p>Finché non hai usato il codice, sì, entro 14 giorni. Trovi tutto nei <a href="https://app.ar.gioxx.org/terms.html">termini</a>.</p>
+        <p>Finché non hai usato il codice, sì, entro 14 giorni. Trovi tutto nei <a data-doc href="https://app.ar.gioxx.org/terms.html">termini</a>.</p>
       </details>
+      <h2 id="contatti">Idee e problemi</h2>
+      <p>Hai un'idea per migliorare A/R, qualcosa non funziona o non è chiaro? Dimmelo: A/R cresce anche con le segnalazioni di chi la usa.</p>
+      <ul>
+        <li><strong>Su GitHub:</strong> apri una <a href="https://github.com/gioxx/andata-ritorno/issues/new/choose">segnalazione o una richiesta</a>. Va bene anche in italiano.</li>
+        <li><strong>Per email:</strong> scrivi a <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a>, se non usi GitHub o preferisci restare in privato.</li>
+        <li><strong>Problemi di sicurezza:</strong> non in pubblico. Usa la <a href="https://github.com/gioxx/andata-ritorno/security/advisories/new">segnalazione privata</a> o scrivi per email.</li>
+      </ul>
+      <p class="note">Quando segnali un problema non incollare mai il kit di recupero, il codice d'acquisto o i link d'invito: bastano il modello di telefono e cosa è successo.</p>
     </article>
   </div>
 </main>
 
-<footer>
-  <div class="wrap">
-    <p class="say">Andata e Ritorno: meno calzini dispersi.</p>
-    <ul>
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <a class="brand" href="/"><img src="/icon.svg" alt="" width="32" height="32"><span>A/R</span></a>
+      <p>Andata e Ritorno: meno calzini dispersi.</p>
+    </div>
+    <ul class="footer-links">
       <li><a href="https://app.ar.gioxx.org/">Apri A/R</a></li>
-      <li><a href="/">Home</a></li>
-      <li><a href="https://app.ar.gioxx.org/privacy.html">Privacy</a></li>
-      <li><a href="https://app.ar.gioxx.org/terms.html">Termini</a></li>
-      <li><a href="https://github.com/gioxx/andata-ritorno">GitHub</a></li>
+      <li><a href="/guida/">Guida</a></li>
+      <li><a href="/#regala">Regala A/R</a></li>
+      <li><a data-doc href="https://app.ar.gioxx.org/privacy.html">Privacy</a></li>
+      <li><a data-doc href="https://app.ar.gioxx.org/terms.html">Termini</a></li>
+      <li><a href="https://github.com/gioxx/andata-ritorno">GitHub ↗</a></li>
+      <li><a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a></li>
     </ul>
+    <small class="fine">A/R è software libero, con licenza AGPL v3. Foto dei capi: Pexels e Unsplash.</small>
+    <small class="fine">Android è un marchio di Google LLC. Apple e iPhone sono marchi di Apple Inc., registrati negli Stati Uniti e in altri Paesi.</small>
+    <small class="fine">© 2026 Gioxx</small>
   </div>
 </footer>
+<button type="button" class="to-top" data-to-top aria-label="Torna su"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 </body>
 </html>

@@ -185,7 +185,7 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .menuItem .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--holder); color: var(--accent); }
 #menu .menuItem .badge { margin-left: auto; padding: 2px 9px; border-radius: var(--r-pill); background: var(--accent-strong); color: var(--bg); font-size: 0.75rem; font-weight: 700; }
 #menu .menuItem[hidden] { display: none; }
-#menu .menuItem .txt { display: flex; flex-direction: column; min-width: 0; }
+#menu .menuItem .txt { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 #menu .menuItem .txt small { font-size: 0.75rem; font-weight: 400; color: var(--muted); }
 #menu .menuItem .badge { white-space: nowrap; }
 #menu .menuItem.danger { color: var(--danger); }

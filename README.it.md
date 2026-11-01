@@ -1,6 +1,8 @@
-# Andata e Ritorno (A/R)
+<p align="center"><img src="app/public/icons/icon.svg" alt="Icona di A/R" width="96" height="96"></p>
 
-*[Read in English](README.md)*
+<h1 align="center">Andata e Ritorno (A/R)</h1>
+
+<p align="center"><em><a href="README.md">Read in English</a></em> · <a href="https://ar.gioxx.org">ar.gioxx.org</a> · <a href="https://app.ar.gioxx.org">app.ar.gioxx.org</a></p>
 
 Una piccola web app installabile per tenere traccia dei vestiti dei bambini tra **casa** e **scuola** (nido, materna…).
 Fotografi ogni capo una volta; da lì in poi ogni capo è *a scuola* o *a casa* e si sposta con un tocco. Basta foto copiate nelle note per ricordare cosa è dove.
@@ -114,6 +116,10 @@ Poi:
 7. **Codici manuali** (Ko-fi, Satispay, PayPal, regali), da lanciare con il tuo login Wrangler dalla radice del repository: `node worker/scripts/code.mjs family --remote` (o `slot`); `node worker/scripts/code.mjs recover <codice> --remote` stampa un link di recupero per una licenza senza email registrata.
 
 I binding di rate limit `RL_STRICT` / `RL_API` sono facoltativi: senza, l'API semplicemente non limita le richieste. Non committare mai valori segreti. Test: `npm --prefix worker test`.
+
+## Contribuire
+
+Idee, segnalazioni e pull request sono benvenute: leggi [CONTRIBUTING.md](CONTRIBUTING.md), il [Codice di condotta](CODE_OF_CONDUCT.md) e, per le vulnerabilità, [SECURITY.md](SECURITY.md). Non usi GitHub? Scrivi a hello@ar.gioxx.org. Nome e logo di A/R sono regolati da [TRADEMARK.md](TRADEMARK.md).
 
 ## Licenza
 

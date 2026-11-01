@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>A/R · Andata e Ritorno</title>
-<meta name="description" content="A/R keeps track of kids' clothes between home and school: photograph each item once and move it with a tap. Free, no account, family sharing when you want it.">
+<meta name="description" content="A/R keeps track of kids' clothes between home and school: photograph each item once and move it with a tap. Free, no account, open source, family sharing when you want it.">
+<link rel="canonical" href="https://ar.gioxx.org/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="A/R · Andata e Ritorno">
+<meta property="og:locale" content="en_GB">
+<meta property="og:url" content="https://ar.gioxx.org/">
+<meta property="og:title" content="A/R · Andata e Ritorno">
+<meta property="og:description" content="Kids' clothes, between home and school. Photograph each item once and move it with a tap.">
+<meta property="og:image" content="https://ar.gioxx.org/img/og-en.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Anteprima di A/R: la schermata con i capi a scuola e a casa">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f15">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
@@ -12,32 +24,55 @@
 <link rel="alternate" hreflang="it" href="https://ar.gioxx.org/">
 <link rel="preload" href="/fonts/plus-jakarta-sans-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">
+<script src="/theme.js"></script>
+<script type="module" src="/site.js"></script>
+<script type="module" src="/checkout.js"></script>
+<meta name="ar-stripe-key" content="pk_live_51UWzt4Cfwq1bSlj7pn7ZBjpJdWJDnYmg7nBR0A1vTnVQhJN9AtB46sGKl1xLGeSBrJlP64XrolQ81Kh57Gbu7is400oOjjk9He">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="wrap">
-  <nav class="nav" aria-label="Main">
-    <a class="brand" href="/en/"><img src="/icon.svg" alt="" width="36" height="36">A/R</a>
-    <ul>
-      <li><a href="#how">How it works</a></li>
-      <li><a href="#family">Family</a></li>
-      <li><a href="/en/guide/">Guide</a></li>
-      <li><a href="/" hreflang="it" lang="it">Italiano</a></li>
-    </ul>
-  </nav>
+<header class="site-header">
+  <div class="wrap">
+    <nav class="nav" aria-label="Main">
+      <a class="brand" href="/en/"><img src="/icon.svg" alt="" width="40" height="40"><span>A/R<small>Andata e Ritorno</small></span></a>
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#gift">Gift</a></li>
+        <li><a href="/en/guide/">Guide</a></li>
+        <li><a href="/" hreflang="it" lang="it">IT</a></li>
+        <li><button type="button" class="theme-toggle" data-theme-toggle data-labels='{"auto":"Theme: automatic","light":"Theme: light","dark":"Theme: dark"}' aria-label="Theme: automatic">
+          <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+          <svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
+        </button></li>
+        <li class="nav-cta-item"><a class="nav-cta" href="https://app.ar.gioxx.org/">Open the app</a></li>
+      </ul>
+    </nav>
+  </div>
 </header>
 
 <main id="main">
   <div class="wrap hero">
-    <h1>Kids' clothes, between home and school.</h1>
-    <p class="lede">Photograph each item once. From then on every item is either at school or at home, and moves with a tap. No more photos copied into notes to remember what is where.</p>
-    <div class="actions">
-      <a class="btn btn-primary" href="https://app.ar.gioxx.org/">Open A/R, it's free</a>
-      <a class="btn btn-ghost" href="/en/guide/">Read the guide</a>
+    <div>
+      <span class="eyebrow"><img src="/icon.svg" alt="" width="28" height="28">Andata e Ritorno</span>
+      <h1>Kids' clothes, between home and school.</h1>
+      <p class="lede">Photograph each item once. From then on every item is either at school or at home, and moves with a tap. No more photos copied into notes to remember what is where.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="#install">Install it, it's free</a>
+        <a class="btn btn-ghost" href="/en/guide/">Read the guide</a>
+      </div>
+      <ul class="facts">
+        <li>No account</li>
+        <li>Works offline</li>
+        <li>Open source</li>
+      </ul>
     </div>
-    <div class="places" aria-hidden="true">
-      <div class="place place-school"><b>At school</b><span>bodysuits, spare clothes, socks</span></div>
-      <div class="place place-home"><b>At home</b><span>everything else, ready to go back</span></div>
+    <div class="hero-media">
+      <figure class="hero-photo"><img src="/img/hero.jpg" alt="" width="900" height="1350"></figure>
+      <figure class="phone on-light"><img src="/shots/en/home-light.webp" alt="A/R on a phone: the Nursery tab with six items at school and four at home" width="390" height="844"></figure>
+      <figure class="phone on-dark"><img src="/shots/en/home-dark.webp" alt="A/R on a phone: the Nursery tab with six items at school and four at home" width="390" height="844" loading="lazy"></figure>
     </div>
   </div>
 
@@ -45,28 +80,74 @@
     <div class="wrap">
       <h2 id="h-how">How it works</h2>
       <ol class="stages">
-        <li class="stage">
+        <li class="stage stage-school" data-reveal>
           <span class="n">01</span>
           <h3>Photograph the item</h3>
           <p>From the camera, the gallery or the clipboard. Add a description and, if you like, a category: bodysuits, trousers, sweatshirts, pyjamas. One tab per child or per school.</p>
+          <div class="stage-shot" data-pos="middle">
+            <img class="on-light" src="/shots/en/add-light.webp" alt="The Add items panel with the Take photo and Gallery buttons" width="390" height="844" loading="lazy">
+            <img class="on-dark" src="/shots/en/add-dark.webp" alt="The Add items panel with the Take photo and Gallery buttons" width="390" height="844" loading="lazy">
+          </div>
         </li>
-        <li class="stage">
+        <li class="stage stage-home" data-reveal>
           <span class="n">02</span>
           <h3>Move it with a tap</h3>
           <p>Every item is in one of two places: at school or at home. Select what you take or bring back and move it all at once. A/R remembers how long each item has been where it is.</p>
+          <div class="stage-shot" data-pos="bottom">
+            <img class="on-light" src="/shots/en/select-light.webp" alt="Two items selected at home and the button that moves them to school" width="390" height="844" loading="lazy">
+            <img class="on-dark" src="/shots/en/select-dark.webp" alt="Two items selected at home and the button that moves them to school" width="390" height="844" loading="lazy">
+          </div>
         </li>
-        <li class="stage">
+        <li class="stage stage-chip" data-reveal>
           <span class="n">03</span>
           <h3>Share it with the family, if you want</h3>
-          <p>On your own, the phone is enough. With a partner or the grandparents, turn on sharing: everyone sees the same up-to-date wardrobe, and the data travels encrypted.</p>
+          <p>On your own, the phone is enough. With a partner or the grandparents, turn on sharing: everyone sees the same up-to-date wardrobe, and the data travels encrypted. The server cannot read items, photos or names.</p>
+          <div class="stage-shot" data-pos="top">
+            <img class="on-light" src="/shots/en/family-menu-light.webp" alt="The Family menu with sync, devices and inviting a phone" width="390" height="844" loading="lazy">
+            <img class="on-dark" src="/shots/en/family-menu-dark.webp" alt="The Family menu with sync, devices and inviting a phone" width="390" height="844" loading="lazy">
+          </div>
         </li>
       </ol>
     </div>
   </section>
 
-  <section id="family" aria-labelledby="h-plans">
+  <section id="privacy" class="privacy-band" aria-labelledby="h-privacy" data-reveal>
     <div class="wrap">
-      <h2 id="h-plans">Free on your own, one-off for the family</h2>
+      <div class="privacy-head">
+        <div class="privacy-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.6 8-10V5l-8-3-8 3v7c0 6.4 8 10 8 10z"/><rect x="8.5" y="10.5" width="7" height="5.5" rx="1.2"/><path d="M10 10.5V9a2 2 0 0 1 4 0v1.5"/></svg></div>
+        <div>
+          <span class="kicker">Privacy</span>
+          <h2 id="h-privacy">Your data stays yours</h2>
+          <p class="lead">Photos of your kids' clothes are nobody else's business. A/R is built to keep it that way.</p>
+        </div>
+      </div>
+      <ul class="privacy-points">
+        <li><b>No account</b>No email, no password, no profile. Open the app and use it.</li>
+        <li><b>On your own, all on the phone</b>Without a family no data leaves your phone: there is no server in between.</li>
+        <li><b>In a family, encrypted</b>Items, photos and names are encrypted on the phone before they leave. The server only keeps data it cannot read.</li>
+        <li><b>No ads, no tracking</b>No profiling cookies, no analytics, no data sold. The code is public: anyone can check.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="features" aria-labelledby="h-features" data-reveal>
+    <div class="wrap">
+      <h2 id="h-features">Small, but made for busy days</h2>
+      <ul class="features">
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M19 12.9a10 10 0 0 0-2.2-1.6"/><path d="M12 20h.01"/></svg></span><b>Works offline</b>No signal at nursery? No problem: A/R does not need a connection.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg></span><b>One photo and done</b>Take one, pick from the gallery or paste. Photos are shrunk to take little space.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M7 12h10M10 18h4"/></svg></span><b>Categories and filters</b>Bodysuits, trousers, sweatshirts: quick filters to find the right change of clothes.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></span><b>Backup in one file</b>A single .zip with items and photos, checked before it is saved.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span><b>Installs like an app</b>On Android and iPhone, without going through an app store.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></span><b>Light, dark, two languages</b>Light or dark theme, Italian or English: the app picks, or you do.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="pricing" data-reveal aria-labelledby="h-pricing">
+    <div class="wrap">
+      <h2 id="h-pricing">Free on your own. For the family, less than breakfast at a café.</h2>
+      <p class="lead lead-wide">We know: with little ones, a sit-down coffee and croissant has become a rare treat.<br>This one, at least, won't go cold while you hunt for a sock.</p>
       <div class="plans">
         <div class="plan">
           <h3>A/R</h3>
@@ -76,35 +157,41 @@
             <li>Works offline and installs like an app.</li>
             <li>Backups in a single .zip file, photos included.</li>
           </ul>
+          <div class="actions"><a class="btn btn-ghost" href="https://app.ar.gioxx.org/">Open A/R</a></div>
         </div>
-        <div class="plan plan-family">
+        <div class="plan plan-family" id="family">
           <h3>Family sharing</h3>
-          <p class="price">€4.99 <small>one-off · early adopter price</small></p>
+          <p class="price">€4.99 <small>early adopter price</small></p>
           <ul>
             <li>The same wardrobe on 3 phones, always in sync.</li>
             <li>End-to-end encryption: the server cannot read items, photos or names.</li>
             <li>One more phone? Add a seat for €1.99.</li>
-            <li>No subscription, no renewals.</li>
           </ul>
+          <div class="actions"><a class="btn btn-primary" data-checkout="family" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Buy · €4.99</a></div>
+          <p class="fine">The code shows right after payment and reaches you by email. In the app: Menu → Family → <strong>I already have a code</strong>.</p>
         </div>
       </div>
-      <p class="note">Sharing is turned on from the app: Menu → Family. Read the <a href="https://app.ar.gioxx.org/terms.html#en">terms</a> and the <a href="https://app.ar.gioxx.org/privacy.html#en">privacy policy</a>.</p>
+      <div class="after-plans note">
+        <p><strong>Changed your mind?</strong> As long as you have not used the code, we refund you within 14 days, no reason needed: write to <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a>.</p>
+        <p>Ti serve un posto in più per una famiglia già attiva? <a data-checkout="slot" href="https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01">Compra un posto a 1,99 €</a>, poi nell'app: Menu → Famiglia → <strong>Aggiungi un posto</strong>.</p>
+        <p>Payments handled by Stripe. Read the <a data-doc href="https://app.ar.gioxx.org/terms.html#en">terms</a> and the <a data-doc href="https://app.ar.gioxx.org/privacy.html#en">privacy policy</a>.</p>
+      </div>
     </div>
   </section>
 
-  <section aria-labelledby="h-install">
-    <div class="wrap band">
+  <section id="install" aria-labelledby="h-install" data-reveal>
+    <div class="wrap band band-home">
       <h2 id="h-install">Install it on your phone</h2>
       <div class="cols">
         <div>
-          <h3>Android</h3>
+          <h3 class="os-h"><svg class="os" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18.4395 5.5586c-.675 1.1664-1.352 2.3318-2.0274 3.498-.0366-.0155-.0742-.0286-.1113-.043-1.8249-.6957-3.484-.8-4.42-.787-1.8551.0185-3.3544.4643-4.2597.8203-.084-.1494-1.7526-3.021-2.0215-3.4864a1.1451 1.1451 0 0 0-.1406-.1914c-.3312-.364-.9054-.4859-1.379-.203-.475.282-.7136.9361-.3886 1.5019 1.9466 3.3696-.0966-.2158 1.9473 3.3593.0172.031-.4946.2642-1.3926 1.0177C2.8987 12.176.452 14.772 0 18.9902h24c-.119-1.1108-.3686-2.099-.7461-3.0683-.7438-1.9118-1.8435-3.2928-2.7402-4.1836a12.1048 12.1048 0 0 0-2.1309-1.6875c.6594-1.122 1.312-2.2559 1.9649-3.3848.2077-.3615.1886-.7956-.0079-1.1191a1.1001 1.1001 0 0 0-.8515-.5332c-.5225-.0536-.9392.3128-1.0488.5449zm-.0391 8.461c.3944.5926.324 1.3306-.1563 1.6503-.4799.3197-1.188.0985-1.582-.4941-.3944-.5927-.324-1.3307.1563-1.6504.4727-.315 1.1812-.1086 1.582.4941zM7.207 13.5273c.4803.3197.5506 1.0577.1563 1.6504-.394.5926-1.1038.8138-1.584.4941-.48-.3197-.5503-1.0577-.1563-1.6504.4008-.6021 1.1087-.8106 1.584-.4941z"/></svg>Android</h3>
           <ol>
             <li>Open <a href="https://app.ar.gioxx.org/">app.ar.gioxx.org</a> in Chrome.</li>
             <li>Tap <strong>Install app</strong> in the A/R menu, or ⋮ → <strong>Install app</strong>.</li>
           </ol>
         </div>
         <div>
-          <h3>iPhone</h3>
+          <h3 class="os-h"><svg class="os" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>iPhone</h3>
           <ol>
             <li>Open <a href="https://app.ar.gioxx.org/">app.ar.gioxx.org</a> in Safari.</li>
             <li>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>.</li>
@@ -115,25 +202,85 @@
     </div>
   </section>
 
-  <section aria-labelledby="h-privacy">
+  <section id="gift" data-reveal aria-labelledby="h-gift">
     <div class="wrap">
-      <h2 id="h-privacy">Your data stays yours</h2>
-      <p class="lead">No account, no ads, no tracking. Without a family everything stays on the phone; in a family the data is encrypted before it leaves. The code is public on <a href="https://github.com/gioxx/andata-ritorno">GitHub</a>, so anyone can check it.</p>
+      <div class="gift">
+        <div class="gift-body">
+          <span class="kicker">Give A/R</span>
+          <h2 id="h-gift">A gift for anyone living among bodysuits and spare socks</h2>
+          <p class="lead">Know a family that just started nursery? Give them family sharing: you pay, you send them the code.</p>
+          <ol class="gift-steps">
+            <li><b>Buy</b> with the button below, using your own email.</li>
+            <li><b>Get the code</b> right after payment and by email.</li>
+            <li><b>Pass it on:</b> they paste it in Menu → Family → I already have a code.</li>
+          </ol>
+          <div class="actions"><a class="btn btn-primary" data-checkout="family" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Give A/R · €4.99</a></div>
+          <p class="fine">The code does not expire. Licence recovery goes through the purchase email, which is yours: remind them to save the recovery kit.</p>
+        </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="open-source" data-reveal aria-labelledby="h-oss">
+    <div class="wrap split">
+      <div>
+        <span class="kicker">Open source</span>
+        <h2 id="h-oss">All the code is public. You can even run it yourself.</h2>
+        <p class="lead">A/R is free software, under the AGPL v3: the app, the server and this site are on <a href="https://github.com/gioxx/andata-ritorno">GitHub</a>. Anyone can read it, check what it does with data, change it and run it on their own infrastructure.</p>
+        <ul class="oss-points">
+          <li><b>Free on your own, for good</b>Without a family the app talks to no server: there is nothing to pay for.</li>
+          <li><b>Self-hosting</b>A Cloudflare account and the free plans of Workers, D1 and R2 are enough. The README walks through every step, and you mint your own codes.</li>
+          <li><b>So what are you paying for</b>A contribution to the costs of keeping the hosted service running, for those who would rather not run a server. No ads, no investors, no data sold.</li>
+        </ul>
+      </div>
+      <figure class="phone on-light"><img src="/shots/en/invite-light.webp" alt="Inviting a new phone with a QR code to scan" width="390" height="844" loading="lazy"></figure>
+      <figure class="phone on-dark"><img src="/shots/en/invite-dark.webp" alt="Inviting a new phone with a QR code to scan" width="390" height="844" loading="lazy"></figure>
+    </div>
+  </section>
+
+  <section id="share" aria-labelledby="h-share" data-reveal>
+    <div class="wrap share">
+      <div class="share-head">
+        <div class="share-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></svg></div>
+        <div>
+        <h2 id="h-share">Find it useful? Spread the word!</h2>
+        <p class="lead">A/R grows by word of mouth between parents. Send it to the class chat, to someone who just started nursery, or to whoever always loses a sock.</p>
+      </div>
+      </div>
+      <ul class="share-links">
+        <li><button type="button" class="btn btn-primary" data-share hidden>Share</button></li>
+        <li><a class="btn btn-ghost" href="https://wa.me/?text=A%2FR%20keeps%20track%20of%20kids%27%20clothes%20between%20home%20and%20school%3A%20https%3A%2F%2Far.gioxx.org%2Fen%2F">WhatsApp</a></li>
+        <li><a class="btn btn-ghost" href="https://t.me/share/url?url=https%3A%2F%2Far.gioxx.org%2Fen%2F&amp;text=A%2FR%20keeps%20track%20of%20kids%27%20clothes%20between%20home%20and%20school">Telegram</a></li>
+        <li><a class="btn btn-ghost" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Far.gioxx.org%2Fen%2F">Facebook</a></li>
+        <li><a class="btn btn-ghost" href="https://bsky.app/intent/compose?text=A%2FR%20keeps%20track%20of%20kids%27%20clothes%20between%20home%20and%20school%20https%3A%2F%2Far.gioxx.org%2Fen%2F">Bluesky</a></li>
+        <li><a class="btn btn-ghost" href="mailto:?subject=A%2FR%20%C2%B7%20Andata%20e%20Ritorno&amp;body=A%2FR%20keeps%20track%20of%20kids%27%20clothes%20between%20home%20and%20school%3A%20https%3A%2F%2Far.gioxx.org%2Fen%2F">Email</a></li>
+        <li><button type="button" class="btn btn-ghost" data-copy-link="https://ar.gioxx.org/en/" data-copied="Link copied">Copy the link</button></li>
+      </ul>
     </div>
   </section>
 </main>
 
-<footer>
-  <div class="wrap">
-    <p class="say">Andata e Ritorno: fewer lost socks.</p>
-    <ul>
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <a class="brand" href="/en/"><img src="/icon.svg" alt="" width="32" height="32"><span>A/R</span></a>
+      <p>Andata e Ritorno: fewer lost socks.</p>
+    </div>
+    <ul class="footer-links">
       <li><a href="https://app.ar.gioxx.org/">Open A/R</a></li>
       <li><a href="/en/guide/">Guide</a></li>
-      <li><a href="https://app.ar.gioxx.org/privacy.html#en">Privacy</a></li>
-      <li><a href="https://app.ar.gioxx.org/terms.html#en">Terms</a></li>
-      <li><a href="https://github.com/gioxx/andata-ritorno">GitHub</a></li>
+      <li><a href="/en/#gift">Give A/R</a></li>
+      <li><a data-doc href="https://app.ar.gioxx.org/privacy.html#en">Privacy</a></li>
+      <li><a data-doc href="https://app.ar.gioxx.org/terms.html#en">Terms</a></li>
+      <li><a href="https://github.com/gioxx/andata-ritorno">GitHub ↗</a></li>
+      <li><a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a></li>
     </ul>
+    <small class="fine">A/R is free software, under the AGPL v3. Clothing photos: Pexels and Unsplash.</small>
+    <small class="fine">Android is a trademark of Google LLC. Apple and iPhone are trademarks of Apple Inc., registered in the U.S. and other countries.</small>
+    <small class="fine">© 2026 Gioxx</small>
   </div>
 </footer>
+<button type="button" class="to-top" data-to-top aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 </body>
 </html>
