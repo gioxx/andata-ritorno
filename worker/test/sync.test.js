@@ -317,6 +317,25 @@ describe('photos', () => {
     call(path, { method: 'PUT', headers: { authorization: `Bearer ${token}` }, body: data }, extra);
   const row = (f, pid) => env.DB.prepare('SELECT size, ready FROM photos WHERE family_id = ? AND pid = ?').bind(f.familyId, pid).first();
 
+  it('takes no photo for a family purged while the upload body was arriving', async () => {
+    const f = await newFamily();
+    const base = await total();
+    const pid = rid();
+    const body = new ReadableStream({
+      async pull(c) {
+        // The last device leaves after the request was authenticated, before its body is in.
+        expect(await (await del(`/api/devices/${f.deviceId}`, f.token)).json()).toEqual({ purged: true });
+        c.enqueue(bytes(10));
+        c.close();
+      },
+    });
+    const res = await call(`/api/photos/${pid}`, { method: 'PUT', headers: { authorization: `Bearer ${f.token}` }, body, duplex: 'half' });
+    expect(res.status).toBe(401);
+    expect(await row(f, pid)).toBeNull();
+    expect((await env.PHOTOS.list({ prefix: `${f.familyId}/` })).objects).toEqual([]);
+    expect(await total()).toBe(base);
+  });
+
   it('deletes a photo written while its family was purged', async () => {
     const f = await newFamily();
     const base = await total();

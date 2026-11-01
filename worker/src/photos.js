@@ -66,12 +66,14 @@ async function put(req, env, ctx, { pid }) {
   const token = `${new Date().toISOString()}~${randomToken()}`;
   const key = objectKey(familyId, pid, token);
   const delta = '(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))';
-  const fits = '(EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)';
+  // The family must still exist: one purged while this body was arriving takes no new photos.
+  const fits =
+    '(EXISTS (SELECT 1 FROM families WHERE id = ?2) AND (EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5))';
   const results = await env.DB.batch([
     env.DB.prepare('SELECT size, uploaded_at FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
     // Which limit refused it, if one did (same snapshot as the reservation below).
     env.DB.prepare(
-      'SELECT EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?1) < ?3 AS ok',
+      'SELECT EXISTS (SELECT 1 FROM families WHERE id = ?1) AS family, EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?1) < ?3 AS ok',
     ).bind(familyId, pid, MAX_PHOTOS),
     env.DB.prepare("INSERT OR IGNORE INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos"),
     env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND ${fits} AND (${delta} <= 0 OR bytes + ${delta} <= ?4)`).bind(
@@ -86,7 +88,11 @@ async function put(req, env, ctx, { pid }) {
        ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at`,
     ).bind(familyId, pid, size, token),
   ]);
-  if (results[3].meta.changes !== 1) throw new HttpError(413, results[1].results[0].ok ? 'limit-storage' : 'limit-photos');
+  if (results[3].meta.changes !== 1) {
+    const why = results[1].results[0];
+    if (!why.family) throw new HttpError(401, 'unauthorized');
+    throw new HttpError(413, why.ok ? 'limit-storage' : 'limit-photos');
+  }
   const old = results[0].results[0] ?? null;
   // The statements below only touch the row while it is still this request's own.
   const mine = 'EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2 AND uploaded_at = ?3 AND size = ?4)';

@@ -1046,6 +1046,37 @@ describe('final review fixes', () => {
     expect((await snapshot(b)).photos['ph-item-a01']).toBe('img-ph-item-a01')
   })
 
+  it('a pull answered after switching family never merges the old family into the new wardrobe', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    await a.sync()
+    const c = await phone()
+    server.addCode('AR-ZZZZ-ZZZZ-ZZZZ')
+    await createFamily(c.db, c.api, { code: 'AR-ZZZZ-ZZZZ-ZZZZ', familyName: 'Altra', deviceName: 'Telefono 3' })
+    await c.sync()
+
+    const db = await openDb(`ar-sync-${crypto.randomUUID()}`)
+    let switched = false
+    const b = { db }
+    // b's first pull (family A) is answered only after the user left A and joined C, replacing.
+    const fetchFn = async (url, init) => {
+      const res = await server.fetch(url, init)
+      if (!switched && String(url).includes('/api/sync?')) {
+        switched = true
+        await leaveFamily(b.db, b.api)
+        await join(c, b, { mode: 'replace' })
+      }
+      return res
+    }
+    b.api = createApi({ fetchFn, getToken: async () => (await getFamily(db))?.token })
+    b.engine = createSyncEngine({ db, api: b.api, now: iso, defaultTabName: 'Scheda' })
+    await join(a, b)
+    await b.engine.syncNow('menu')
+    expect(switched).toBe(true)
+    expect((await loadAll(b.db)).items.map((i) => i.id)).not.toContain('item-a01')
+  })
+
   it('pins the token for a whole run: a leave and join mid-run never sends old-key data into the new family', async () => {
     const a = await phone()
     await familyOf(a)

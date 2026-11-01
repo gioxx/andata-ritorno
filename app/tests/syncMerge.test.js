@@ -70,6 +70,13 @@ describe('mergeRemote: remote value vs local record', () => {
     expect(plan.pushBack).toEqual([])
   })
 
+  it('a newer local deletion is pushed back over an older remote one', () => {
+    const plan = mergeRemote(local({ tombstones: [{ kind: 'item', id: 'i1', deletedAt: T3 }] }), [dead('item', 'i1', T1)], opts)
+    expect(keys(plan.pushBack)).toEqual(['item:i1'])
+    const same = mergeRemote(local({ tombstones: [{ kind: 'item', id: 'i1', deletedAt: T1 }] }), [dead('item', 'i1', T3)], opts)
+    expect(same.pushBack).toEqual([])
+  })
+
   it('an older remote item changes nothing locally and is pushed back', () => {
     const mine = item('i1', 'A', { label: 'mio', updatedAt: T2 })
     const plan = mergeRemote(local({ items: [mine] }), [val('item', item('i1', 'A', { updatedAt: T1 }))], opts)

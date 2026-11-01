@@ -182,7 +182,11 @@ async function stripeWebhook(req, env, ctx) {
     return json({ received: true });
   }
   const to = session.customer_details.email;
-  if (to) await defer(ctx, sendEmail(env, { to, ...codeEmail(issued.code, issued.kind) }));
+  // Sent before answering: if it fails, Stripe retries the delivery and the same code goes out
+  // again (once only, thanks to the idempotency key), instead of the buyer never getting it.
+  if (to && !(await sendEmail(env, { to, ...codeEmail(issued.code, issued.kind) }, { idempotencyKey: `code-${session.id}` }))) {
+    throw new Error('code email not sent');
+  }
   return json({ received: true });
 }
 

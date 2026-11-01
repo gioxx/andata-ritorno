@@ -117,7 +117,9 @@ export function mergeRemote(local, remote, { now, defaultTabName, deviceId }) {
   // Where the server holds something other than the result here, push ours so all devices converge.
   for (const [key, { kind, id, r }] of latest) {
     const cur = state[kind].get(id)
-    const differs = r.tombstone ? !!cur : cur ? !same(cur, r.value) : tombs.has(id)
+    // Two deletions: the newer one must end up on the server, or an edit made between them would
+    // beat the older one there and bring the record back on another device.
+    const differs = r.tombstone ? !!cur || tombs.get(id).deletedAt > r.tombstone.deletedAt : cur ? !same(cur, r.value) : tombs.has(id)
     if (differs) pushBack.add(key)
   }
 

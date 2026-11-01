@@ -340,17 +340,27 @@ describe('Stripe', () => {
     expect(n).toBe(0);
   });
 
-  it('a failing email send does not fail the webhook', async () => {
+  it('a failing email send fails the webhook, so Stripe retries and the same code goes out', async () => {
     const id = 'cs_test_mail_down';
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    let down = true;
+    const sent = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(typeof input === 'string' ? input : input.url);
-      if (url.hostname === 'api.resend.com') return new Response('down', { status: 500 });
+      if (url.hostname === 'api.resend.com') {
+        if (down) return new Response('down', { status: 500 });
+        sent.push({ key: init.headers['idempotency-key'], body: JSON.parse(init.body) });
+        return Response.json({ id: 'email_1' });
+      }
       return Response.json({ id, payment_status: 'paid', customer_details: { email: 'a@example.com' }, line_items: { data: [{ price: { id: 'price_family' } }] } });
     });
+    expect((await webhook(sessionEvent(id))).status).toBe(500);
+    down = false;
     expect((await webhook(sessionEvent(id))).status).toBe(200);
     const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM codes WHERE stripe_session = ?').bind(id).first();
     expect(n).toBe(1);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].key).toBe(`code-${id}`);
   });
 });
 

@@ -181,6 +181,9 @@ export function createSyncEngine({
   /** Merge everything pulled in one step, alone in the mutation queue, and write it in one tx. */
   async function merge(meta, remote) {
     return exclusive(async () => {
+      // The pull may have waited on the network while the user left (or switched family, which runs
+      // in this same queue): data of the old membership must not land in the new wardrobe.
+      if (!sameMembership(await getFamily(db), meta)) throw new MembershipChanged()
       const [{ tabs, categories, items }, tombstones, photoIds] = await Promise.all([loadAll(db), getTombstones(db), getPhotoIds(db)])
       const name = typeof defaultTabName === 'function' ? defaultTabName() : defaultTabName
       const plan = mergeRemote({ tabs, categories, items, tombstones, photoIds }, remote, { now: now(), defaultTabName: name, deviceId: meta.deviceId })
