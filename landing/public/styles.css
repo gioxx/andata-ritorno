@@ -100,10 +100,10 @@ p { margin: 0 0 var(--space-md); }
 /* ---- Phone frame around real screenshots ---- */
 /* An iPhone-like body: titanium rim, black bezel, Dynamic Island, side buttons. The screenshots carry
    their own status bar (9:41, signal, Wi-Fi, battery) and home indicator. */
-.phone { position: relative; margin: 0; width: 100%; max-width: 300px; aspect-ratio: 390 / 844; padding: 9px; border-radius: 50px; background: #0b0b0d; box-shadow: 0 0 0 2px var(--color-rim), inset 0 0 0 1px rgb(255 255 255 / 0.08), var(--shadow-device); }
-.phone::before { content: ''; position: absolute; top: 20px; left: 50%; width: 31%; height: 26px; transform: translateX(-50%); border-radius: var(--radius-pill); background: #000; z-index: 1; }
+.phone { position: relative; margin: 0; width: 100%; max-width: 300px; aspect-ratio: 390 / 844; padding: 7px; border-radius: 44px; corner-shape: superellipse(1.6); background: #0b0b0d; box-shadow: 0 0 0 2px var(--color-rim), inset 0 0 0 1px rgb(255 255 255 / 0.08), var(--shadow-device); }
+.phone::before { content: ''; position: absolute; top: 16px; left: 50%; width: 31%; height: 26px; transform: translateX(-50%); border-radius: var(--radius-pill); background: #000; z-index: 1; }
 .phone::after { content: ''; position: absolute; left: -4px; top: 19%; width: 3px; height: 7%; border-radius: 2px 0 0 2px; background: var(--color-rim); box-shadow: 0 54px 0 0 var(--color-rim); }
-.phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 41px; }
+.phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 38px; corner-shape: superellipse(1.6); }
 .shot { margin: 0; display: grid; justify-items: center; gap: var(--space-sm); }
 .shot figcaption { font-size: var(--text-sm); color: var(--color-muted); text-align: center; max-width: 30ch; }
 
@@ -137,9 +137,9 @@ p { margin: 0 0 var(--space-md); }
 .stage .n { display: inline-grid; place-items: center; width: 36px; height: 36px; margin-bottom: var(--space-md); border-radius: var(--radius-pill); background: var(--color-accent-strong); color: var(--color-on-accent); font-weight: 800; font-size: var(--text-sm); }
 .stage h3 { margin-bottom: var(--space-sm); }
 .stage p { color: var(--color-muted); margin: 0 0 var(--space-lg); }
-.stage-shot { position: relative; margin-top: auto; align-self: center; width: min(100%, 280px); height: 300px; padding: 8px 8px 0; border-radius: 40px 40px 0 0; background: #0b0b0d; box-shadow: 0 0 0 2px var(--color-rim), var(--shadow-device); }
-.stage-shot[data-pos="top"]::before { content: ''; position: absolute; top: 18px; left: 50%; width: 30%; height: 24px; transform: translateX(-50%); border-radius: var(--radius-pill); background: #000; }
-.stage-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 32px 32px 0 0; }
+.stage-shot { position: relative; margin-top: auto; align-self: center; width: min(100%, 280px); height: 300px; padding: 7px 7px 0; border-radius: 42px 42px 0 0; corner-shape: superellipse(1.6); background: #0b0b0d; box-shadow: 0 0 0 2px var(--color-rim), var(--shadow-device); }
+.stage-shot[data-pos="top"]::before { content: ''; position: absolute; top: 15px; left: 50%; width: 30%; height: 24px; transform: translateX(-50%); border-radius: var(--radius-pill); background: #000; }
+.stage-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 36px 36px 0 0; corner-shape: superellipse(1.6); }
 .stage-shot[data-pos="middle"] img { object-position: center 62%; }
 .stage-shot[data-pos="bottom"] img { object-position: bottom; border-radius: 0; }
 
@@ -200,9 +200,9 @@ section > .wrap > h2 { margin-bottom: var(--space-lg); }
 .doc li { margin-bottom: var(--space-xs); }
 .doc .shots { display: flex; flex-wrap: wrap; gap: var(--space-lg); margin: var(--space-lg) 0; }
 .doc .shots .shot { flex: 1 1 200px; max-width: 240px; }
-.doc .shots .phone { max-width: 220px; padding: 7px; border-radius: 38px; }
-.doc .shots .phone img { border-radius: 31px; }
-.doc .shots .phone::before { top: 15px; height: 19px; }
+.doc .shots .phone { max-width: 220px; padding: 5px; border-radius: 33px; }
+.doc .shots .phone img { border-radius: 28px; }
+.doc .shots .phone::before { top: 11px; height: 19px; }
 .doc .shots .phone::after { box-shadow: 0 40px 0 0 var(--color-rim); }
 .callout { margin: var(--space-md) 0; padding: var(--space-md) var(--space-lg); border-radius: var(--radius-tile); background: var(--color-school); }
 .callout strong { display: block; }
