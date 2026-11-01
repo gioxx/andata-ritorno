@@ -17,7 +17,8 @@ export default defineConfig({
         globIgnores: ['admin/**'],
         navigateFallback: 'index.html',
         // The static policy page is its own document, not an app route.
-        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/admin\//, /^\/api\//],
+        // /cdn-cgi/ is Cloudflare's (Access login callback): it must reach the edge, never the cached app.
+        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/admin\//, /^\/cdn-cgi\//, /^\/api\//],
       },
     }),
   ],
