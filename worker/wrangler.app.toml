@@ -17,8 +17,8 @@ run_worker_first = ["/api/*"]
 [vars]
 APP_ORIGIN = "https://app.ar.gioxx.org"
 # Stripe price ids (not secret); set the real ones at deploy time.
-PRICE_FAMILY = ""
-PRICE_SLOT = ""
+PRICE_FAMILY = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
+PRICE_SLOT = "price_1UX1rBCfwq1bSlj7mAr3JtPY"
 # Global cap on stored photo bytes across all families (R2 free tier is 10 GB; default 9 GB when unset).
 MAX_TOTAL_PHOTO_BYTES = "9000000000"
 
