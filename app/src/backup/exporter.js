@@ -1,6 +1,7 @@
 // Export: build the v2 ZIP, hand it to the share sheet (Android) or download it.
 import { loadAll, getPhoto, getMeta, setMeta } from '../db.js'
 import { buildZip } from './zip.js'
+import { getFamily, kitOf } from '../sync/family.js'
 import { t } from '../i18n.js'
 
 // iOS Safari 15+ shares ZIP files through the same API; if the gesture expired it throws and we download.
@@ -33,6 +34,13 @@ export async function markBackupDone(db, now, saved) {
   await setMeta(db, 'unsavedCount', Math.max(0, current - saved))
 }
 
+/** The kit of the family this phone is in, if it has one yet (an invited phone gets it by sync). */
+async function familyKitOf(db) {
+  const meta = await getFamily(db)
+  if (!meta || meta.pending) return null
+  try { return kitOf(meta) } catch { return null }
+}
+
 /**
  * Side effects are injectable for tests. Meta is only touched once the file surely reached the
  * user (shared). A download gives the page no answer: the caller asks, then calls markBackupDone.
@@ -41,7 +49,7 @@ export async function markBackupDone(db, now, saved) {
 export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date() } = {}) {
   const saved = (await getMeta(db, 'unsavedCount')) ?? 0
   const { tabs, items, categories } = await loadAll(db)
-  const blob = await buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id), now })
+  const blob = await buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id), now, familyKit: await familyKitOf(db) })
   const name = backupFileName(now)
   const file = new File([blob], name, { type: 'application/zip' })
 

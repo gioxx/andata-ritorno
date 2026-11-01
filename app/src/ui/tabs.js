@@ -15,7 +15,7 @@ function ensureDom() {
   wrap.innerHTML = `
     <dialog id="newTab"><form method="dialog">
       <h3>${t('tabs.newTitle')}</h3>
-      <input type="text" id="newTabName" placeholder="${t('tabs.placeholder')}" autocomplete="off">
+      <input type="text" id="newTabName" maxlength="60" placeholder="${t('tabs.placeholder')}" autocomplete="off">
       <div class="row">
         <button value="" class="cancel-inline">${t('common.cancel')}</button>
         <button value="ok" class="primary" id="newTabOk" disabled>${t('tabs.create')}</button>
@@ -23,7 +23,7 @@ function ensureDom() {
     </form></dialog>
     <dialog id="tabMgr"><form method="dialog">
       <h3>${t('tabs.manageTitle')}</h3>
-      <input type="text" id="mgrName" autocomplete="off" aria-label="${t('tabs.nameLabel')}">
+      <input type="text" id="mgrName" maxlength="60" autocomplete="off" aria-label="${t('tabs.nameLabel')}">
       <button type="button" class="primary" id="mgrSave">${t('tabs.saveName')}</button>
       <div class="row mgr-row">
         <button type="button" id="mgrLeft">${t('tabs.moveLeft')}</button>

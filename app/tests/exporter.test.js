@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { unzipSync } from 'fflate'
+import { unzipSync, strFromU8 } from 'fflate'
 import { openDb, getMeta, setMeta, putTab, addItems } from '../src/db.js'
 import { exportBackup, markBackupDone } from '../src/backup/exporter.js'
+import { prepareImport, commitImport } from '../src/backup/importer.js'
+import { setFamily, kitOf } from '../src/sync/family.js'
 
 const T = '2026-02-01T00:00:00.000Z'
 async function seeded() {
@@ -81,5 +83,38 @@ describe('exportBackup', () => {
     await exportBackup(db, { share: async () => false, download, now })
     const entries = unzipSync(new Uint8Array(await download.mock.calls[0][0].arrayBuffer()))
     expect(JSON.parse(new TextDecoder().decode(entries['backup.json'])).exportedAt).toBe(now.toISOString())
+  })
+})
+
+describe('family kit in backups', () => {
+  const kitMeta = { familyId: 'family-1234', deviceId: 'device-01', token: 't', keyRaw: 'A'.repeat(43), recoverySecret: 'secret_1234', cursor: 0, lastSyncAt: null, licenceKind: 'family' }
+
+  async function exported(db) {
+    let file = null
+    await exportBackup(db, { share: async () => false, download: (f) => { file = f } })
+    return file
+  }
+
+  it('a backup made in a family carries the kit, round-trips, and the importer exposes it', async () => {
+    const p = { db: await seeded() }
+    await setFamily(p.db, kitMeta)
+    const file = await exported(p.db)
+    const json = JSON.parse(strFromU8(unzipSync(new Uint8Array(await file.arrayBuffer()))['backup.json']))
+    expect(json.familyKit).toBe(kitOf(kitMeta))
+    const dst = { db: await openDb('ar-exp-' + crypto.randomUUID()) }
+    const prepared = await prepareImport(dst.db, file)
+    expect(prepared.incoming.familyKit).toBe(kitOf(kitMeta))
+    const summary = await commitImport(dst.db, prepared, { partial: false })
+    expect(summary.familyKit).toBe(kitOf(kitMeta))
+  })
+
+  it('outside a family there is no kit', async () => {
+    const p = { db: await seeded() }
+    const file = await exported(p.db)
+    const json = JSON.parse(strFromU8(unzipSync(new Uint8Array(await file.arrayBuffer()))['backup.json']))
+    expect('familyKit' in json).toBe(false)
+    const dst = { db: await openDb('ar-exp-' + crypto.randomUUID()) }
+    const summary = await commitImport(dst.db, await prepareImport(dst.db, file), { partial: false })
+    expect(summary.familyKit).toBeNull()
   })
 })

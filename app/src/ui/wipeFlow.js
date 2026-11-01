@@ -16,19 +16,32 @@ function show(html) {
   return d
 }
 
-/** Erase for real, alone in the mutation queue; on failure the app reloads onto what is left. */
-export async function eraseEverything({ db, reload = () => location.reload() }) {
+/**
+ * Erase for real, alone in the mutation queue; on failure the app reloads onto what is left.
+ * In a family, leave first (best effort): offline, the wipe goes on and the user is told to remove
+ * this phone from another one.
+ * @param {{ db:any, reload?:()=>void, leave?:()=>Promise<'none'|'left'|'failed'> }} o
+ */
+export async function eraseEverything({ db, reload = () => location.reload(), leave = async () => 'none' }) {
+  let left = 'none'
   try {
     // Overlay while waiting: a delete blocked by another tab finishes once that tab has reloaded.
-    await withBusy(() => runExclusive(() => wipeAll({ db, onBlocked: () => setBusyMessage(t('wipe.blocked')) })))
+    await withBusy(async () => {
+      left = await leave().catch(() => 'failed')
+      await runExclusive(() => wipeAll({ db, onBlocked: () => setBusyMessage(t('wipe.blocked')) }))
+    })
+    if (left === 'failed') alert(t('wipe.leaveFailed'))
   } catch {
     reportError(new Error('wipe-failed'))
   }
   reload() // welcome screen after success; after a failure the closed connection is reopened
 }
 
-/** @param {{ db: any, onExport: () => Promise<void>, erase?: (o: {db: any}) => Promise<void> }} deps */
-export function openWipeFlow({ db, onExport, erase = eraseEverything }) {
+/**
+ * @param {{ db: any, onExport: () => Promise<unknown>, leave?: () => Promise<'none'|'left'|'failed'>,
+ *   erase?: (o: {db: any, leave?: () => Promise<string>}) => Promise<void> }} deps
+ */
+export function openWipeFlow({ db, onExport, leave, erase = eraseEverything }) {
   const step1 = show(`<form method="dialog"><h3>${t('wipe.title')}</h3>
     <p class="plain">${t('wipe.body')}</p>
     <div id="wipeUnsaved">${unsavedHtml()}</div>
@@ -44,13 +57,13 @@ export function openWipeFlow({ db, onExport, erase = eraseEverything }) {
       step1.querySelector('#wipeUnsaved').innerHTML = unsavedHtml() // the backup zeroed the counter
     } else if (act === 'continue') {
       step1.close()
-      openConfirm({ db, erase })
+      openConfirm({ db, erase, leave })
     }
   })
   openModal(step1)
 }
 
-function openConfirm({ db, erase }) {
+function openConfirm({ db, erase, leave }) {
   const word = t('wipe.word')
   const d = show(`<form method="dialog"><h3>${t('wipe.title')}</h3>
     <p class="plain">${t('wipe.confirmText', { word })}</p>
@@ -69,7 +82,7 @@ function openConfirm({ db, erase }) {
     if (!matches()) return
     go.disabled = true
     d.close()
-    erase({ db })
+    erase({ db, leave })
   })
   openModal(d)
 }

@@ -1,0 +1,11 @@
+# Product landing and user guide: static assets only, on the bare domain. The app itself lives on
+# app.ar.gioxx.org (worker/wrangler.app.toml).
+name = "andata-ritorno-landing"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "ar.gioxx.org", custom_domain = true }]
+
+[assets]
+directory = "./public"
+not_found_handling = "404-page"

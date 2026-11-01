@@ -6,6 +6,8 @@ import { esc } from './esc.js'
 import { reportError, openModal } from './dialogs.js'
 import { mappingRows, importErrorMessage, blockedTitle, failureRow, confirmedChoice, importDoneText } from './model.js'
 import { getMeta } from '../db.js'
+import { getFamily } from '../sync/family.js'
+import { familyHooks } from './familyDialogs.js'
 import { t } from '../i18n.js'
 
 let busyDlg = null
@@ -92,6 +94,13 @@ export async function importFile(db, file) {
   const lastBackupAt = await getMeta(db, 'lastBackupAt').catch(() => null)
   await showMessage(importDoneText(formatSummary(summary), lastBackupAt))
   if (reloadError) alert(t('import.reloadFailed', { message: reloadError?.message ?? reloadError }))
+  // A backup made in a family carries its kit: a phone outside any family can rejoin with it.
+  if (summary.familyKit && !(await getFamily(db).catch(() => true))) {
+    const go = await ask(`<h3>${t('family.restore')}</h3><p>${t('import.kitFound')}</p>
+      <div class="row"><button type="button" class="primary" data-result="restore">${t('family.restore')}</button></div>
+      <button type="button" class="cancel" data-result="">${t('family.notNow')}</button>`)
+    if (go === 'restore') await familyHooks.onRestore({ kit: summary.familyKit }).catch(reportError)
+  }
 }
 
 /** Runs inside runExclusive: db-level calls and dialogs only, never a queued store action. */

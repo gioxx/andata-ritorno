@@ -13,7 +13,12 @@ export default defineConfig({
       manifest: false, // hand-written public/manifest.webmanifest, linked from index.html
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
+        // Behind Cloudflare Access: precaching it would hit the login redirect and fail the install.
+        globIgnores: ['admin/**'],
         navigateFallback: 'index.html',
+        // The static policy page is its own document, not an app route.
+        // /cdn-cgi/ is Cloudflare's (Access login callback): it must reach the edge, never the cached app.
+        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/admin(\/|$)/, /^\/cdn-cgi\//, /^\/api\//],
       },
     }),
   ],

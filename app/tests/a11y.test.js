@@ -80,6 +80,7 @@ describe('dialogs', () => {
     const dlg = document.getElementById('editItem')
     expect(dlg.open).toBe(true)
     expect(dlg.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement.tagName).toBe('H3') // not the label field: no keyboard until it is tapped
     expect(dlg.getAttribute('aria-labelledby')).toBeTruthy()
     expect(document.getElementById('editSince').textContent).toMatch(/^🏫 A scuola dal 12 gennaio/)
     key(dlg, 'Escape')
