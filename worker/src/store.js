@@ -1,4 +1,5 @@
 // Family data helpers shared by the licence and family routes.
+import { HttpError } from './http.js';
 
 export async function deviceLimit(env, licenceId) {
   const row = await env.DB.prepare('SELECT base_limit + extra_slots AS n FROM licences WHERE id = ?').bind(licenceId).first();
@@ -69,4 +70,14 @@ export async function purgePhotos(env, familyId) {
   } catch (e) {
     console.error('photo purge failed', familyId, e);
   }
+}
+
+/**
+ * The owner's emergency brake, switched from the admin page: while registrations are closed no new
+ * family is created and no new phone joins one (503 registrations-closed). Families already in keep
+ * syncing, and a recovery kit still brings one of their phones back.
+ */
+export async function requireRegistrationsOpen(env) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'registrations'").first();
+  if (row?.value === 'closed') throw new HttpError(503, 'registrations-closed');
 }

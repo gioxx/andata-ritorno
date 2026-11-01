@@ -10,7 +10,7 @@ export const FAMILY_ERROR_CODES = [
   'offline', 'bad-request', 'bad-signature', 'unauthorized', 'not-paid', 'bad-kit', 'bad-code', 'bad-session', 'not-found',
   'code-is-family', 'code-is-slot', 'code-used', 'family-full', 'invite-expired', 'link-expired',
   'limit-photos', 'limit-photo-size', 'limit-storage', 'limit-record-size', 'limit-records', 'limit-daily', 'too-large', 'rate-limited',
-  'already-in-family',
+  'already-in-family', 'registrations-closed',
 ]
 
 /** User-facing message for an ApiError (or any error): unknown codes get a generic line. */

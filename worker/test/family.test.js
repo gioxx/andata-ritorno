@@ -359,3 +359,30 @@ describe('recovery kit', () => {
     }
   });
 });
+
+describe('registrations closed from the admin page', () => {
+  const setRegistrations = (value) =>
+    env.DB.prepare("INSERT INTO settings (key, value) VALUES ('registrations', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(value).run();
+  afterEach(() => setRegistrations('open'));
+
+  it('stops new families and new phones, but not the families already in', async () => {
+    const fam = await newFamily();
+    const inviteToken = await invite(fam.token);
+    await setRegistrations('closed');
+
+    const code = newCode();
+    await env.DB.prepare("INSERT INTO codes (hash, kind, source, created_at) VALUES (?, 'family', 'manual', ?)").bind(await hashCode(code), now()).run();
+    const redeem = await post('/api/redeem', { code, familyId: rid(), deviceId: rid(), familyNameEnc: 'ZmFtaWx5', deviceNameEnc: 'ZGV2', recoveryHash: await sha256Hex(SECRET) });
+    expect(redeem.status).toBe(503);
+    expect(await redeem.json()).toEqual({ error: 'registrations-closed' });
+    const unused = await env.DB.prepare('SELECT redeemed_at FROM codes WHERE hash = ?').bind(await hashCode(code)).first();
+    expect(unused.redeemed_at).toBeNull();
+
+    const join = await post('/api/join', joinBody(inviteToken));
+    expect(join.status).toBe(503);
+    expect((await get('/api/family', fam.token)).status).toBe(200);
+
+    await setRegistrations('open');
+    expect((await post('/api/join', joinBody(inviteToken))).status).toBe(200);
+  });
+});

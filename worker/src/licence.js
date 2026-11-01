@@ -3,7 +3,7 @@ import { hmacHex, randomToken, requireApiDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
 import { getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
-import { deviceLimit, purgePhotos, purgeStatements } from './store.js';
+import { deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen } from './store.js';
 import { ENC, HEX64, ID, isSecret } from './validate.js';
 
 const LINK_TTL_MS = 30 * 60 * 1000;
@@ -115,6 +115,7 @@ async function redeem(req, env) {
   const code = await findCode(env, body.code);
   if (code.kind === 'slot') throw new HttpError(409, 'code-is-slot');
   if (code.redeemed_at) return (await replay(env, code.licence_id, f)) ?? codeUsed();
+  await requireRegistrationsOpen(env);
 
   const licenceId = crypto.randomUUID();
   const token = randomToken();
@@ -250,6 +251,7 @@ async function licenceRestart(req, env) {
     throw new HttpError(410, 'link-expired');
   };
   if (link.used_at || link.expires_at <= at) return (await replay(env, licenceId, f)) ?? expired();
+  await requireRegistrationsOpen(env);
   // The new family id must differ from the old one: it is the marker of the request that used the link.
   if (f.familyId === old) throw new HttpError(400, 'bad-request');
 

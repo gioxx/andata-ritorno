@@ -1,4 +1,5 @@
-// Owner dashboard: renders /api/admin/stats (aggregate numbers only; behind Cloudflare Access).
+// Owner dashboard: renders /api/admin/stats (aggregate numbers only; behind Cloudflare Access)
+// and holds the switch that closes new registrations in an emergency.
 const out = document.getElementById('out')
 const at = document.getElementById('at')
 const nf = new Intl.NumberFormat('it-IT')
@@ -12,7 +13,15 @@ const SOURCE = { stripe: 'Stripe', manual: 'Manuale' }
 function render(s) {
   const p = s.photos
   const used = p.cap ? Math.min(100, (100 * p.counted) / p.cap) : 0
+  const reg = s.registrationsOpen
   out.innerHTML = `
+    <section class="switch ${reg ? '' : 'closed'}" aria-labelledby="reg-h">
+      <h2 id="reg-h">Nuove registrazioni: ${reg ? 'aperte' : 'bloccate'}</h2>
+      <p>${reg
+        ? 'Si possono creare famiglie nuove e aggiungere telefoni con un invito.'
+        : 'Nessuna famiglia nuova, nessun telefono nuovo (né con un invito né ripartendo da una licenza). Le famiglie esistenti continuano a sincronizzarsi e il kit di recupero funziona. Chi paga riceve comunque il codice: potrà usarlo alla riapertura.'}</p>
+      <button type="button" id="reg-toggle" data-open="${reg ? 'false' : 'true'}">${reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni'}</button>
+    </section>
     <h2>Famiglie e telefoni</h2>
     <div class="grid">
       ${tile(n(s.families.total), 'famiglie')}
@@ -56,5 +65,26 @@ async function load() {
   }
 }
 
+async function setRegistrations(open) {
+  if (!open && !confirm('Bloccare le nuove registrazioni? Le famiglie esistenti non ne risentono.')) return
+  at.textContent = 'Salvataggio…'
+  try {
+    const res = await fetch('/api/admin/registrations', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ open }),
+    })
+    if (!res.ok) throw new Error(`Errore ${res.status}`)
+    await load()
+  } catch (e) {
+    at.innerHTML = `<span class="err">${esc(e.message)}</span>`
+  }
+}
+
+out.addEventListener('click', (e) => {
+  const btn = e.target.closest('#reg-toggle')
+  if (btn) setRegistrations(btn.dataset.open === 'true')
+})
 document.getElementById('reload').addEventListener('click', load)
 load()
