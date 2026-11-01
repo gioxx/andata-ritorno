@@ -7,6 +7,7 @@ import { json } from './http.js';
 
 const CACHE_SECONDS = 6 * 60 * 60;
 const MIN_SHOWN = 10;
+const MIN_FAMILIES = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** @returns {number|null} n rounded down to ten, or null when too small to show. */
@@ -25,12 +26,16 @@ async function compute(env) {
     env.DB.prepare('SELECT COUNT(*) AS n FROM photos WHERE ready = 1'),
   ]);
   const n = (r) => r.results[0]?.n ?? 0;
+  // With only a handful of families, any total describes those families: show nothing until there
+  // are enough of them to hide in.
+  const crowd = n(families) >= MIN_FAMILIES;
+  const shown = (v) => (crowd ? coarse(v) : null);
   return {
-    families: coarse(n(families)),
-    phones: coarse(n(phones)),
-    activePhones30d: coarse(n(active)),
-    syncedRecords: coarse(n(records)),
-    photos: coarse(n(photos)),
+    families: shown(n(families)),
+    phones: shown(n(phones)),
+    activePhones30d: shown(n(active)),
+    syncedRecords: shown(n(records)),
+    photos: shown(n(photos)),
     // The day, not the time: the cache refreshes a few times a day.
     asOf: new Date().toISOString().slice(0, 10),
   };
