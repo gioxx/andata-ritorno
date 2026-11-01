@@ -340,6 +340,24 @@ export async function openJoin(invite) {
     <div id="famJoinBody"><p class="plain">${t('sync.syncing')}</p></div>
     <p class="plain err" role="alert"></p><button value="" class="cancel">${t('common.cancel')}</button></form>`)
   openModal(d)
+  // An earlier attempt with this invite whose answer was lost: the server may have used the invite
+  // already (its preview would then say expired), so that attempt is finished instead.
+  const pending = (await getFamily(ctx.db))?.pending
+  if (pending?.op === 'join' && pending.body.inviteToken === invite.inviteToken) {
+    try {
+      await runExclusive(async () => {
+        await resumePending(ctx.db, ctx.api)
+        if (pending.mode === 'replace') await load(ctx.db)
+      })
+    } catch (e) {
+      d.querySelector('#famJoinBody').innerHTML = ''
+      d.querySelector('.err').textContent = familyError(e)
+      return
+    }
+    d.close()
+    Promise.resolve(ctx.onEntered()).catch(reportError)
+    return
+  }
   const body = d.querySelector('#famJoinBody')
   let name = null
   let count = 0

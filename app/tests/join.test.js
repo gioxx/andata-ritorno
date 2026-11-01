@@ -102,6 +102,30 @@ describe('join screen', () => {
     expect((await getFamily(p.db)).familyId).toBe(inv.familyId)
   })
 
+  it('reopening the invite after a lost answer finishes that join, though the invite is spent', async () => {
+    const inv = await invite()
+    const p = await phone()
+    const onEntered = vi.fn()
+    initFamilyUi({ ...p, onEntered, onLeft: vi.fn(), onExport: vi.fn() })
+    await openJoin(inv)
+    // The client retries once by itself: both answers get lost.
+    let lost = 0
+    server.beforeHandle = (method, path) => {
+      if (method === 'POST' && path === '/api/join' && lost++ < 2) server.loseNextResponse(method, path)
+    }
+    dlg().querySelector('#joinDevice').value = 'Telefono 2'
+    dlg().querySelector('[data-go]').click()
+    await until(() => dlg()?.querySelector('.err')?.textContent)
+    expect((await getFamily(p.db)).pending?.op).toBe('join')
+    server.beforeHandle = null
+    dlg().close()
+    await openJoin(inv)
+    await until(() => onEntered.mock.calls.length)
+    const meta = await getFamily(p.db)
+    expect(meta.pending).toBeUndefined()
+    expect(meta.familyId).toBe(inv.familyId)
+  })
+
   it('"replace" stops when the backup did not reach the user: nothing cleared, not joined', async () => {
     const inv = await invite()
     const p = await phone()
@@ -277,7 +301,7 @@ describe('invite screen', () => {
     initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
     await openInvite()
     await until(() => dlg()?.querySelector('.qr'))
-    expect(dlg().textContent).toContain('Posto 2 di 4')
+    expect(dlg().textContent).toContain('Posto 2 di 3')
   })
 })
 

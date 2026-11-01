@@ -1,7 +1,7 @@
 // Family membership on this device: the stored family (meta key 'family') and the flows that
 // create, join, recover, restart or leave one. Creating, joining or recovering turns sync tracking
 // on and queues every local tab, category and item, so local data uploads on the next sync.
-import { getMeta, setMeta, deleteMeta, setSyncTracking, markAllDirty, queueOutbox, clearSyncStores, clearWardrobe } from '../db.js'
+import { getMeta, setMeta, deleteMeta, setSyncTracking, announceMembership, markAllDirty, queueOutbox, clearSyncStores, clearWardrobe } from '../db.js'
 import { generateKeyRaw, importKey, encryptJson, decryptJson, b64url, randomToken, sha256Hex } from './crypto.js'
 
 /**
@@ -124,12 +124,14 @@ async function enter(db, meta, { token, deviceLimit }, { dropEmptyTabs = false }
   await deleteMeta(db, 'photosRefused')
   // Tracking first, then queue everything: an edit in between is covered either way.
   setSyncTracking(true)
+  announceMembership(false)
   await clearSyncStores(db)
   const empty = await markAllDirty(db, { skipEmptyTabs: dropEmptyTabs })
   if (empty.length) await setMeta(db, EMPTY_TABS_META, empty)
   else await deleteMeta(db, EMPTY_TABS_META)
   if (done.recoverySecret) await queueOutbox(db, KIT_KIND, KIT_RID) // lets invited devices show the kit
   await setFamily(db, done)
+  announceMembership(true)
   return done
 }
 
@@ -301,11 +303,13 @@ export async function leaveFamily(db, api, { timeoutMs } = {}) {
     }
   }
   setSyncTracking(false)
+  announceMembership(false)
   await clearFamily(db)
   await deleteMeta(db, 'orphanSeen')
   await deleteMeta(db, 'photosRefused')
   await deleteMeta(db, EMPTY_TABS_META)
   await clearSyncStores(db)
+  announceMembership(true)
   return { purged }
 }
 

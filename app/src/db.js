@@ -69,6 +69,26 @@ export function setSyncTracking(on) {
   tracking = !!on
 }
 
+// Other open tabs of the app learn membership changes here: their writes start (or stop) queueing
+// at once, and once the change is settled they reload to show it.
+const membership = typeof BroadcastChannel === 'function' ? new BroadcastChannel('ar-membership') : null
+membership?.unref?.()
+let onElsewhere = null
+membership?.addEventListener('message', ({ data }) => {
+  tracking = !!data?.tracking
+  if (data?.settled) onElsewhere?.()
+})
+
+/** Tell the other tabs this tab's tracking state; `settled` once the membership is stored. */
+export function announceMembership(settled) {
+  membership?.postMessage({ tracking, settled })
+}
+
+/** Run `fn` when another tab settles a membership change. */
+export function onMembershipElsewhere(fn) {
+  onElsewhere = fn
+}
+
 /** Stores a write tx must open: the outbox joins in when tracking. */
 const withOutbox = (stores) => (tracking ? [...stores, 'outbox'] : stores)
 

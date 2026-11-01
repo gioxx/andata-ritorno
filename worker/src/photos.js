@@ -15,6 +15,32 @@ const USAGE = "key = 'photo_bytes'";
 const STALE_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_TOTAL = 9_000_000_000;
 
+/**
+ * The R2 key of one upload of a photo. Each upload writes under its own token, so cleaning up an
+ * abandoned or replaced upload never touches another upload's object. Rows written before per-upload
+ * keys (a plain time, no '~') keep the bare key.
+ */
+const objectKey = (familyId, pid, uploadedAt) => (uploadedAt.includes('~') ? `${familyId}/${pid}/${uploadedAt}` : `${familyId}/${pid}`);
+
+/**
+ * Delete this photo's objects from uploads older than `token` (or up to it, `inclusive`), plus the
+ * bare key of before. Newer uploads may still be in flight: theirs are kept.
+ */
+async function dropUploads(env, familyId, pid, token, { inclusive = false } = {}) {
+  const prefix = `${familyId}/${pid}/`;
+  const keys = [`${familyId}/${pid}`];
+  let cursor;
+  do {
+    const page = await env.PHOTOS.list({ prefix, cursor });
+    for (const o of page.objects) {
+      const t = o.key.slice(prefix.length);
+      if (inclusive ? t <= token : t < token) keys.push(o.key);
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  await env.PHOTOS.delete(keys);
+}
+
 /** Global cap on stored photo bytes (all families), from the MAX_TOTAL_PHOTO_BYTES var. */
 function totalCap(env) {
   const n = Number(env.MAX_TOTAL_PHOTO_BYTES);
@@ -34,10 +60,11 @@ async function put(req, env, ctx, { pid }) {
   // written, so an interrupted upload is re-sent by the next sync instead of leaving a dangling row.
   // The R2 write comes after the reservation, so a refusal never leaves an object behind.
   const size = body.byteLength;
-  // This request's uploaded_at, which marks the row as its own: the time plus a nonce, so two
-  // uploads of the same photo in the same millisecond never take each other's row for their own.
-  // Listing shows the time part only (the first 24 characters).
+  // This request's uploaded_at, which marks the row (and the object key) as its own: the time plus a
+  // nonce, so two uploads of the same photo in the same millisecond never take each other's for
+  // their own. Listing shows the time part only (the first 24 characters).
   const token = `${new Date().toISOString()}~${randomToken()}`;
+  const key = objectKey(familyId, pid, token);
   const delta = '(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))';
   const fits = '(EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)';
   const results = await env.DB.batch([
@@ -64,7 +91,7 @@ async function put(req, env, ctx, { pid }) {
   // The statements below only touch the row while it is still this request's own.
   const mine = 'EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2 AND uploaded_at = ?3 AND size = ?4)';
   try {
-    await env.PHOTOS.put(`${familyId}/${pid}`, body);
+    await env.PHOTOS.put(key, body);
   } catch (e) {
     // Give the reservation back so a failed upload does not eat the budget; the previous object
     // (if any) was not touched.
@@ -96,29 +123,37 @@ async function put(req, env, ctx, { pid }) {
     env.DB.prepare('UPDATE photos SET ready = 1 WHERE family_id = ? AND pid = ? AND uploaded_at = ?').bind(familyId, pid, token),
     env.DB.prepare('SELECT 1 FROM families WHERE id = ?').bind(familyId),
   ]);
-  if (done[0].meta.changes !== 1 && !done[1].results.length) {
-    // The family was purged while the object was being written (last device left, or the licence
-    // moved on): the purge already swept the prefix, so this late object would stay unreachable and
-    // outside the total. Nobody can upload to a purged family, so deleting it races with no one.
-    await env.PHOTOS.delete(`${familyId}/${pid}`);
-    throw new HttpError(401, 'unauthorized');
+  if (done[0].meta.changes === 1) {
+    // This upload is the photo now: the objects of earlier ones are nobody's.
+    try {
+      await dropUploads(env, familyId, pid, token);
+    } catch (e) {
+      console.error('photo cleanup failed', familyId, pid, e);
+    }
+    return new Response(null, { status: 204 });
   }
+  // The row is no longer this upload's: a newer upload took it, the photo was deleted, or the family
+  // was purged meanwhile (its prefix already swept). This object is nobody's either way.
+  await env.PHOTOS.delete(key);
+  if (!done[1].results.length) throw new HttpError(401, 'unauthorized');
   return new Response(null, { status: 204 });
 }
 
 async function get(req, env, ctx, { pid }) {
   const { familyId } = await requireApiDevice(env, req);
   checkPid(pid);
-  const known = await env.DB.prepare('SELECT 1 FROM photos WHERE family_id = ? AND pid = ? AND ready = 1').bind(familyId, pid).first();
-  const obj = known && (await env.PHOTOS.get(`${familyId}/${pid}`));
+  const row = await env.DB.prepare('SELECT uploaded_at FROM photos WHERE family_id = ? AND pid = ? AND ready = 1').bind(familyId, pid).first();
+  const obj = row && (await env.PHOTOS.get(objectKey(familyId, pid, row.uploaded_at)));
   if (!obj) throw new HttpError(404, 'not-found');
   return new Response(obj.body, { headers: { 'content-type': 'application/octet-stream', 'cache-control': 'private, no-store' } });
 }
 
-/** Drop this family's abandoned reservations: their rows and their bytes in the total. */
+/** Drop this family's abandoned reservations: their rows, their bytes in the total, their objects. */
 async function reclaimStale(env, familyId) {
   const before = new Date(Date.now() - STALE_MS).toISOString();
   const stale = 'family_id = ?1 AND ready = 0 AND uploaded_at < ?2';
+  const { results: rows } = await env.DB.prepare(`SELECT pid, uploaded_at FROM photos WHERE ${stale}`).bind(familyId, before).all();
+  if (!rows.length) return;
   await env.DB.batch([
     env.DB.prepare(`UPDATE usage SET bytes = MAX(0, bytes - (SELECT COALESCE(SUM(size), 0) FROM photos WHERE ${stale})) WHERE ${USAGE}`).bind(
       familyId,
@@ -126,9 +161,8 @@ async function reclaimStale(env, familyId) {
     ),
     env.DB.prepare(`DELETE FROM photos WHERE ${stale}`).bind(familyId, before),
   ]);
-  // R2 is left alone: a retry of the same photo may already have written a new object under the
-  // same key, which a delete here would destroy. An object left behind by a reclaimed reservation
-  // is replaced by the next upload of that photo (or by none: a few bytes, outside the total).
+  // Up to the abandoned upload only: a retry of the same photo has a newer key and may be in flight.
+  for (const r of rows) await dropUploads(env, familyId, r.pid, r.uploaded_at, { inclusive: true });
 }
 
 async function list(req, env) {
@@ -144,7 +178,7 @@ async function list(req, env) {
 async function remove(req, env, ctx, { pid }) {
   const { familyId } = await requireApiDevice(env, req);
   checkPid(pid);
-  await env.PHOTOS.delete(`${familyId}/${pid}`);
+  await dropUploads(env, familyId, pid, '\uffff', { inclusive: true });
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE usage SET bytes = MAX(0, bytes - COALESCE((SELECT size FROM photos WHERE family_id = ? AND pid = ?), 0)) WHERE ${USAGE}`,

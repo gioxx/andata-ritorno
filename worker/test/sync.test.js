@@ -461,24 +461,52 @@ describe('photos', () => {
     expect((await get(`/api/photos/${pid}`, f.token)).status).toBe(200);
   });
 
-  it('listing reclaims reservations abandoned for over an hour: rows and bytes, never R2 objects', async () => {
+  const keysOf = async (f, pid) => (await env.PHOTOS.list({ prefix: `${f.familyId}/${pid}` })).objects.map((o) => o.key).sort();
+
+  it('listing reclaims reservations abandoned for over an hour: rows, bytes and their objects only', async () => {
     const f = await newFamily();
     const total = async () => (await env.DB.prepare("SELECT bytes FROM usage WHERE key = 'photo_bytes'").first())?.bytes ?? 0;
     expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204); // seeds the usage row
     const base = await total();
-    const old = new Date(Date.now() - 61 * 60 * 1000).toISOString();
+    const old = `${new Date(Date.now() - 61 * 60 * 1000).toISOString()}~stale`;
+    const retry = `${now()}~retry`;
     await env.DB.batch([
       env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, 100, ?, 0)').bind(f.familyId, 'stale-0000', old),
       env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, 7, ?, 0)').bind(f.familyId, 'fresh-0000', now()),
       env.DB.prepare("UPDATE usage SET bytes = bytes + 107 WHERE key = 'photo_bytes'"),
     ]);
-    await env.PHOTOS.put(`${f.familyId}/stale-0000`, bytes(100));
+    // The abandoned upload's object, and one a retry of the same photo is writing right now.
+    await env.PHOTOS.put(`${f.familyId}/stale-0000/${old}`, bytes(100));
+    await env.PHOTOS.put(`${f.familyId}/stale-0000/${retry}`, bytes(100));
     expect((await get('/api/photos', f.token)).status).toBe(200);
     expect(await total()).toBe(base + 7);
     const pids = (await env.DB.prepare('SELECT pid FROM photos WHERE family_id = ? AND ready = 0').bind(f.familyId).all()).results.map((r) => r.pid);
     expect(pids).toEqual(['fresh-0000']);
-    // The object is left alone: a retry of the same photo may have just written it.
-    expect(await env.PHOTOS.get(`${f.familyId}/stale-0000`)).not.toBeNull();
+    expect(await keysOf(f, 'stale-0000')).toEqual([`${f.familyId}/stale-0000/${retry}`]);
+  });
+
+  it('keeps one object per photo: a replacement deletes the earlier upload, a delete removes all', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    await put(`/api/photos/${pid}`, bytes(10), f.token);
+    // An upload abandoned after its R2 write, then taken over by a newer one before any cleanup.
+    await env.PHOTOS.put(`${f.familyId}/${pid}/2000-01-01T00:00:00.000Z~lost`, bytes(3));
+    await put(`/api/photos/${pid}`, bytes(20), f.token);
+    expect(await keysOf(f, pid)).toHaveLength(1);
+    expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(20));
+    await del(`/api/photos/${pid}`, f.token);
+    expect(await keysOf(f, pid)).toEqual([]);
+  });
+
+  it('still serves and replaces a photo stored under the bare key of before', async () => {
+    const f = await newFamily();
+    const pid = rid();
+    await env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, 4, ?, 1)').bind(f.familyId, pid, now()).run();
+    await env.PHOTOS.put(`${f.familyId}/${pid}`, bytes(4));
+    expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(4));
+    await put(`/api/photos/${pid}`, bytes(6), f.token);
+    expect(await env.PHOTOS.get(`${f.familyId}/${pid}`)).toBeNull();
+    expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(6));
   });
 
   it('caps a family at 2 000 photos; replacing does not count twice', async () => {

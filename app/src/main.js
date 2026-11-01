@@ -2,7 +2,7 @@ import '@fontsource/plus-jakarta-sans/500.css';
 import '@fontsource/plus-jakarta-sans/600.css';
 import '@fontsource/plus-jakarta-sans/700.css';
 import './styles.css';
-import { openDb, setVersionChangeHandler } from './db.js';
+import { openDb, setVersionChangeHandler, onMembershipElsewhere } from './db.js';
 import { getFamily } from './sync/family.js';
 import { createApi } from './sync/api.js';
 import { initSync, syncNow, subscribeSync, isProgressOnly, seedSyncStatus } from './sync/engine.js';
@@ -84,6 +84,8 @@ async function startApp() {
     if (blocked) root.textContent = '';
     // A newer tab wants to upgrade the DB: our connection is closed, so reload onto the new code.
     setVersionChangeHandler(() => location.reload());
+    // Another tab created, joined or left a family: show the new membership here too.
+    onMembershipElsewhere(() => location.reload());
   } catch {
     storageScreen(t('main.storageFailed.body'));
   }

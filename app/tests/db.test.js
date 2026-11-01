@@ -5,7 +5,7 @@ import {
   replacePhoto, deleteItems, getPhoto, getMeta, setMeta, applyPlan, setVersionChangeHandler,
   putCategory, deleteCategory, putCategories, putTabs, setItemsCategory,
   setSyncTracking, readOutbox, clearOutbox, getTombstones, putTombstones, clearSyncStores, clearWardrobe, applySyncPlan,
-  markAllDirty, getPhotoIds, putSyncedPhoto,
+  markAllDirty, getPhotoIds, putSyncedPhoto, onMembershipElsewhere,
 } from '../src/db.js'
 
 const T0 = '2026-01-01T00:00:00.000Z'
@@ -556,6 +556,29 @@ describe('db', () => {
       expect(await readOutbox(db)).toEqual([])
       expect((await db.get('tabs', 'T')).updatedAt).toBe(T0)
     })
+  })
+})
+
+describe('membership in another tab', () => {
+  it('starts queueing at once and reloads once the change is settled', async () => {
+    const db = await fresh()
+    const other = new BroadcastChannel('ar-membership')
+    let settled = 0
+    onMembershipElsewhere(() => settled++)
+    try {
+      other.postMessage({ tracking: true, settled: false })
+      await new Promise((r) => setTimeout(r, 20))
+      await putTab(db, tab('A', 0))
+      expect((await readOutbox(db)).map((e) => `${e.kind}:${e.id}`)).toEqual(['tab:A'])
+      expect(settled).toBe(0)
+      other.postMessage({ tracking: true, settled: true })
+      await new Promise((r) => setTimeout(r, 20))
+      expect(settled).toBe(1)
+    } finally {
+      other.close()
+      onMembershipElsewhere(null)
+      setSyncTracking(false)
+    }
   })
 })
 
