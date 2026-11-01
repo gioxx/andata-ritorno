@@ -20,3 +20,9 @@ updates:
     groups:
       worker-minor:
         update-types: [minor, patch]
+    # The Workers test pool pins vitest's major version: bump them together, by hand.
+    ignore:
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: "@vitest/*"
+        update-types: [version-update:semver-major]
