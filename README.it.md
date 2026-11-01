@@ -1,6 +1,8 @@
-# Andata e Ritorno (A/R)
+<p align="center"><img src="app/public/icons/icon.svg" alt="Icona di A/R" width="96" height="96"></p>
 
-*[Read in English](README.md)*
+<h1 align="center">Andata e Ritorno (A/R)</h1>
+
+<p align="center"><em><a href="README.md">Read in English</a></em> · <a href="https://ar.gioxx.org">ar.gioxx.org</a> · <a href="https://app.ar.gioxx.org">app.ar.gioxx.org</a></p>
 
 Una piccola web app installabile per tenere traccia dei vestiti dei bambini tra **casa** e **scuola** (nido, materna…).
 Fotografi ogni capo una volta; da lì in poi ogni capo è *a scuola* o *a casa* e si sposta con un tocco. Basta foto copiate nelle note per ricordare cosa è dove.
