@@ -15,7 +15,7 @@
   --color-school: #fde9d9; --color-home: #e3eedd;
   --color-accent: #d96f4f; --color-accent-strong: #a34a2a; --color-on-accent: #fbf7f1;
   --color-header: rgb(251 247 241 / 0.86);
-  --color-device: #23201c; --shadow-device: 0 30px 60px -20px rgb(80 50 30 / 0.35); --color-rim: #a9a49c; --color-gift-wash: rgb(253 233 217 / 0.35); --color-bow-shade: #a34a2a; --color-band: #2b2620; --color-band-ink: #fbf7f1; --color-band-line: rgb(251 247 241 / 0.18); --color-band-accent: #f2a487;
+  --color-device: #23201c; --shadow-device: 0 30px 60px -20px rgb(80 50 30 / 0.35); --color-rim: #a9a49c; --color-gift-wash: rgb(253 233 217 / 0.35); --color-band: #2b2620; --color-band-ink: #fbf7f1; --color-band-line: rgb(251 247 241 / 0.18); --color-band-accent: #f2a487;
   --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: var(--font-display);
   --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px;
@@ -34,7 +34,7 @@
     --color-school: #2a1d18; --color-home: #18231b;
     --color-accent: #e88563; --color-accent-strong: #e88563; --color-on-accent: #0d0f15;
     --color-header: rgb(13 15 21 / 0.86);
-    --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45); --color-bow-shade: #b4512f; --color-band: #1d1511; --color-band-ink: #eceef5; --color-band-line: rgb(232 133 99 / 0.28); --color-band-accent: #f2a487;
+    --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45); --color-band: #1d1511; --color-band-ink: #eceef5; --color-band-line: rgb(232 133 99 / 0.28); --color-band-accent: #f2a487;
   }
 }
 :root[data-theme="dark"] {
@@ -44,7 +44,7 @@
   --color-school: #2a1d18; --color-home: #18231b;
   --color-accent: #e88563; --color-accent-strong: #e88563; --color-on-accent: #0d0f15;
   --color-header: rgb(13 15 21 / 0.86);
-  --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45); --color-bow-shade: #b4512f; --color-band: #1d1511; --color-band-ink: #eceef5; --color-band-line: rgb(232 133 99 / 0.28); --color-band-accent: #f2a487;
+  --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45); --color-band: #1d1511; --color-band-ink: #eceef5; --color-band-line: rgb(232 133 99 / 0.28); --color-band-accent: #f2a487;
 }
 
 * { box-sizing: border-box; }
@@ -260,9 +260,9 @@ html { scroll-behavior: smooth; } /* fallback when site.js does not run */
 .to-top:hover { background: var(--color-ink); color: var(--color-paper); }
 .to-top svg { width: 22px; height: 22px; }
 
-/* Gift: the photo sits behind the whole card, washed out on the text side; a gift voucher on top. */
-.gift { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); align-items: center; padding: var(--space-xl) var(--space-lg); border-radius: var(--radius-section); overflow: hidden;
-  background: linear-gradient(180deg, var(--color-school) 50%, var(--color-gift-wash)), url('/img/gift.jpg') center 70% / cover; }
+/* Gift: the photo sits behind the whole card, washed out on the text side. */
+.gift { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); align-items: center; padding: var(--space-xl) var(--space-lg) 220px; border-radius: var(--radius-section); overflow: hidden;
+  background: linear-gradient(180deg, var(--color-school) 62%, var(--color-gift-wash)), url('/img/gift.jpg') center bottom / cover; }
 @media (min-width: 900px) {
   .gift { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); padding: var(--space-2xl) var(--space-xl);
     background: linear-gradient(90deg, var(--color-school) 48%, var(--color-gift-wash) 75%), url('/img/gift.jpg') center / cover; }
@@ -270,19 +270,6 @@ html { scroll-behavior: smooth; } /* fallback when site.js does not run */
 .gift-steps { counter-reset: gift; list-style: none; margin: var(--space-lg) 0 0; padding: 0; display: grid; gap: var(--space-sm); }
 .gift-steps li { counter-increment: gift; position: relative; padding-left: 44px; min-height: 28px; }
 .gift-steps li::before { content: counter(gift); position: absolute; left: 0; top: -1px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-pill); background: var(--color-accent-strong); color: var(--color-on-accent); font-weight: 800; font-size: var(--text-sm); }
-.gift-visual { display: grid; place-items: center; padding: var(--space-md) 0; }
-.voucher { position: relative; width: min(100%, 340px); padding: var(--space-lg); border-radius: 20px; background: var(--color-tile); box-shadow: 0 24px 50px -18px rgb(80 40 20 / 0.45); transform: rotate(-4deg); }
-.voucher-ribbon { position: absolute; top: 0; bottom: 0; right: 56px; width: 18px; background: var(--color-accent); opacity: 0.9; }
-.voucher-bow { position: absolute; top: -44px; right: 5px; width: 120px; height: 86px; filter: drop-shadow(0 4px 6px rgb(80 40 20 / 0.25)); }
-.voucher-bow .bow-loop, .voucher-bow .bow-tail { fill: var(--color-accent); }
-.voucher-bow .bow-fold { fill: var(--color-bow-shade); opacity: 0.6; }
-.voucher-bow .bow-knot { fill: var(--color-bow-shade); }
-.voucher-head { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: var(--text-lg); line-height: 1.1; }
-.voucher-head img { width: 40px; height: 40px; border-radius: 10px; }
-.voucher-head small { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-accent-strong); text-transform: uppercase; letter-spacing: 0.08em; }
-.voucher-title { margin: var(--space-lg) 0 2px; font-weight: 800; font-size: var(--text-xl); line-height: 1.15; max-width: 12ch; }
-.voucher-sub { margin: 0; color: var(--color-muted); font-size: var(--text-sm); }
-.voucher-code { margin: var(--space-lg) 0 0; padding-top: var(--space-md); border-top: 2px dashed var(--color-line); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 700; letter-spacing: 0.06em; color: var(--color-ink); }
 .kicker + h2 { margin-bottom: var(--space-md); }
 .split .oss-points { grid-template-columns: minmax(0, 1fr); }
 
