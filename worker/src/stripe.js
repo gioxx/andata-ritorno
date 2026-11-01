@@ -34,7 +34,7 @@ export async function verifyWebhook(rawBody, sigHeader, secret, nowSec) {
 /**
  * Fetch a Checkout Session with its line items. Unknown ids → 404 `bad-session`; other Stripe
  * failures throw a plain Error (500), so the webhook gets retried.
- * @returns {Promise<{id: string, payment_status: string, customer_details: {email: string|null}, line_items: {price: {id: string}}[]}>}
+ * @returns {Promise<{id: string, payment_status: string, amount_total: number|null, currency: string|null, livemode: boolean|null, customer_details: {email: string|null}, line_items: {price: {id: string}}[]}>}
  */
 export async function getCheckoutSession(env, id) {
   if (typeof id !== 'string' || !/^cs_[A-Za-z0-9_]{1,250}$/.test(id)) throw new HttpError(404, 'bad-session');
@@ -47,6 +47,9 @@ export async function getCheckoutSession(env, id) {
   return {
     id: s.id,
     payment_status: s.payment_status,
+    amount_total: typeof s.amount_total === 'number' ? s.amount_total : null,
+    currency: typeof s.currency === 'string' ? s.currency : null,
+    livemode: typeof s.livemode === 'boolean' ? s.livemode : null,
     customer_details: { email: s.customer_details?.email ?? null },
     line_items: (s.line_items?.data ?? []).map((li) => ({ price: { id: li.price?.id ?? null } })),
   };

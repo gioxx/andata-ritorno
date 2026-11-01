@@ -3,6 +3,7 @@ import { hmacHex, randomToken, requireApiDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
 import { createEmbeddedSession, getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
+import { notifyOwner, purchaseMessage } from './notify.js';
 import { deviceLimit, purgePhotos, purgeStatements, registrationsOpen, requireRegistrationsOpen } from './store.js';
 import { ENC, HEX64, ID, isSecret } from './validate.js';
 
@@ -231,6 +232,12 @@ async function stripeWebhook(req, env, ctx) {
   if (to && !(await sendEmail(env, { to, ...codeEmail(issued.code, issued.kind) }, { idempotencyKey: `code-${session.id}` }))) {
     throw new Error('code email not sent');
   }
+  // Only from the webhook (the page may issue the code first) and only once the buyer has their
+  // code. Not awaited: a slow or failing Telegram never delays or fails the delivery. A rare
+  // duplicate is possible if Stripe redelivers an event that was already answered.
+  const note = notifyOwner(env, purchaseMessage(issued.kind, session));
+  if (ctx?.waitUntil) ctx.waitUntil(note);
+  else await note;
   return json({ received: true });
 }
 
