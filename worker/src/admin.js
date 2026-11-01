@@ -71,12 +71,13 @@ async function stats(req, env) {
   const now = Date.now();
   const iso = (ms) => new Date(ms).toISOString();
   // Calendar-aligned, like the dashboard's buckets: the last `days` UTC days including today, or
-  // the last 12 months including this one; the previous period is the same span just before.
+  // the last 12 months including this one.
   const today = new Date(now);
   const startOf = (y, m, d) => Date.UTC(y, m, d);
   const byMonth = days > 90;
   const fromMs = byMonth ? startOf(today.getUTCFullYear(), today.getUTCMonth() - 11, 1) : startOf(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - (days - 1));
-  const prevMs = byMonth ? startOf(today.getUTCFullYear(), today.getUTCMonth() - 23, 1) : fromMs - days * DAY_MS;
+  // The previous period lasts exactly as long as the current one, which ends now (today is partial).
+  const prevMs = fromMs - (now - fromMs);
   const from = iso(fromMs);
   const prevFrom = iso(prevMs);
   const bucket = byMonth ? 7 : 10; // substr length: YYYY-MM or YYYY-MM-DD
