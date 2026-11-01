@@ -377,6 +377,56 @@ describe('Stripe', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].key).toBe(`code-${id}`);
   });
+
+  describe('owner notification on Telegram', () => {
+    const TG = { TELEGRAM_BOT_TOKEN: 'tg-token', TELEGRAM_CHAT_ID: '42' };
+    function mockWithTelegram(id, session, telegramStatus = 200) {
+      const messages = [];
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = new URL(typeof input === 'string' ? input : input.url);
+        if (url.hostname === 'api.telegram.org') {
+          messages.push({ path: url.pathname, body: JSON.parse(init.body) });
+          return new Response(telegramStatus === 200 ? '{"ok":true}' : 'down', { status: telegramStatus });
+        }
+        if (url.hostname === 'api.resend.com') return Response.json({ id: 'email_1' });
+        return Response.json({ id, payment_status: 'paid', customer_details: { email: 'a@example.com' }, line_items: { data: [{ price: { id: session.price } }] }, ...session.extra });
+      });
+      return messages;
+    }
+
+    it('sends the purchase, without personal data, once the code email is out', async () => {
+      const id = 'cs_test_tg';
+      const messages = mockWithTelegram(id, { price: 'price_family', extra: { amount_total: 1500, currency: 'eur', livemode: false } });
+      expect((await webhook(sessionEvent(id), undefined, TG)).status).toBe(200);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].path).toBe('/bottg-token/sendMessage');
+      expect(messages[0].body.chat_id).toBe('42');
+      expect(messages[0].body.text).toBe('A/R: acquisto, nuova famiglia (15,00 EUR) [test]');
+      expect(messages[0].body.text).not.toContain('example.com');
+    });
+
+    it('names an extra seat and works without amount details', async () => {
+      const id = 'cs_test_tg_slot';
+      const messages = mockWithTelegram(id, { price: 'price_slot' });
+      expect((await webhook(sessionEvent(id), undefined, TG)).status).toBe(200);
+      expect(messages[0].body.text).toBe('A/R: acquisto, posto in più');
+    });
+
+    it('a failing Telegram never fails the webhook', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const id = 'cs_test_tg_down';
+      const messages = mockWithTelegram(id, { price: 'price_family' }, 500);
+      expect((await webhook(sessionEvent(id), undefined, TG)).status).toBe(200);
+      expect(messages).toHaveLength(1);
+    });
+
+    it('sends nothing when the bot is not configured', async () => {
+      const id = 'cs_test_tg_off';
+      const messages = mockWithTelegram(id, { price: 'price_family' });
+      expect((await webhook(sessionEvent(id))).status).toBe(200);
+      expect(messages).toHaveLength(0);
+    });
+  });
 });
 
 describe('licence recovery', () => {

@@ -59,6 +59,7 @@ simple = { limit = 600, period = 60 }
 
 # Secrets (wrangler secret put): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 # EMAIL_HMAC_KEY, CODE_HMAC_KEY, RESEND_API_KEY.
+# Optional: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (owner notification on each purchase).
 
 # Test copy on its own origin, database and bucket: `--env test` (`npm run deploy:test`), with
 # Stripe in test mode.
