@@ -1,4 +1,4 @@
-import { HttpError, json } from './http.js';
+import { HttpError, json, readJson } from './http.js';
 
 // The owner's dashboard: aggregate numbers only, never encrypted content, names or hashes.
 // Cloudflare Access sits in front of /admin.html and /api/admin/*; this Worker checks the Access
@@ -61,7 +61,7 @@ async function stats(req, env) {
   await requireAdmin(env, req);
   const ago = (days) => new Date(Date.now() - days * DAY_MS).toISOString();
   const one = (sql, ...args) => env.DB.prepare(sql).bind(...args);
-  const [families, devices, licences, codes, months, records, photos, usage, invites] = await env.DB.batch([
+  const [families, devices, licences, codes, months, records, photos, usage, invites, settings] = await env.DB.batch([
     one('SELECT COUNT(*) AS total, SUM(created_at >= ?) AS new30 FROM families', ago(30)),
     one(
       `SELECT COUNT(*) AS total, SUM(last_seen_at >= ?) AS active1, SUM(last_seen_at >= ?) AS active7, SUM(last_seen_at >= ?) AS active30
@@ -84,6 +84,7 @@ async function stats(req, env) {
     one('SELECT SUM(ready = 1) AS ready, SUM(ready = 0) AS pending, COALESCE(SUM(size), 0) AS bytes FROM photos'),
     one("SELECT bytes FROM usage WHERE key = 'photo_bytes'"),
     one('SELECT COUNT(*) AS open FROM invites WHERE used_at IS NULL AND expires_at > ?', new Date().toISOString()),
+    one("SELECT value FROM settings WHERE key = 'registrations'"),
   ]);
   const row = (r) => r.results[0] ?? {};
   const cap = Number(env.MAX_TOTAL_PHOTO_BYTES);
@@ -97,9 +98,27 @@ async function stats(req, env) {
     records: row(records).total ?? 0,
     photos: { ...row(photos), counted: row(usage).bytes ?? 0, cap: Number.isFinite(cap) ? cap : null },
     openInvites: row(invites).open ?? 0,
+    registrationsOpen: row(settings).value !== 'closed',
   });
+}
+
+/** Open or close registrations (see requireRegistrationsOpen). Body: {open: boolean}. */
+async function setRegistrations(req, env) {
+  await requireAdmin(env, req);
+  // The Access cookie rides along on cross-site requests too: accept only same-origin JSON, which
+  // a form on another site cannot send without a CORS preflight this Worker never answers.
+  const origin = req.headers.get('origin');
+  const type = req.headers.get('content-type') ?? '';
+  if (origin !== new URL(req.url).origin || !type.startsWith('application/json')) throw new HttpError(404, 'not-found');
+  const { open } = (await readJson(req, 1024)) ?? {};
+  if (typeof open !== 'boolean') throw new HttpError(400, 'bad-request');
+  await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('registrations', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1")
+    .bind(open ? 'open' : 'closed')
+    .run();
+  return json({ registrationsOpen: open });
 }
 
 export const adminRoutes = {
   'GET /api/admin/stats': stats,
+  'POST /api/admin/registrations': setRegistrations,
 };

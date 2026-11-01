@@ -13,3 +13,8 @@ td.n, th.n { text-align: right; }
 .err { color: #b3261e; font-weight: 600; }
 button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent-strong); color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
 button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.switch { padding: 14px 16px; border-radius: 14px; background: var(--chip); margin: 8px 0 20px; }
+.switch h2 { margin-top: 0; }
+.switch.closed { outline: 2px solid #b3261e; }
+.switch.closed h2 { color: #b3261e; }
+@media (prefers-color-scheme: dark) { .switch.closed { outline-color: #f2b8b5; } .switch.closed h2, .err { color: #f2b8b5; } }

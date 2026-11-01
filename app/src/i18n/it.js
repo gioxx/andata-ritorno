@@ -305,6 +305,7 @@ export default {
   'family.err.limit-records': 'Raggiunto il limite di elementi della famiglia.',
   'family.err.limit-daily': 'Questo telefono ha inviato molte modifiche oggi: le altre partono domani, da sole. Intanto restano salvate qui.',
   'family.err.too-large': 'Richiesta troppo grande.',
+  'family.err.registrations-closed': 'Le nuove attivazioni sono sospese per un po’. Riprova più tardi: se hai un codice, resta valido.',
   'family.err.rate-limited': 'Troppi tentativi. Riprova tra qualche minuto.',
   'family.err.unknown': 'Qualcosa è andato storto. Riprova.',
   'family.code.title': 'Inserisci il codice',

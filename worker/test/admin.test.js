@@ -28,12 +28,15 @@ async function token(claims = {}, signer = keys.privateKey) {
   return `${head}.${body}.${b64url(sig)}`;
 }
 
-const stats = (jwt, extra = ON) => {
+const mockCerts = () =>
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = typeof input === 'string' ? input : input.url;
     if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
     throw new Error(`unexpected fetch ${url}`);
   });
+
+const stats = (jwt, extra = ON) => {
+  mockCerts();
   const headers = jwt ? { 'cf-access-jwt-assertion': jwt } : {};
   return worker.fetch(new Request('https://ar.test/api/admin/stats', { headers }), { ...env, ...extra }, {});
 };
@@ -70,5 +73,33 @@ describe('GET /api/admin/stats', () => {
     expect(out.codes.find((c) => c.kind === 'family' && c.source === 'stripe').issued).toBeGreaterThan(0);
     expect(out.salesByMonth[0]).toMatchObject({ month: new Date().toISOString().slice(0, 7) });
     expect(JSON.stringify(out)).not.toMatch(/h-admin-1|name_enc|token_hash|email_hmac/);
+  });
+});
+
+describe('POST /api/admin/registrations', () => {
+  const set = async (body, { jwt, origin = 'https://ar.test', type = 'application/json' } = {}) => {
+    mockCerts();
+    const headers = { 'content-type': type, ...(origin ? { origin } : {}), ...(jwt ? { 'cf-access-jwt-assertion': jwt } : {}) };
+    return worker.fetch(new Request('https://ar.test/api/admin/registrations', { method: 'POST', headers, body: JSON.stringify(body) }), { ...env, ...ON }, {});
+  };
+  const open = async () => (await (await stats(await token())).json()).registrationsOpen;
+
+  it('closes and reopens registrations, shown in the stats', async () => {
+    expect(await open()).toBe(true);
+    const res = await set({ open: false }, { jwt: await token() });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ registrationsOpen: false });
+    expect(await open()).toBe(false);
+    expect((await set({ open: true }, { jwt: await token() })).status).toBe(200);
+    expect(await open()).toBe(true);
+  });
+
+  it('looks absent without a valid token and refuses cross-site or malformed requests', async () => {
+    expect((await set({ open: false })).status).toBe(404);
+    expect((await set({ open: false }, { jwt: await token(), origin: 'https://evil.example' })).status).toBe(404);
+    expect((await set({ open: false }, { jwt: await token(), origin: null })).status).toBe(404);
+    expect((await set({ open: false }, { jwt: await token(), type: 'text/plain' })).status).toBe(404);
+    expect((await set({ open: 'no' }, { jwt: await token() })).status).toBe(400);
+    expect(await open()).toBe(true);
   });
 });

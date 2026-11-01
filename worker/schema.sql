@@ -19,3 +19,4 @@ CREATE TABLE photos (family_id TEXT NOT NULL, pid TEXT NOT NULL, size INTEGER NO
 CREATE TABLE usage (key TEXT PRIMARY KEY, bytes INTEGER NOT NULL);
 CREATE TABLE device_usage (device_id TEXT PRIMARY KEY, day TEXT NOT NULL, units INTEGER NOT NULL);
 INSERT INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos;
+CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

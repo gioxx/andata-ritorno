@@ -1,6 +1,6 @@
 import { HttpError, json, readJson, strictLimit } from './http.js';
 import { randomToken, requireApiDevice, sha256Hex } from './auth.js';
-import { deviceLimit, purgePhotos, purgeStatements } from './store.js';
+import { deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen } from './store.js';
 import { ENC, ID, isSecret } from './validate.js';
 
 const INVITE_TTL_MS = 10 * 60 * 1000;
@@ -97,6 +97,7 @@ async function join(req, env) {
   // A used invite goes to the device-bound replay first, even past its TTL.
   if (inv?.used_at) return replayJoin(env, inv, deviceId);
   if (!inv || inv.expires_at <= at) inviteExpired();
+  await requireRegistrationsOpen(env);
 
   const token = randomToken();
   const tokenHash = await sha256Hex(token);

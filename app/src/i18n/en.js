@@ -304,6 +304,7 @@ export default {
   'family.err.limit-records': 'The family reached its item limit.',
   'family.err.limit-daily': 'This phone sent a lot of changes today: the rest go out tomorrow, by themselves. Meanwhile they stay saved here.',
   'family.err.too-large': 'Request too large.',
+  'family.err.registrations-closed': 'New activations are paused for a while. Try again later: if you have a code, it stays valid.',
   'family.err.rate-limited': 'Too many attempts. Try again in a few minutes.',
   'family.err.unknown': 'Something went wrong. Try again.',
   'family.code.title': 'Enter the code',
