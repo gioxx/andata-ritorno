@@ -112,4 +112,15 @@ describe('API hardening', () => {
     }
     expect(statuses).toEqual([401, 401, 401, 429, 429]);
   });
+
+  it('turns a blocked IP away before querying the database', async () => {
+    const RL_STRICT = { limit: async ({ key }) => ({ success: !key.startsWith('auth:') }) };
+    const ip = '203.0.113.77';
+    expect((await call('/api/family', { headers: { authorization: 'Bearer wrong-token-xxxxxxxx', 'cf-connecting-ip': ip } }, { RL_STRICT })).status).toBe(429);
+    const prepare = vi.spyOn(env.DB, 'prepare');
+    const res = await call('/api/family', { headers: { authorization: 'Bearer another-wrong-token', 'cf-connecting-ip': ip } }, { RL_STRICT });
+    expect(res.status).toBe(429);
+    expect(prepare).not.toHaveBeenCalled();
+    prepare.mockRestore();
+  });
 });
