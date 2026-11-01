@@ -339,3 +339,9 @@ html:has(dialog[open]) { overflow: hidden; }
 .checkout-dialog, .doc-dialog { overscroll-behavior: contain; }
 .doc-sheet .meta { color: var(--color-muted); font-size: var(--text-sm); }
 .footer-story { max-width: 34rem; font-size: var(--text-sm); line-height: 1.55; }
+
+/* ---- A/R in numbers ---- */
+.number-tiles { list-style: none; margin: var(--space-lg) 0 var(--space-md); padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-md); }
+.number-tiles li { padding: var(--space-lg); border-radius: var(--radius-section); background: var(--color-chip); color: var(--color-muted); font-weight: 600; }
+.number-tiles li[hidden] { display: none; }
+.number-tiles b { display: block; font-size: var(--text-2xl); font-weight: 800; color: var(--color-ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
