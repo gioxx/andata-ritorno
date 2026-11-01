@@ -19,7 +19,7 @@ describe('privacy.html', () => {
     expect(it).toBeGreaterThan(0)
     expect(en).toBeGreaterThan(it)
     for (const part of [html.slice(it, en), html.slice(en)]) {
-      for (const w of ['Cloudflare', 'Stripe', 'Resend', 'HMAC', 'privacy@gioxx.org', 'AES-GCM']) expect(part).toContain(w)
+      for (const w of ['Cloudflare', 'Stripe', 'Resend', 'HMAC', 'hello@ar.gioxx.org', 'AES-GCM']) expect(part).toContain(w)
     }
   })
   it('describes the metadata the server keeps as it is stored', () => {
