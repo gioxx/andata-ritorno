@@ -393,6 +393,12 @@ async function setRegistrations(open) {
 
 // ---------- resources (independent of the filters: always today, this month, last 30 days) ----------
 function gauge(name, value, limit, fmt = n, per = 'oggi', provider = null) {
+  // No limit on the plan (Resend reports null): the number alone, no meter, no warning.
+  if (limit == null) {
+    return el('div', { class: 'res' },
+      el('span', { class: 'name' }, providerIcon(provider), document.createTextNode(name)),
+      el('b', { text: fmt(value) }), el('span', { class: 'of', text: ` ${per} · nessun limite sul piano` }))
+  }
   const pct = limit ? Math.min(100, (100 * value) / limit) : 0
   const level = pct >= 90 ? 'hot' : pct >= 70 ? 'warn' : ''
   const m = el('div', { class: `meter ${level}`, role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(limit), 'aria-valuenow': String(value), 'aria-label': name })
@@ -426,9 +432,11 @@ function renderUsage(u) {
   // Resend: the whole account (other projects included) from Resend itself; A/R's own share below.
   const rs = u.resend || {}
   const fromResend = !rs.error && (rs.day != null || rs.month != null)
+  // Resend's Usage API states the plan's limits (null = uncapped); the list fallback does not.
+  const usageApi = fromResend && rs.source === 'usage'
   const mine = (v) => el('span', { class: 'state', text: `di cui inviate da A/R: ${n(v)}` })
-  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, rs.dayLimit ?? L.emailsDay, n, 'oggi', 'resend')
-  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, rs.monthLimit ?? L.emailsMonth, n, 'nel mese', 'resend')
+  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, usageApi ? rs.dayLimit : L.emailsDay, n, 'oggi', 'resend')
+  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, usageApi ? rs.monthLimit : L.emailsMonth, n, 'nel mese', 'resend')
   g1.append(el('br'), mine(u.emails.today)); g2.append(el('br'), mine(u.emails.month))
   grid.append(g1, g2)
   frag.append(grid)
