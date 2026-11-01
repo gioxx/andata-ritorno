@@ -96,7 +96,8 @@ describe('POST /api/admin/registrations', () => {
 
   it('looks absent without a valid token and refuses cross-site or malformed requests', async () => {
     expect((await set({ open: false })).status).toBe(404);
-    expect((await set({ open: false }, { jwt: await token(), origin: 'https://evil.example' })).status).toBe(404);
+    // A foreign page is stopped before anything else.
+    expect((await set({ open: false }, { jwt: await token(), origin: 'https://evil.example' })).status).toBe(403);
     expect((await set({ open: false }, { jwt: await token(), origin: null })).status).toBe(404);
     expect((await set({ open: false }, { jwt: await token(), type: 'text/plain' })).status).toBe(404);
     expect((await set({ open: 'no' }, { jwt: await token() })).status).toBe(400);

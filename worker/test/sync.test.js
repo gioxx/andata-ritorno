@@ -200,7 +200,7 @@ describe('streamed bodies without Content-Length', () => {
     });
   };
   const streamed = (path, n, token) =>
-    call(path, { method: path.includes('photos') ? 'PUT' : 'POST', headers: { authorization: `Bearer ${token}` }, body: stream(n), duplex: 'half' });
+    call(path, { method: path.includes('photos') ? 'PUT' : 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': path.includes('photos') ? 'application/octet-stream' : 'application/json' }, body: stream(n), duplex: 'half' });
 
   it('rejects a photo over 3 MB', async () => {
     const f = await newFamily();

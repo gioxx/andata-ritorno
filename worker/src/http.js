@@ -19,6 +19,9 @@ export function json(obj, status = 200) {
   });
 }
 
+/** The client's IP as Cloudflare saw it. */
+export const clientIp = (req) => req.headers.get('cf-connecting-ip') || 'unknown';
+
 /**
  * Read a request body, stopping as soon as it exceeds maxBytes (so a chunked body without
  * Content-Length is never fully buffered). Throws HttpError(413, code) when too large.
@@ -49,8 +52,13 @@ export async function readBody(req, maxBytes, code = 'too-large') {
   return out;
 }
 
-/** Parse a JSON body, rejecting anything larger than maxBytes. */
+/**
+ * Parse a JSON body, rejecting anything larger than maxBytes. The body must be declared as JSON:
+ * a cross-site form or a "simple" fetch cannot send that without a CORS preflight, which only the
+ * landing site's routes ever answer.
+ */
 export async function readJson(req, maxBytes = 65536) {
+  if (!/^application\/json\b/i.test(req.headers.get('content-type') || '')) throw new HttpError(415, 'unsupported-media-type');
   const buf = await readBody(req, maxBytes);
   try {
     return JSON.parse(new TextDecoder().decode(buf));
@@ -94,5 +102,5 @@ export async function limited(binding, key) {
 
 /** The tight per-IP bucket for unauthenticated routes that check a secret or a code. */
 export async function strictLimit(env, req) {
-  if (await limited(env.RL_STRICT, req.headers.get('cf-connecting-ip') || 'unknown')) throw new HttpError(429, 'rate-limited');
+  if (await limited(env.RL_STRICT, clientIp(req))) throw new HttpError(429, 'rate-limited');
 }

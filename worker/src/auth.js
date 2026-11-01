@@ -1,4 +1,4 @@
-import { HttpError, limited } from './http.js';
+import { HttpError, clientIp, limited } from './http.js';
 
 export async function sha256Hex(s) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -27,12 +27,19 @@ const SEEN_EVERY_MS = 10 * 60 * 1000;
  * @returns {Promise<{deviceId: string, familyId: string}>}
  */
 export async function requireDevice(env, req) {
-  const m = /^Bearer (\S+)$/.exec(req.headers.get('authorization') || '');
-  if (!m) throw new HttpError(401, 'unauthorized');
+  // Device routes skip the per-IP limit (a family's phones may share one IP). Failed attempts do
+  // not: an IP that keeps sending wrong tokens gets the tight bucket, so tokens cannot be guessed
+  // and the database is not used as a punching bag.
+  const refuse = async () => {
+    if (await limited(env.RL_STRICT, `auth:${clientIp(req)}`)) throw new HttpError(429, 'rate-limited');
+    throw new HttpError(401, 'unauthorized');
+  };
+  const m = /^Bearer ([A-Za-z0-9_-]{8,200})$/.exec(req.headers.get('authorization') || '');
+  if (!m) return refuse();
   const row = await env.DB.prepare('SELECT id, family_id, last_seen_at FROM devices WHERE token_hash = ?')
     .bind(await sha256Hex(m[1]))
     .first();
-  if (!row) throw new HttpError(401, 'unauthorized');
+  if (!row) return refuse();
   const now = Date.now();
   if (!(now - Date.parse(row.last_seen_at) < SEEN_EVERY_MS)) {
     await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?')
