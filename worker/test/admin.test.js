@@ -106,19 +106,22 @@ describe('POST /api/admin/registrations', () => {
 });
 
 describe('GET /api/admin/usage', () => {
-  const usage = async (extra = { RESEND_READ_KEY: 're_test' }, graphql = null) => {
-    await caches.default.delete(new Request('https://resend-usage.internal/v1'));
+  const usage = async (extra = { RESEND_READ_KEY: 're_test' }, graphql = null, resendUsageApi = null) => {
+    await caches.default.delete(new Request('https://resend-usage.internal/v2'));
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.url;
       if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
       if (url === 'https://api.cloudflare.com/client/v4/graphql' && graphql) return Response.json(graphql);
+      if (url === 'https://api.resend.com/usage') {
+        return resendUsageApi ? Response.json(resendUsageApi) : Response.json({ message: 'Not found' }, { status: 404 });
+      }
       if (url.startsWith('https://api.resend.com/emails')) {
         // Two pages: today's two emails, then one from earlier this month (if not the 1st) and one from last month.
         const now = new Date();
-        const today = now.toISOString().replace('T', ' ');
+        const today = now.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '.674981+00');
         const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 1)).toISOString();
         const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0)).toISOString();
-        if (!url.includes('after=')) return Response.json({ has_more: true, data: [{ id: 'e1', created_at: today }, { id: 'e2', created_at: today }] });
+        if (!url.includes('after=')) return Response.json({ has_more: true, data: [{ id: 'e1', created_at: today, to: ['a@x.test', 'b@x.test'] }, { id: 'e2', created_at: today, to: ['c@x.test'] }] });
         return Response.json({ has_more: true, data: [{ id: 'e3', created_at: monthStart }, { id: 'e4', created_at: lastMonth }] });
       }
       throw new Error(`unexpected fetch ${url}`);
@@ -136,8 +139,14 @@ describe('GET /api/admin/usage', () => {
     expect(out.emails.month).toBeGreaterThanOrEqual(3);
     expect(out.cloudflare).toEqual({ configured: false });
     const firstDay = new Date().getUTCDate() === 1;
-    expect(out.resend).toEqual({ day: firstDay ? 3 : 2, month: 3, capped: false });
+    // List fallback: three recipients today, one earlier this month.
+    expect(out.resend).toEqual({ day: firstDay ? 4 : 3, month: 4, source: 'list' });
     expect(out.limits.d1RowsWrittenDay).toBe(100_000);
+  });
+
+  it('prefers Resend\'s Usage API (quota units, received mail included)', async () => {
+    const out = await usage({ RESEND_READ_KEY: 're_test' }, null, { object: 'usage', emails: { daily: { used: 10, limit: 100 }, monthly: { used: 120, limit: 3000 } } });
+    expect(out.resend).toEqual({ day: 10, month: 120, dayLimit: 100, monthLimit: 3000, source: 'usage' });
   });
 
   it('sums R2 operations into class A and B and passes D1 and Worker days through', async () => {

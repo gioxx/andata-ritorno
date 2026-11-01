@@ -193,47 +193,67 @@ const USAGE_QUERY = `query ($account: String!, $db: String!, $script: String!, $
 const RESEND_PAGES = 40; // 100 emails each: beyond the free plan's 3,000 a month
 const RESEND_CACHE_S = 10 * 60;
 
+/** Resend timestamps look like "2026-04-03 22:13:42.674981+00": make them ISO 8601. */
+export function resendTime(v) {
+  const iso = String(v).trim().replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
+  return Date.parse(iso);
+}
+
 /**
- * Resend's account-wide usage (every project on the account): the emails listed by Resend since
- * the start of today and of this month (UTC, like Resend's quotas), newest first, 100 per page.
- * Needs RESEND_READ_KEY (full access); cached for ten minutes so the dashboard does not page
- * through the list on every load.
- * @returns {Promise<{day: number, month: number, capped: boolean}|{error: string}>}
+ * Resend's account-wide usage (every project on the account), from Resend's Usage API: emails
+ * counted against the daily and monthly quotas (each recipient, received mail included). If that
+ * API is not available to the account, the sent-email list is paged instead, counting recipients.
+ * Needs RESEND_READ_KEY (full access); cached for ten minutes.
+ * @returns {Promise<{day: number, month: number, dayLimit?: number|null, monthLimit?: number|null, source: string}|{error: string}>}
  */
 async function resendQuota(env, fetchFn) {
   const key = env.RESEND_READ_KEY;
   if (!key) return { error: 'RESEND_READ_KEY not set' };
   const cache = globalThis.caches?.default;
-  const cacheKey = new Request('https://resend-usage.internal/v1');
+  const cacheKey = new Request('https://resend-usage.internal/v2');
   const hit = await cache?.match(cacheKey);
   if (hit) return hit.json();
-  const now = new Date();
-  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  let day = 0, month = 0, after = null, capped = true;
+  const auth = { headers: { authorization: `Bearer ${key}` } };
+  let out;
   try {
-    for (let page = 0; page < RESEND_PAGES; page++) {
-      const url = `https://api.resend.com/emails?limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}`;
-      const res = await fetchFn(url, { headers: { authorization: `Bearer ${key}` } });
-      if (!res.ok) throw new Error(`resend ${res.status}`);
-      const body = await res.json();
-      const list = body.data ?? [];
-      let older = false;
-      for (const e of list) {
-        const t = Date.parse(String(e.created_at).replace(' ', 'T'));
-        if (!(t >= monthStart)) { older = true; break; }
-        month++;
-        if (t >= dayStart) day++;
-      }
-      if (older || !body.has_more || !list.length) { capped = false; break; }
-      after = list[list.length - 1].id;
+    const res = await fetchFn('https://api.resend.com/usage', auth);
+    if (res.ok) {
+      const u = (await res.json()).emails ?? {};
+      out = { day: u.daily?.used ?? 0, month: u.monthly?.used ?? 0, dayLimit: u.daily?.limit ?? null, monthLimit: u.monthly?.limit ?? null, source: 'usage' };
+    } else {
+      out = await resendFromList(fetchFn, auth);
     }
   } catch (e) {
     return { error: String(e.message || e).slice(0, 200) };
   }
-  const out = { day, month, capped };
-  if (cache) await cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'cache-control': `max-age=${RESEND_CACHE_S}` } }));
+  if (cache && !out.error) await cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'cache-control': `max-age=${RESEND_CACHE_S}` } }));
   return out;
+}
+
+/** Fallback: page the sent-email list back to the start of the month, counting recipients. */
+async function resendFromList(fetchFn, auth) {
+  const now = new Date();
+  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  let day = 0, month = 0, after = null;
+  for (let page = 0; page < RESEND_PAGES; page++) {
+    const res = await fetchFn(`https://api.resend.com/emails?limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}`, auth);
+    if (!res.ok) throw new Error(`resend ${res.status}`);
+    const body = await res.json();
+    const list = body.data ?? [];
+    let older = false;
+    for (const e of list) {
+      const t = resendTime(e.created_at);
+      if (Number.isNaN(t)) throw new Error(`unreadable date ${String(e.created_at).slice(0, 40)}`);
+      if (t < monthStart) { older = true; break; }
+      const units = [e.to, e.cc, e.bcc].reduce((a, r) => a + (Array.isArray(r) ? r.length : r ? 1 : 0), 0) || 1;
+      month += units;
+      if (t >= dayStart) day += units;
+    }
+    if (older || !body.has_more || !list.length) break;
+    after = list[list.length - 1].id;
+  }
+  return { day, month, source: 'list' };
 }
 
 /**
