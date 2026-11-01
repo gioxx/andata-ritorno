@@ -59,6 +59,9 @@ APP_ORIGIN = "https://ar-test.gioxx.org"
 PRICE_FAMILY = "price_1UX01dEFvDNKlb6tsEMmZ1ff"
 PRICE_SLOT = "price_1UX01eEFvDNKlb6tcS4Lh2wV"
 MAX_TOTAL_PHOTO_BYTES = "500000000"
+# Owner dashboard (/admin): Cloudflare Access application "A/R admin (test)". Not secrets.
+ACCESS_TEAM_DOMAIN = "cerbero.cloudflareaccess.com"
+ACCESS_AUD = "b24786f2ae9c9d173e497f74d19abc40edda78dd7abc25525a2798e9d46cf2af"
 
 [[env.test.d1_databases]]
 binding = "DB"
