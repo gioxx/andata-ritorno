@@ -43,7 +43,8 @@ async function compute(env) {
 
 async function stats(req, env, ctx) {
   const cache = globalThis.caches?.default;
-  const key = new Request(new URL('/api/public/stats', req.url).href);
+  // Versioned key: a change to what is shown must not wait for old cached answers to expire.
+  const key = new Request(new URL('/api/public/stats?v=2', req.url).href);
   const hit = await cache?.match(key);
   if (hit) return hit;
   const res = json(await compute(env));
