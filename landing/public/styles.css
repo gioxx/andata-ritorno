@@ -15,7 +15,7 @@
   --color-school: #fde9d9; --color-home: #e3eedd;
   --color-accent: #d96f4f; --color-accent-strong: #a34a2a; --color-on-accent: #fbf7f1;
   --color-header: rgb(251 247 241 / 0.86);
-  --color-device: #23201c; --shadow-device: 0 30px 60px -20px rgb(80 50 30 / 0.35); --color-rim: #a9a49c; --color-gift-wash: rgb(253 233 217 / 0.35);
+  --color-device: #23201c; --shadow-device: 0 30px 60px -20px rgb(80 50 30 / 0.35); --color-rim: #a9a49c; --color-gift-wash: rgb(253 233 217 / 0.35); --color-bow-shade: #a34a2a;
   --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: var(--font-display);
   --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px;
@@ -34,7 +34,7 @@
     --color-school: #2a1d18; --color-home: #18231b;
     --color-accent: #e88563; --color-accent-strong: #e88563; --color-on-accent: #0d0f15;
     --color-header: rgb(13 15 21 / 0.86);
-    --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45);
+    --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45); --color-bow-shade: #b4512f;
   }
 }
 :root[data-theme="dark"] {
@@ -44,7 +44,7 @@
   --color-school: #2a1d18; --color-home: #18231b;
   --color-accent: #e88563; --color-accent-strong: #e88563; --color-on-accent: #0d0f15;
   --color-header: rgb(13 15 21 / 0.86);
-  --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45);
+  --color-device: #3a3f4d; --shadow-device: 0 30px 70px -20px rgb(232 133 99 / 0.28); --color-rim: #6d7280; --color-gift-wash: rgb(42 29 24 / 0.45); --color-bow-shade: #b4512f;
 }
 
 * { box-sizing: border-box; }
@@ -272,7 +272,10 @@ html { scroll-behavior: smooth; } /* fallback when site.js does not run */
 .gift-visual { display: grid; place-items: center; padding: var(--space-md) 0; }
 .voucher { position: relative; width: min(100%, 340px); padding: var(--space-lg); border-radius: 20px; background: var(--color-tile); box-shadow: 0 24px 50px -18px rgb(80 40 20 / 0.45); transform: rotate(-4deg); }
 .voucher-ribbon { position: absolute; top: 0; bottom: 0; right: 56px; width: 18px; background: var(--color-accent); opacity: 0.9; }
-.voucher-ribbon::after { content: ''; position: absolute; top: 18px; left: 50%; width: 46px; height: 28px; transform: translateX(-50%); border-radius: 50% 50% 8px 8px; border: 6px solid var(--color-accent); border-bottom: 0; }
+.voucher-bow { position: absolute; top: -44px; right: 5px; width: 120px; height: 86px; filter: drop-shadow(0 4px 6px rgb(80 40 20 / 0.25)); }
+.voucher-bow .bow-loop, .voucher-bow .bow-tail { fill: var(--color-accent); }
+.voucher-bow .bow-fold { fill: var(--color-bow-shade); opacity: 0.6; }
+.voucher-bow .bow-knot { fill: var(--color-bow-shade); }
 .voucher-head { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: var(--text-lg); line-height: 1.1; }
 .voucher-head img { width: 40px; height: 40px; border-radius: 10px; }
 .voucher-head small { display: block; font-size: 0.75rem; font-weight: 700; color: var(--color-accent-strong); text-transform: uppercase; letter-spacing: 0.08em; }
