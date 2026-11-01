@@ -190,25 +190,50 @@ const USAGE_QUERY = `query ($account: String!, $db: String!, $script: String!, $
   } }
 }`;
 
+const RESEND_PAGES = 40; // 100 emails each: beyond the free plan's 3,000 a month
+const RESEND_CACHE_S = 10 * 60;
+
 /**
- * Resend's account-wide usage: every API answer carries x-resend-daily-quota (free plan) and
- * x-resend-monthly-quota, the emails used so far. A one-item list is the cheapest call that gets
- * them; RESEND_READ_KEY (full access) is used when set, the sending key otherwise.
- * @returns {Promise<{day: number|null, month: number|null}|{error: string}>}
+ * Resend's account-wide usage (every project on the account): the emails listed by Resend since
+ * the start of today and of this month (UTC, like Resend's quotas), newest first, 100 per page.
+ * Needs RESEND_READ_KEY (full access); cached for ten minutes so the dashboard does not page
+ * through the list on every load.
+ * @returns {Promise<{day: number, month: number, capped: boolean}|{error: string}>}
  */
 async function resendQuota(env, fetchFn) {
-  const key = env.RESEND_READ_KEY || env.RESEND_API_KEY;
-  if (!key) return { error: 'no key' };
+  const key = env.RESEND_READ_KEY;
+  if (!key) return { error: 'RESEND_READ_KEY not set' };
+  const cache = globalThis.caches?.default;
+  const cacheKey = new Request('https://resend-usage.internal/v1');
+  const hit = await cache?.match(cacheKey);
+  if (hit) return hit.json();
+  const now = new Date();
+  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  let day = 0, month = 0, after = null, capped = true;
   try {
-    const res = await fetchFn('https://api.resend.com/emails?limit=1', { headers: { authorization: `Bearer ${key}` } });
-    const num = (h) => (res.headers.has(h) ? Number(res.headers.get(h)) : null);
-    const day = num('x-resend-daily-quota');
-    const month = num('x-resend-monthly-quota');
-    if (day === null && month === null) return { error: `no quota headers (HTTP ${res.status})` };
-    return { day, month };
+    for (let page = 0; page < RESEND_PAGES; page++) {
+      const url = `https://api.resend.com/emails?limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}`;
+      const res = await fetchFn(url, { headers: { authorization: `Bearer ${key}` } });
+      if (!res.ok) throw new Error(`resend ${res.status}`);
+      const body = await res.json();
+      const list = body.data ?? [];
+      let older = false;
+      for (const e of list) {
+        const t = Date.parse(String(e.created_at).replace(' ', 'T'));
+        if (!(t >= monthStart)) { older = true; break; }
+        month++;
+        if (t >= dayStart) day++;
+      }
+      if (older || !body.has_more || !list.length) { capped = false; break; }
+      after = list[list.length - 1].id;
+    }
   } catch (e) {
     return { error: String(e.message || e).slice(0, 200) };
   }
+  const out = { day, month, capped };
+  if (cache) await cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'cache-control': `max-age=${RESEND_CACHE_S}` } }));
+  return out;
 }
 
 /**

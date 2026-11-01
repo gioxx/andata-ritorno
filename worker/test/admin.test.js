@@ -106,12 +106,21 @@ describe('POST /api/admin/registrations', () => {
 });
 
 describe('GET /api/admin/usage', () => {
-  const usage = async (extra = { RESEND_API_KEY: 're_test' }, graphql = null) => {
+  const usage = async (extra = { RESEND_READ_KEY: 're_test' }, graphql = null) => {
+    await caches.default.delete(new Request('https://resend-usage.internal/v1'));
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.url;
       if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
       if (url === 'https://api.cloudflare.com/client/v4/graphql' && graphql) return Response.json(graphql);
-      if (url.startsWith('https://api.resend.com/emails')) return Response.json({ data: [] }, { headers: { 'x-resend-daily-quota': '12', 'x-resend-monthly-quota': '345' } });
+      if (url.startsWith('https://api.resend.com/emails')) {
+        // Two pages: today's two emails, then one from earlier this month (if not the 1st) and one from last month.
+        const now = new Date();
+        const today = now.toISOString().replace('T', ' ');
+        const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 1)).toISOString();
+        const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0)).toISOString();
+        if (!url.includes('after=')) return Response.json({ has_more: true, data: [{ id: 'e1', created_at: today }, { id: 'e2', created_at: today }] });
+        return Response.json({ has_more: true, data: [{ id: 'e3', created_at: monthStart }, { id: 'e4', created_at: lastMonth }] });
+      }
       throw new Error(`unexpected fetch ${url}`);
     });
     const res = await worker.fetch(new Request('https://ar.test/api/admin/usage', { headers: { 'cf-access-jwt-assertion': await token() } }), { ...env, ...ON, ...extra }, {});
@@ -126,13 +135,14 @@ describe('GET /api/admin/usage', () => {
     expect(out.emails.today).toBe(3);
     expect(out.emails.month).toBeGreaterThanOrEqual(3);
     expect(out.cloudflare).toEqual({ configured: false });
-    expect(out.resend).toEqual({ day: 12, month: 345 });
+    const firstDay = new Date().getUTCDate() === 1;
+    expect(out.resend).toEqual({ day: firstDay ? 3 : 2, month: 3, capped: false });
     expect(out.limits.d1RowsWrittenDay).toBe(100_000);
   });
 
   it('sums R2 operations into class A and B and passes D1 and Worker days through', async () => {
     const day = new Date().toISOString().slice(0, 10);
-    const out = await usage({ RESEND_API_KEY: 're_test', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, {
+    const out = await usage({ RESEND_READ_KEY: 're_test', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, {
       data: { viewer: { accounts: [{
         d1: [{ dimensions: { date: day }, sum: { readQueries: 5, writeQueries: 2, rowsRead: 900, rowsWritten: 40 } }],
         worker: [{ dimensions: { date: day }, sum: { requests: 120, errors: 1, subrequests: 3 } }],
@@ -150,7 +160,7 @@ describe('GET /api/admin/usage', () => {
   });
 
   it('reports a GraphQL error instead of failing', async () => {
-    const out = await usage({ RESEND_API_KEY: 're_test', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { errors: [{ message: 'not authorized' }] });
+    const out = await usage({ RESEND_READ_KEY: 're_test', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { errors: [{ message: 'not authorized' }] });
     expect(out.cloudflare).toEqual({ configured: true, error: 'not authorized' });
   });
 });
