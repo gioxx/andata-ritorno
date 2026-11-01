@@ -1,4 +1,5 @@
-import { HttpError, json, readJson } from './http.js';
+import { HttpError, UpstreamError, json, publicError, readJson } from './http.js';
+import { notifyOwner, telegramConfigured } from './notify.js';
 
 // The owner's dashboard: aggregate numbers only, never encrypted content, names or hashes.
 // Cloudflare Access sits in front of /admin.html and /api/admin/*; this Worker checks the Access
@@ -153,6 +154,7 @@ async function stats(req, env) {
     openInvites: row(invites).open ?? 0,
     budgetToday: row(budget),
     registrationsOpen: row(settings).value !== 'closed',
+    telegram: { configured: telegramConfigured(env) },
   });
 }
 
@@ -224,7 +226,7 @@ async function resendQuota(env, fetchFn) {
       out = await resendFromList(fetchFn, auth);
     }
   } catch (e) {
-    return { error: String(e.message || e).slice(0, 200) };
+    return { error: publicError(e, 'resend usage failed') };
   }
   if (cache && !out.error) await cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'cache-control': `max-age=${RESEND_CACHE_S}` } }));
   return out;
@@ -238,13 +240,13 @@ async function resendFromList(fetchFn, auth) {
   let day = 0, month = 0, after = null;
   for (let page = 0; page < RESEND_PAGES; page++) {
     const res = await fetchFn(`https://api.resend.com/emails?limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}`, auth);
-    if (!res.ok) throw new Error(`resend ${res.status}`);
+    if (!res.ok) throw new UpstreamError(`resend ${res.status}`);
     const body = await res.json();
     const list = body.data ?? [];
     let older = false;
     for (const e of list) {
       const t = resendTime(e.created_at);
-      if (Number.isNaN(t)) throw new Error(`unreadable date ${String(e.created_at).slice(0, 40)}`);
+      if (Number.isNaN(t)) throw new UpstreamError(`unreadable date ${String(e.created_at).slice(0, 40)}`);
       if (t < monthStart) { older = true; break; }
       const units = [e.to, e.cc, e.bcc].reduce((a, r) => a + (Array.isArray(r) ? r.length : r ? 1 : 0), 0) || 1;
       month += units;
@@ -292,7 +294,7 @@ async function usage(req, env, ctx, params, fetchFn = fetch) {
       }),
     });
     const body = await res.json();
-    if (!res.ok || body.errors?.length) throw new Error(body.errors?.map((e) => e.message).join('; ') || `graphql ${res.status}`);
+    if (!res.ok || body.errors?.length) throw new UpstreamError(body.errors?.map((e) => e.message).join('; ') || `graphql ${res.status}`);
     const acc = body.data?.viewer?.accounts?.[0] ?? {};
     const byDate = (rows, pick) => rows.map((r) => ({ day: r.dimensions.date, ...pick(r.sum) })).sort((a, b) => a.day.localeCompare(b.day));
     let classA = 0, classB = 0;
@@ -308,19 +310,26 @@ async function usage(req, env, ctx, params, fetchFn = fetch) {
       r2: { classAMonth: classA, classBMonth: classB, bytes: (size.payloadSize ?? 0) + (size.metadataSize ?? 0), objects: size.objectCount ?? 0 },
     };
   } catch (e) {
-    out.cloudflare = { configured: true, error: String(e.message || e).slice(0, 300) };
+    out.cloudflare = { configured: true, error: publicError(e, 'cloudflare usage failed') };
   }
   return json(out);
+}
+
+/**
+ * The Access cookie rides along on cross-site requests too: dashboard actions accept only
+ * same-origin JSON, which a form on another site cannot send without a CORS preflight this Worker
+ * never answers.
+ */
+function requireSameOriginJson(req) {
+  const origin = req.headers.get('origin');
+  const type = req.headers.get('content-type') ?? '';
+  if (origin !== new URL(req.url).origin || !type.startsWith('application/json')) throw new HttpError(404, 'not-found');
 }
 
 /** Open or close registrations (see requireRegistrationsOpen). Body: {open: boolean}. */
 async function setRegistrations(req, env) {
   await requireAdmin(env, req);
-  // The Access cookie rides along on cross-site requests too: accept only same-origin JSON, which
-  // a form on another site cannot send without a CORS preflight this Worker never answers.
-  const origin = req.headers.get('origin');
-  const type = req.headers.get('content-type') ?? '';
-  if (origin !== new URL(req.url).origin || !type.startsWith('application/json')) throw new HttpError(404, 'not-found');
+  requireSameOriginJson(req);
   const { open } = (await readJson(req, 1024)) ?? {};
   if (typeof open !== 'boolean') throw new HttpError(400, 'bad-request');
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('registrations', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1")
@@ -329,8 +338,17 @@ async function setRegistrations(req, env) {
   return json({ registrationsOpen: open });
 }
 
+/** Sends a test message to the owner's Telegram chat, to check the bot token and chat id. */
+async function testTelegram(req, env) {
+  await requireAdmin(env, req);
+  requireSameOriginJson(req);
+  const res = await notifyOwner(env, 'A/R: messaggio di prova dalla dashboard. Le notifiche degli acquisti arriveranno qui.');
+  return json({ configured: telegramConfigured(env), sent: res.ok, ...(res.ok ? {} : { error: res.error }) });
+}
+
 export const adminRoutes = {
   'GET /api/admin/stats': stats,
   'GET /api/admin/usage': usage,
   'POST /api/admin/registrations': setRegistrations,
+  'POST /api/admin/telegram/test': testTelegram,
 };

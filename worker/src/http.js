@@ -12,6 +12,27 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * A failure of an upstream service (Resend, Cloudflare, Telegram) whose `detail` was composed here
+ * and is safe to show on the owner's dashboard (a status code, the service's own short reason).
+ */
+export class UpstreamError extends Error {
+  /** @param {string} detail */
+  constructor(detail) {
+    super(detail);
+    this.detail = String(detail).slice(0, 300);
+  }
+}
+
+/**
+ * The text an error may show in a response: the detail of an UpstreamError, a generic sentence for
+ * anything else (whose message or stack could reveal internals). The full error goes to the log.
+ */
+export function publicError(e, where) {
+  console.error(where, e);
+  return e instanceof UpstreamError ? e.detail : 'unexpected error (see the Worker logs)';
+}
+
 export function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,

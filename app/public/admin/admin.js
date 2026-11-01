@@ -287,6 +287,13 @@ function render() {
     el('button', { type: 'button', class: 'primary', id: 'reg-toggle', 'data-open': reg ? 'false' : 'true', text: reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni' }))
   cards.append(sw)
 
+  // Telegram purchase notifications
+  const tg = s.telegram?.configured
+  cards.append(card(`Notifiche Telegram: ${tg ? 'configurate' : 'non configurate'}`, null, 'w4',
+    el('p', { class: 'sub', text: tg ? 'A ogni acquisto arriva un messaggio, senza dati personali.' : 'Imposta i secret TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID del Worker per riceverle.' }),
+    el('button', { type: 'button', class: 'ghost', id: 'tg-test', ...(tg ? {} : { disabled: '' }), text: 'Invia messaggio di prova' }),
+    el('p', { class: 'sub', id: 'tg-result', role: 'status' })))
+
   // Storage meter
   const meter = el('div', { class: `meter ${used > 85 ? 'hot' : ''}`, role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': used.toFixed(1), 'aria-label': 'Spazio foto usato' })
   const fill = el('i'); fill.style.width = `${used}%`; meter.append(fill)
@@ -391,6 +398,29 @@ async function setRegistrations(open) {
   }
 }
 
+async function testTelegram(btn) {
+  const result = $('#tg-result')
+  btn.disabled = true
+  result.textContent = 'Invio…'
+  try {
+    const res = await fetch('/api/admin/telegram/test', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+    if (!res.ok) throw new Error(`Errore ${res.status}`)
+    const r = await res.json()
+    result.replaceChildren(r.sent
+      ? el('span', { text: 'Inviato: controlla Telegram.' })
+      : el('span', { class: 'err', text: `Non inviato: ${r.error}${/chat not found/i.test(r.error) ? ' (scrivi /start al bot e controlla il chat ID)' : ''}` }))
+  } catch (e) {
+    result.replaceChildren(el('span', { class: 'err', text: e.message }))
+  } finally {
+    btn.disabled = false
+  }
+}
+
 // ---------- resources (independent of the filters: always today, this month, last 30 days) ----------
 function gauge(name, value, limit, fmt = n, per = 'oggi', provider = null) {
   // No limit on the plan (Resend reports null): the number alone, no meter, no warning.
@@ -491,6 +521,8 @@ $('#tables').addEventListener('change', (e) => {
 out.addEventListener('click', (e) => {
   const btn = e.target.closest('#reg-toggle')
   if (btn) setRegistrations(btn.dataset.open === 'true')
+  const tg = e.target.closest('#tg-test')
+  if (tg) testTelegram(tg)
 })
 $('#reload').addEventListener('click', () => { load(); loadUsage() })
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { render(); if (state.usage) renderUsage(state.usage) })
