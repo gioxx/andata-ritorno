@@ -17,6 +17,7 @@
     "wrangler": "^4"
   },
   "overrides": {
-    "undici": "^7.30.1"
+    "undici": "^7.30.1",
+    "sharp": "^0.35.5"
   }
 }
