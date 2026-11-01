@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>A/R · Andata e Ritorno</title>
-<meta name="description" content="A/R tiene traccia dei vestiti dei bimbi tra casa e scuola: fotografi ogni capo una volta e lo sposti con un tocco. Gratis, senza account, anche in famiglia.">
+<meta name="description" content="A/R tiene traccia dei vestiti dei bimbi tra casa e scuola: fotografi ogni capo una volta e lo sposti con un tocco. Gratis, senza account, open source, anche in famiglia.">
+<link rel="canonical" href="https://ar.gioxx.org/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="A/R · Andata e Ritorno">
+<meta property="og:locale" content="it_IT">
+<meta property="og:url" content="https://ar.gioxx.org/">
+<meta property="og:title" content="A/R · Andata e Ritorno">
+<meta property="og:description" content="I vestiti dei bimbi, tra casa e scuola. Fotografi ogni capo una volta e lo sposti con un tocco.">
+<meta property="og:image" content="https://ar.gioxx.org/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Anteprima di A/R: la schermata con i capi a scuola e a casa">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f15">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
@@ -12,61 +24,93 @@
 <link rel="alternate" hreflang="en" href="https://ar.gioxx.org/en/">
 <link rel="preload" href="/fonts/plus-jakarta-sans-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">
+<script src="/theme.js"></script>
+<script type="module" src="/site.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Vai al contenuto</a>
-<header class="wrap">
-  <nav class="nav" aria-label="Principale">
-    <a class="brand" href="/"><img src="/icon.svg" alt="" width="36" height="36">A/R</a>
-    <ul>
-      <li><a href="#come-funziona">Come funziona</a></li>
-      <li><a href="#famiglia">Famiglia</a></li>
-      <li><a href="/guida/">Guida</a></li>
-      <li><a href="/en/" hreflang="en" lang="en">English</a></li>
-    </ul>
-  </nav>
+<header class="site-header">
+  <div class="wrap">
+    <nav class="nav" aria-label="Principale">
+      <a class="brand" href="/"><img src="/icon.svg" alt="" width="40" height="40"><span>A/R<small>Andata e Ritorno</small></span></a>
+      <ul>
+        <li><a href="#come-funziona">Come funziona</a></li>
+        <li><a href="#prezzi">Prezzi</a></li>
+        <li><a href="#regala">Regala</a></li>
+        <li><a href="/guida/">Guida</a></li>
+        <li><a href="/en/" hreflang="en" lang="en">EN</a></li>
+        <li><button type="button" class="theme-toggle" data-theme-toggle data-labels='{"auto":"Tema: automatico","light":"Tema: chiaro","dark":"Tema: scuro"}' aria-label="Tema: automatico">
+          <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+          <svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
+        </button></li>
+        <li class="nav-cta-item"><a class="nav-cta" href="https://app.ar.gioxx.org/">Apri l'app</a></li>
+      </ul>
+    </nav>
+  </div>
 </header>
 
 <main id="main">
   <div class="wrap hero">
-    <h1>I vestiti dei bimbi, tra casa e scuola.</h1>
-    <p class="lede">Fotografa ogni capo una volta. Da lì in poi ogni capo è a scuola o a casa, e lo sposti con un tocco. Niente più foto copiate nelle note per ricordarti cosa è dove.</p>
-    <div class="actions">
-      <a class="btn btn-primary" href="https://app.ar.gioxx.org/">Apri A/R, è gratis</a>
-      <a class="btn btn-ghost" href="/guida/">Leggi la guida</a>
+    <div>
+      <span class="eyebrow"><img src="/icon.svg" alt="" width="28" height="28">Andata e Ritorno</span>
+      <h1>I vestiti dei bimbi, tra casa e scuola.</h1>
+      <p class="lede">Fotografa ogni capo una volta. Da lì in poi ogni capo è a scuola o a casa, e lo sposti con un tocco. Niente più foto copiate nelle note per ricordarti cosa è dove.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://app.ar.gioxx.org/">Apri A/R, è gratis</a>
+        <a class="btn btn-ghost" href="/guida/">Leggi la guida</a>
+      </div>
+      <ul class="facts">
+        <li>Senza account</li>
+        <li>Funziona offline</li>
+        <li>Open source</li>
+      </ul>
     </div>
-    <div class="places" aria-hidden="true">
-      <div class="place place-school"><b>A scuola</b><span>body, cambio, calzini di riserva</span></div>
-      <div class="place place-home"><b>A casa</b><span>tutto il resto, pronto per tornare</span></div>
+    <div class="hero-media">
+      <figure class="hero-photo"><img src="/img/hero.jpg" alt="" width="900" height="1350"></figure>
+      <figure class="phone on-light"><img src="/shots/it/home-light.webp" alt="A/R sul telefono: la scheda Nido con sei capi a scuola e quattro a casa" width="390" height="844"></figure>
+      <figure class="phone on-dark"><img src="/shots/it/home-dark.webp" alt="A/R sul telefono: la scheda Nido con sei capi a scuola e quattro a casa" width="390" height="844" loading="lazy"></figure>
     </div>
   </div>
 
-  <section id="come-funziona" aria-labelledby="h-how">
+  <section id="come-funziona" aria-labelledby="h-come">
     <div class="wrap">
-      <h2 id="h-how">Come funziona</h2>
+      <h2 id="h-come">Come funziona</h2>
       <ol class="stages">
-        <li class="stage">
-          <span class="n">01</span>
-          <h3>Fotografa il capo</h3>
-          <p>Dalla fotocamera, dalla galleria o dagli appunti. Aggiungi una descrizione e, se vuoi, una categoria: body, pantaloni, felpe, pigiami. Una scheda per ogni bimbo o per ogni scuola.</p>
+        <li class="stage" data-reveal>
+          <div class="stage-text">
+            <span class="n">01</span>
+            <h3>Fotografa il capo</h3>
+            <p>Dalla fotocamera, dalla galleria o dagli appunti. Aggiungi una descrizione e, se vuoi, una categoria: body, pantaloni, felpe, pigiami. Una scheda per ogni bimbo o per ogni scuola.</p>
+          </div>
+          <figure class="phone on-light"><img src="/shots/it/add-light.webp" alt="Il pannello Aggiungi capi con i pulsanti Scatta e Galleria" width="390" height="844" loading="lazy"></figure>
+          <figure class="phone on-dark"><img src="/shots/it/add-dark.webp" alt="Il pannello Aggiungi capi con i pulsanti Scatta e Galleria" width="390" height="844" loading="lazy"></figure>
         </li>
-        <li class="stage">
-          <span class="n">02</span>
-          <h3>Spostalo con un tocco</h3>
-          <p>Ogni capo è in uno di due posti: a scuola o a casa. Selezioni quelli che porti o riporti e li sposti tutti insieme. A/R ricorda da quanto tempo un capo è dove si trova.</p>
+        <li class="stage" data-reveal>
+          <div class="stage-text">
+            <span class="n">02</span>
+            <h3>Spostalo con un tocco</h3>
+            <p>Ogni capo è in uno di due posti: a scuola o a casa. Selezioni quelli che porti o riporti e li sposti tutti insieme. A/R ricorda da quanto tempo un capo è dove si trova.</p>
+          </div>
+          <figure class="phone on-light"><img src="/shots/it/select-light.webp" alt="Due capi selezionati a casa e il pulsante per spostarli a scuola" width="390" height="844" loading="lazy"></figure>
+          <figure class="phone on-dark"><img src="/shots/it/select-dark.webp" alt="Due capi selezionati a casa e il pulsante per spostarli a scuola" width="390" height="844" loading="lazy"></figure>
         </li>
-        <li class="stage">
-          <span class="n">03</span>
-          <h3>Condividilo in famiglia, se vuoi</h3>
-          <p>Da soli basta il telefono. In due, o con i nonni, attivi la condivisione: tutti vedono lo stesso guardaroba, aggiornato, e i dati viaggiano cifrati.</p>
+        <li class="stage" data-reveal>
+          <div class="stage-text">
+            <span class="n">03</span>
+            <h3>Condividilo in famiglia, se vuoi</h3>
+            <p>Da soli basta il telefono. In due, o con i nonni, attivi la condivisione: tutti vedono lo stesso guardaroba, aggiornato, e i dati viaggiano cifrati. Il server non può leggere né capi, né foto, né nomi.</p>
+          </div>
+          <figure class="phone on-light"><img src="/shots/it/family-menu-light.webp" alt="Il menu Famiglia con la sincronizzazione, i dispositivi e l'invito di un telefono" width="390" height="844" loading="lazy"></figure>
+          <figure class="phone on-dark"><img src="/shots/it/family-menu-dark.webp" alt="Il menu Famiglia con la sincronizzazione, i dispositivi e l'invito di un telefono" width="390" height="844" loading="lazy"></figure>
         </li>
       </ol>
     </div>
   </section>
 
-  <section id="famiglia" aria-labelledby="h-plans">
+  <section id="prezzi" data-reveal aria-labelledby="h-prezzi">
     <div class="wrap">
-      <h2 id="h-plans">Gratis da soli, una tantum in famiglia</h2>
+      <h2 id="h-prezzi">Gratis da soli, una tantum in famiglia</h2>
       <div class="plans">
         <div class="plan">
           <h3>A/R</h3>
@@ -76,8 +120,9 @@
             <li>Funziona anche senza rete e si installa come un'app.</li>
             <li>Backup in un unico file .zip, foto comprese.</li>
           </ul>
+          <div class="actions"><a class="btn btn-ghost" href="https://app.ar.gioxx.org/">Apri A/R</a></div>
         </div>
-        <div class="plan plan-family">
+        <div class="plan plan-family" id="famiglia">
           <h3>Condivisione in famiglia</h3>
           <p class="price">4,99 € <small>una volta sola · prezzo per i primi utenti</small></p>
           <ul>
@@ -86,14 +131,55 @@
             <li>Un telefono in più? Aggiungi un posto a 1,99 €.</li>
             <li>Nessun abbonamento, nessun rinnovo.</li>
           </ul>
+          <div class="actions"><a class="btn btn-primary" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Acquista · 4,99 €</a></div>
+          <p class="fine">Il codice compare subito dopo il pagamento e ti arriva per email. Nell'app: Menu → Famiglia → <strong>Ho già un codice</strong>.</p>
         </div>
       </div>
-      <p class="note">La condivisione si attiva dall'app: Menu → Famiglia. Leggi i <a href="https://app.ar.gioxx.org/terms.html">termini</a> e l'<a href="https://app.ar.gioxx.org/privacy.html">informativa sulla privacy</a>.</p>
+      <div class="after-plans note">
+        <p><strong>Ci hai ripensato?</strong> Finché non hai usato il codice, entro 14 giorni ti rimborsiamo, senza dover spiegare perché: scrivi a <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a>.</p>
+        <p>Ti serve un posto in più per una famiglia già attiva? <a href="https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01">Compra un posto a 1,99 €</a>, poi nell'app: Menu → Famiglia → <strong>Aggiungi un posto</strong>.</p>
+        <p>Pagamenti gestiti da Stripe. Leggi i <a href="https://app.ar.gioxx.org/terms.html">termini</a> e l'<a href="https://app.ar.gioxx.org/privacy.html">informativa sulla privacy</a>.</p>
+      </div>
     </div>
   </section>
 
-  <section aria-labelledby="h-install">
-    <div class="wrap band">
+  <section id="regala" data-reveal aria-labelledby="h-regala">
+    <div class="wrap band band-school">
+      <span class="kicker">Regala A/R</span>
+      <h2 id="h-regala">Un regalo per chi vive tra body e calzini di riserva</h2>
+      <div class="gift-grid">
+        <p class="lead">Conosci una famiglia appena entrata al nido? Regalale la condivisione: paghi tu, a loro mandi il codice.</p>
+        <figure class="gift-photo"><img src="/img/gift.jpg" alt="" width="1200" height="800" loading="lazy"></figure>
+      </div>
+      <ol class="steps">
+        <li><b>Acquista</b>Con il pulsante qui sotto, usando la tua email.</li>
+        <li><b>Ricevi il codice</b>Compare dopo il pagamento e ti arriva per email.</li>
+        <li><b>Inoltralo</b>Chi lo riceve apre A/R e lo incolla in Menu → Famiglia → Ho già un codice.</li>
+      </ol>
+      <div class="actions"><a class="btn btn-primary" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Regala A/R · 4,99 €</a></div>
+      <p class="fine">Il codice non scade. Il recupero della licenza passa dall'email dell'acquisto, cioè la tua: ricorda a chi lo riceve di salvare il kit di recupero.</p>
+    </div>
+  </section>
+
+  <section id="open-source" data-reveal aria-labelledby="h-oss">
+    <div class="wrap split">
+      <div>
+        <span class="kicker">Open source</span>
+        <h2 id="h-oss">Tutto il codice è pubblico. Puoi anche fartela da te.</h2>
+        <p class="lead">A/R è software libero, con licenza AGPL v3: l'app, il server e questo sito sono su <a href="https://github.com/gioxx/andata-ritorno">GitHub</a>. Chiunque può leggerlo, controllare cosa fa con i dati, modificarlo e metterlo in piedi sulla propria infrastruttura.</p>
+        <ul class="oss-points">
+          <li><b>Da soli è gratis, per sempre</b>Senza famiglia l'app non parla con nessun server: non c'è niente da pagare.</li>
+          <li><b>Self-hosting</b>Bastano un account Cloudflare e i piani gratuiti di Workers, D1 e R2. Il README spiega ogni passo, e i codici te li generi da te.</li>
+          <li><b>Cosa paghi, allora</b>Un rimborso spese per tenere acceso il servizio ospitato, per chi non vuole o non sa gestirsi un server. Niente pubblicità, niente investitori, niente dati venduti.</li>
+        </ul>
+      </div>
+      <figure class="phone on-light"><img src="/shots/it/invite-light.webp" alt="L'invito di un nuovo telefono con il QR da inquadrare" width="390" height="844" loading="lazy"></figure>
+      <figure class="phone on-dark"><img src="/shots/it/invite-dark.webp" alt="L'invito di un nuovo telefono con il QR da inquadrare" width="390" height="844" loading="lazy"></figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-install" data-reveal>
+    <div class="wrap band band-home">
       <h2 id="h-install">Installala sul telefono</h2>
       <div class="cols">
         <div>
@@ -115,25 +201,33 @@
     </div>
   </section>
 
-  <section aria-labelledby="h-privacy">
+  <section aria-labelledby="h-privacy" data-reveal>
     <div class="wrap">
       <h2 id="h-privacy">I tuoi dati restano tuoi</h2>
-      <p class="lead">Niente account, niente pubblicità, niente tracciamento. Senza famiglia tutto resta sul telefono; in famiglia i dati sono cifrati prima di partire. Il codice è pubblico su <a href="https://github.com/gioxx/andata-ritorno">GitHub</a>, quindi chiunque può verificarlo.</p>
+      <p class="lead">Niente account, niente pubblicità, niente tracciamento. Senza famiglia tutto resta sul telefono; in famiglia i dati sono cifrati prima di partire, con una chiave che solo i vostri telefoni conoscono.</p>
     </div>
   </section>
 </main>
 
 <footer>
-  <div class="wrap">
-    <p class="say">Andata e Ritorno: meno calzini dispersi.</p>
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <img src="/icon.svg" alt="" width="64" height="64">
+      <div>
+        <p class="say">Andata e Ritorno: meno calzini dispersi.</p>
+        <p class="note">A/R è software libero (AGPL v3). © 2026 Gioxx · <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a></p>
+      </div>
+    </div>
     <ul>
       <li><a href="https://app.ar.gioxx.org/">Apri A/R</a></li>
       <li><a href="/guida/">Guida</a></li>
+      <li><a href="#regala">Regala A/R</a></li>
       <li><a href="https://app.ar.gioxx.org/privacy.html">Privacy</a></li>
       <li><a href="https://app.ar.gioxx.org/terms.html">Termini</a></li>
       <li><a href="https://github.com/gioxx/andata-ritorno">GitHub</a></li>
     </ul>
   </div>
 </footer>
+<button type="button" class="to-top" data-to-top aria-label="Torna su"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 </body>
 </html>
