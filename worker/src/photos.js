@@ -92,7 +92,17 @@ async function put(req, env, ctx, { pid }) {
     }
     throw e;
   }
-  await env.DB.prepare('UPDATE photos SET ready = 1 WHERE family_id = ? AND pid = ? AND uploaded_at = ?').bind(familyId, pid, token).run();
+  const done = await env.DB.batch([
+    env.DB.prepare('UPDATE photos SET ready = 1 WHERE family_id = ? AND pid = ? AND uploaded_at = ?').bind(familyId, pid, token),
+    env.DB.prepare('SELECT 1 FROM families WHERE id = ?').bind(familyId),
+  ]);
+  if (done[0].meta.changes !== 1 && !done[1].results.length) {
+    // The family was purged while the object was being written (last device left, or the licence
+    // moved on): the purge already swept the prefix, so this late object would stay unreachable and
+    // outside the total. Nobody can upload to a purged family, so deleting it races with no one.
+    await env.PHOTOS.delete(`${familyId}/${pid}`);
+    throw new HttpError(401, 'unauthorized');
+  }
   return new Response(null, { status: 204 });
 }
 

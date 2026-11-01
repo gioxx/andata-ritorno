@@ -318,20 +318,32 @@ export function createSyncEngine({
     return stored
   }
 
-  /** Delete server photos no local item has referenced for 30 days (only once fully synced). */
-  async function sweepOrphans(api, items) {
+  /**
+   * Delete server photos no local item has referenced for 30 days (only once fully synced), and
+   * offer again the photos local items use that the server lost: another phone may have swept one
+   * as an orphan while this phone was bringing its item back.
+   * @returns {Promise<string[]>} codes of photos the server refused
+   */
+  async function sweepOrphans(api, key, meta, items) {
     const referenced = new Set(items.map((it) => it.photoId))
     const seen = (await getMeta(db, 'orphanSeen')) ?? {}
     const at = now()
     const next = {}
     const { photos } = await api.listPhotos()
+    const stored = new Set()
     for (const { pid } of photos) {
+      stored.add(pid)
       if (referenced.has(pid)) continue
       const first = seen[pid] ?? at
       if (Date.parse(at) - Date.parse(first) >= ORPHAN_MS) await api.deletePhoto(pid)
       else next[pid] = first
     }
     await setMeta(db, 'orphanSeen', next)
+    // Refused photos wait for their own retry; photos this phone does not hold are not its to send.
+    const held = (await getMeta(db, REFUSED)) ?? {}
+    const local = await getPhotoIds(db)
+    const lost = items.filter((it) => it.photoId && !stored.has(it.photoId) && !held[it.photoId] && local.has(it.photoId))
+    return lost.length ? uploadPhotos(api, key, meta, lost) : []
   }
 
   /** One pass of the photo queue; never rejects (offline or removed: the next sync retries). */
@@ -409,16 +421,19 @@ export function createSyncEngine({
     /** @type {SyncPlan|null} */
     const plan = remote.length ? await merge(meta, remote) : null
     const kit = secret && secret !== meta.recoverySecret ? { recoverySecret: secret } : {}
+    // Empty tabs are reconciled before the cursor moves on: a restart in between would pull again
+    // from the old cursor, so the marker is never judged against a pull missing the family's tabs.
+    if (!sameMembership(await getFamily(db), meta)) throw new MembershipChanged()
+    const droppedTabs = await discardEmptyTabs(remote)
     meta = await updateFamily(db, meta, { cursor, ...kit })
     if (!meta) throw new MembershipChanged()
-    const droppedTabs = await discardEmptyTabs(remote)
     if ((plan && changesLocal(plan)) || droppedTabs) await onApplied()
 
     const refused = await push(api, key, meta)
     const { items } = await loadAll(db)
     const owed = await pruneRefused(items)
     const pending = await outboxSize()
-    if (!pending) await sweepOrphans(api, items)
+    if (!pending) refused.push(...(await sweepOrphans(api, key, meta, items)))
 
     const view = await describeFamily(key, await api.family())
     const lastSyncAt = now()

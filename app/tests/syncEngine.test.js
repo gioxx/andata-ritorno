@@ -536,6 +536,28 @@ describe('sync engine (two phones)', () => {
     expect(await getMeta(b.db, 'emptyTabsToDrop')).toBeUndefined()
   })
 
+  it('a run stopped before the empty tabs are reconciled pulls again: a family tab is kept', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await putTab(a.db, tab('tab-spare', 1))
+    await familyOf(a)
+    await a.sync()
+    const b = await phone()
+    await putTab(b.db, tab('tab-spare', 1))
+    await join(a, b)
+    // The app dies right after the pull: the marker read is the first thing that fails.
+    const get = b.db.get.bind(b.db)
+    let fail = true
+    b.db.get = (store, key) => {
+      if (fail && store === 'meta' && key === 'emptyTabsToDrop') { fail = false; throw new Error('closed') }
+      return get(store, key)
+    }
+    await b.sync()
+    await b.sync()
+    expect((await loadAll(b.db)).tabs.map((t) => t.id).sort()).toEqual(['tab-home-a', 'tab-spare'])
+    expect(await getMeta(b.db, 'emptyTabsToDrop')).toBeUndefined()
+  })
+
   it('leaving right after joining forgets the tabs to discard', async () => {
     const a = await phone()
     await seed(a, 'tab-home-a', ['item-a01'])
@@ -897,6 +919,20 @@ describe('sync engine (two phones)', () => {
     await a.sync()
     expect(photos()).toEqual(['ph-item-a02'])
     expect(await getMeta(a.db, 'orphanSeen')).toEqual({})
+  })
+
+  it('offers again a photo the server lost while a local item still uses it', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const meta = await familyOf(a)
+    await a.sync()
+    const photos = () => [...server.families.get(meta.familyId).photos.keys()]
+    // Another phone swept it as an orphan while this one was bringing the item back.
+    await a.api.deletePhoto('ph-item-a01')
+    expect(photos()).toEqual([])
+    await a.sync()
+    expect(photos()).toEqual(['ph-item-a01'])
+    expect(a.engine.status).toMatchObject({ state: 'idle', errorCode: null })
   })
 
   it('single-flight: a call while running schedules exactly one more run', async () => {

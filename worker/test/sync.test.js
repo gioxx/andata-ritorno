@@ -317,6 +317,27 @@ describe('photos', () => {
     call(path, { method: 'PUT', headers: { authorization: `Bearer ${token}` }, body: data }, extra);
   const row = (f, pid) => env.DB.prepare('SELECT size, ready FROM photos WHERE family_id = ? AND pid = ?').bind(f.familyId, pid).first();
 
+  it('deletes a photo written while its family was purged', async () => {
+    const f = await newFamily();
+    const base = await total();
+    const pid = rid();
+    // The last device leaves while the object is being written.
+    const purging = {
+      PHOTOS: {
+        put: async (...a) => {
+          expect(await (await del(`/api/devices/${f.deviceId}`, f.token)).json()).toEqual({ purged: true });
+          return env.PHOTOS.put(...a);
+        },
+        get: (...a) => env.PHOTOS.get(...a),
+        delete: (...a) => env.PHOTOS.delete(...a),
+        list: (...a) => env.PHOTOS.list(...a),
+      },
+    };
+    expect((await putWith(`/api/photos/${pid}`, bytes(10), f.token, purging)).status).toBe(401);
+    expect(await env.PHOTOS.get(`${f.familyId}/${pid}`)).toBeNull();
+    expect(await total()).toBe(base);
+  });
+
   it('gives the reservation back when the R2 write fails (new photo and replacement)', async () => {
     const f = await newFamily();
     const base = await total();
