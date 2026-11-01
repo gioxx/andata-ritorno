@@ -18,7 +18,7 @@ export default defineConfig({
         navigateFallback: 'index.html',
         // The static policy page is its own document, not an app route.
         // /cdn-cgi/ is Cloudflare's (Access login callback): it must reach the edge, never the cached app.
-        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/admin\//, /^\/cdn-cgi\//, /^\/api\//],
+        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/admin(\/|$)/, /^\/cdn-cgi\//, /^\/api\//],
       },
     }),
   ],
