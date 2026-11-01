@@ -72,17 +72,18 @@ async function put(req, env, ctx, { pid }) {
   const key = objectKey(familyId, pid, token);
   const delta = '(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))';
   // The family must still exist: one purged while this body was arriving takes no new photos.
-  // It must also fit the family's photo count and its share of bytes.
+  // It must also fit the family's photo count and its share of bytes; a replacement that does not
+  // grow the family always fits, so a family above a lowered cap can still shrink.
   const fits = `(EXISTS (SELECT 1 FROM families WHERE id = ?2)
     AND (EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)
-    AND (SELECT COALESCE(SUM(size), 0) FROM photos WHERE family_id = ?2) + ${delta} <= ?6)`;
+    AND (${delta} <= 0 OR (SELECT COALESCE(SUM(size), 0) FROM photos WHERE family_id = ?2) + ${delta} <= ?6))`;
   const results = await env.DB.batch([
     env.DB.prepare('SELECT size, uploaded_at FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
     // Which limit refused it, if one did (same snapshot as the reservation below).
     env.DB.prepare(
       `SELECT EXISTS (SELECT 1 FROM families WHERE id = ?2) AS family,
          (EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)
-         AND (SELECT COALESCE(SUM(size), 0) FROM photos WHERE family_id = ?2) + ${delta} <= ?6 AS ok`,
+         AND (${delta} <= 0 OR (SELECT COALESCE(SUM(size), 0) FROM photos WHERE family_id = ?2) + ${delta} <= ?6) AS ok`,
     ).bind(size, familyId, pid, null, MAX_PHOTOS, MAX_FAMILY_PHOTO_BYTES),
     env.DB.prepare("INSERT OR IGNORE INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos"),
     // The device's daily budget comes first: the reservation below runs only if it was spent.

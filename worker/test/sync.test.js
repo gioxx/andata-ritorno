@@ -580,8 +580,13 @@ describe('photos', () => {
     const res = await put(`/api/photos/${rid()}`, bytes(10), f.token);
     expect(res.status).toBe(413);
     expect((await res.json()).error).toBe('limit-photos');
-    expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204);
-    await env.DB.prepare("UPDATE usage SET bytes = bytes - ? WHERE key = 'photo_bytes'").bind(300_000_000 - 5).run();
+    expect((await put('/api/photos/small-0-xxxx', bytes(5), f.token)).status).toBe(204);
+    // Above the cap (a family from before it was lowered): replacing without growing still works.
+    await env.DB.prepare('UPDATE photos SET size = size + 1000 WHERE family_id = ? AND pid = ?').bind(f.familyId, 'big-0-xxxx').run();
+    expect((await put('/api/photos/small-0-xxxx', bytes(5), f.token)).status).toBe(204);
+    expect((await put('/api/photos/small-0-xxxx', bytes(6), f.token)).status).toBe(413);
+    expect((await put(`/api/photos/${rid()}`, bytes(1), f.token)).status).toBe(413);
+    await env.DB.prepare("UPDATE usage SET bytes = (SELECT COALESCE(SUM(size), 0) FROM photos) WHERE key = 'photo_bytes'").run();
   });
 
   it('holds the photo cap under concurrent uploads', async () => {
