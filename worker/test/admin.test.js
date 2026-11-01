@@ -103,3 +103,47 @@ describe('POST /api/admin/registrations', () => {
     expect(await open()).toBe(true);
   });
 });
+
+describe('GET /api/admin/usage', () => {
+  const usage = async (extra = {}, graphql = null) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
+      if (url === 'https://api.cloudflare.com/client/v4/graphql' && graphql) return Response.json(graphql);
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const res = await worker.fetch(new Request('https://ar.test/api/admin/usage', { headers: { 'cf-access-jwt-assertion': await token() } }), { ...env, ...ON, ...extra }, {});
+    expect(res.status).toBe(200);
+    return res.json();
+  };
+
+  it('counts the emails sent and says when Cloudflare analytics are not configured', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare('INSERT INTO email_usage (day, n) VALUES (?, 3) ON CONFLICT(day) DO UPDATE SET n = 3').bind(today).run();
+    const out = await usage();
+    expect(out.emails.today).toBe(3);
+    expect(out.emails.month).toBeGreaterThanOrEqual(3);
+    expect(out.cloudflare).toEqual({ configured: false });
+    expect(out.limits.d1RowsWrittenDay).toBe(100_000);
+  });
+
+  it('sums R2 operations into class A and B and passes D1 and Worker days through', async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const out = await usage({ CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, {
+      data: { viewer: { accounts: [{
+        d1: [{ dimensions: { date: day }, sum: { readQueries: 5, writeQueries: 2, rowsRead: 900, rowsWritten: 40 } }],
+        worker: [{ dimensions: { date: day }, sum: { requests: 120, errors: 1, subrequests: 3 } }],
+        r2ops: [{ dimensions: { actionType: 'PutObject' }, sum: { requests: 7 } }, { dimensions: { actionType: 'GetObject' }, sum: { requests: 30 } }],
+        r2size: [{ max: { payloadSize: 1000, metadataSize: 24, objectCount: 9 } }],
+      }] } },
+    });
+    expect(out.cloudflare.d1[0]).toMatchObject({ day, rowsRead: 900, rowsWritten: 40, queries: 7 });
+    expect(out.cloudflare.worker[0]).toMatchObject({ requests: 120, errors: 1 });
+    expect(out.cloudflare.r2).toEqual({ classAMonth: 7, classBMonth: 30, bytes: 1024, objects: 9 });
+  });
+
+  it('reports a GraphQL error instead of failing', async () => {
+    const out = await usage({ CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { errors: [{ message: 'not authorized' }] });
+    expect(out.cloudflare).toEqual({ configured: true, error: 'not authorized' });
+  });
+});

@@ -29,6 +29,11 @@ MAX_TOTAL_PHOTO_BYTES = "9000000000"
 # Owner dashboard (/admin): Cloudflare Access application on app.ar.gioxx.org. Not secrets.
 ACCESS_TEAM_DOMAIN = "cerbero.cloudflareaccess.com"
 ACCESS_AUD = "b24786f2ae9c9d173e497f74d19abc40edda78dd7abc25525a2798e9d46cf2af"
+# Resource usage on the dashboard (Cloudflare GraphQL Analytics; the token is the CF_ANALYTICS_TOKEN secret).
+CF_ACCOUNT_ID = "d332b3385566decf1a29b4b9177a730a"
+D1_DATABASE_ID = "16d422ac-e415-4c87-98de-c815c439cbb6"
+WORKER_NAME = "andata-ritorno-app"
+R2_BUCKET_NAME = "andata-ritorno-photos"
 
 [[d1_databases]]
 binding = "DB"
