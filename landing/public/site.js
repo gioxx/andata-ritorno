@@ -160,3 +160,28 @@ if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
     })
   }
 }
+
+// "A/R in numeri": aggregate, rounded totals from the app's server (issue #4). The section stays
+// hidden when the numbers cannot be read or are all too small to show.
+const numbers = document.querySelector('[data-numbers]')
+if (numbers) {
+  const it = document.documentElement.lang === 'it'
+  const fmt = new Intl.NumberFormat(it ? 'it-IT' : 'en-GB')
+  fetch('https://app.ar.gioxx.org/api/public/stats')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((s) => {
+      let shown = 0
+      for (const li of numbers.querySelectorAll('[data-stat]')) {
+        const v = s[li.dataset.stat]
+        if (typeof v !== 'number') continue
+        li.querySelector('b').textContent = `${fmt.format(v)}+`
+        li.hidden = false
+        shown++
+      }
+      if (!shown) return
+      const date = new Date(`${s.asOf}T12:00:00Z`).toLocaleDateString(it ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+      numbers.querySelector('[data-stat-date]').textContent = it ? `Aggiornato al ${date}.` : `As of ${date}.`
+      numbers.hidden = false
+    })
+    .catch(() => {})
+}

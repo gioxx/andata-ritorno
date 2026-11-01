@@ -4,9 +4,10 @@ import { licenceRoutes } from './licence.js';
 import { syncRoutes } from './sync.js';
 import { photoRoutes } from './photos.js';
 import { adminRoutes } from './admin.js';
+import { publicRoutes } from './public.js';
 
 // Later tasks add routes here as 'METHOD /api/path/:param': async (req, env, ctx, params) => Response.
-export const routes = { ...licenceRoutes, ...familyRoutes, ...syncRoutes, ...photoRoutes, ...adminRoutes };
+export const routes = { ...licenceRoutes, ...familyRoutes, ...syncRoutes, ...photoRoutes, ...adminRoutes, ...publicRoutes };
 
 // Routes a device calls with its token: limited per device (requireApiDevice), never per IP. A
 // first sync sends one request per photo, and a whole family may sit behind one home IP.
@@ -19,8 +20,9 @@ const deviceRoutes = new Set([
   licenceRoutes['POST /api/slot'],
 ]);
 
-// The landing site (SITE_ORIGIN) opens Checkout in a modal: it may call these two routes cross-origin.
-const SITE_ROUTES = new Set(['/api/checkout', '/api/unlock/session']);
+// The landing site (SITE_ORIGIN) opens Checkout in a modal and shows the public numbers: it may call
+// these routes cross-origin.
+const SITE_ROUTES = new Set(['/api/checkout', '/api/unlock/session', '/api/public/stats']);
 
 function withCors(res, origin) {
   const out = new Response(res.body, res);
