@@ -26,12 +26,25 @@ const SEEN_EVERY_MS = 10 * 60 * 1000;
  * every 10 minutes: a sync makes many calls, and D1's free plan caps writes per day).
  * @returns {Promise<{deviceId: string, familyId: string}>}
  */
+// IPs that ran out of failed-auth attempts, until when (ms). Kept in the isolate, so a blocked IP
+// is turned away before any database query; the rate limiter stays the source of truth.
+const blockedIps = new Map();
+const BLOCK_MS = 60 * 1000;
+const MAX_BLOCKED = 10_000;
+
 export async function requireDevice(env, req) {
   // Device routes skip the per-IP limit (a family's phones may share one IP). Failed attempts do
   // not: an IP that keeps sending wrong tokens gets the tight bucket, so tokens cannot be guessed
   // and the database is not used as a punching bag.
+  const ip = clientIp(req);
+  const now = Date.now();
+  if ((blockedIps.get(ip) ?? 0) > now) throw new HttpError(429, 'rate-limited');
   const refuse = async () => {
-    if (await limited(env.RL_STRICT, `auth:${clientIp(req)}`)) throw new HttpError(429, 'rate-limited');
+    if (await limited(env.RL_STRICT, `auth:${ip}`)) {
+      if (blockedIps.size >= MAX_BLOCKED) blockedIps.delete(blockedIps.keys().next().value);
+      blockedIps.set(ip, now + BLOCK_MS);
+      throw new HttpError(429, 'rate-limited');
+    }
     throw new HttpError(401, 'unauthorized');
   };
   const m = /^Bearer ([A-Za-z0-9_-]{8,200})$/.exec(req.headers.get('authorization') || '');
@@ -40,7 +53,6 @@ export async function requireDevice(env, req) {
     .bind(await sha256Hex(m[1]))
     .first();
   if (!row) return refuse();
-  const now = Date.now();
   if (!(now - Date.parse(row.last_seen_at) < SEEN_EVERY_MS)) {
     await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?')
       .bind(new Date(now).toISOString(), row.id)
