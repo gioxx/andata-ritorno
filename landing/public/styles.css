@@ -222,7 +222,7 @@ section > .wrap > h2 + .lead { margin-bottom: var(--space-lg); }
 .footer-links a { display: inline-flex; min-height: 44px; align-items: center; color: var(--color-muted); text-decoration: none; font-weight: 600; }
 .footer-links a:hover { color: var(--color-ink); }
 .site-footer small { display: block; font-size: 0.75rem; line-height: 1.5; color: var(--color-muted); }
-@media (min-width: 900px) { .footer-grid { grid-template-columns: 1fr 2fr; column-gap: 48px; } .site-footer small { grid-column: 2; } }
+@media (min-width: 900px) { .footer-grid { grid-template-columns: 1fr 2fr; column-gap: 48px; align-content: start; } .footer-brand { grid-row: 1 / span 4; } .site-footer small { grid-column: 2; } }
 
 /* ---- Platform logos, privacy icon ---- */
 .os-h { display: flex; align-items: center; gap: 10px; }
