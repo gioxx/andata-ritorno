@@ -427,8 +427,8 @@ function renderUsage(u) {
   const rs = u.resend || {}
   const fromResend = !rs.error && (rs.day != null || rs.month != null)
   const mine = (v) => el('span', { class: 'state', text: `di cui inviate da A/R: ${n(v)}` })
-  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, L.emailsDay, n, 'oggi', 'resend')
-  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, L.emailsMonth, n, 'nel mese', 'resend')
+  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, rs.dayLimit ?? L.emailsDay, n, 'oggi', 'resend')
+  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, rs.monthLimit ?? L.emailsMonth, n, 'nel mese', 'resend')
   g1.append(el('br'), mine(u.emails.today)); g2.append(el('br'), mine(u.emails.month))
   grid.append(g1, g2)
   frag.append(grid)
