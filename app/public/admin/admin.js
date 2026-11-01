@@ -15,6 +15,20 @@ const SOURCE = { stripe: 'Stripe', manual: 'Manuale' }
 
 const state = { days: 30, kind: 'all', tables: false, data: null, usage: null }
 
+// Provider marks (Simple Icons, CC0) so each box says at a glance whose numbers it shows.
+const ICONS = {
+  cloudflare: { color: '#f38020', d: 'M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727' },
+  resend: { color: 'currentColor', d: 'M2.023 0v24h5.553v-8.434h2.998L15.326 24h6.65l-5.372-9.258a7.652 7.652 0 0 0 3.316-3.016c.709-1.21 1.062-2.57 1.062-4.08 0-1.462-.353-2.767-1.062-3.91-.709-1.165-1.692-2.079-2.95-2.742C15.737.331 14.355 0 12.823 0Zm5.553 4.87h4.219c.731 0 1.349.125 1.851.376.526.252.925.618 1.2 1.098.274.457.412.994.412 1.611S15.132 9.12 14.88 9.6c-.229.48-.572.856-1.03 1.13-.434.252-.948.38-1.542.38H7.576Z' },
+  stripe: { color: '#635bff', d: 'M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z' },
+}
+function providerIcon(name) {
+  const i = ICONS[name]
+  if (!i) return null
+  const s = svg('svg', { class: 'pv', viewBox: '0 0 24 24', 'aria-hidden': 'true' })
+  s.append(svg('path', { d: i.d, fill: i.color }))
+  return s
+}
+
 // ---------- small DOM helpers (labels always through textContent) ----------
 function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag)
@@ -222,7 +236,9 @@ function table(head, rows) {
 }
 
 function card(title, sub, cls, ...body) {
-  return el('section', { class: `card ${cls}` }, el('h2', { text: title }), sub ? el('p', { class: 'sub', text: sub }) : null, ...body)
+  const [, provider] = /\bpv-(\w+)/.exec(cls) || []
+  const h = el('h2', {}, providerIcon(provider), document.createTextNode(title))
+  return el('section', { class: `card ${cls}` }, h, sub ? el('p', { class: 'sub', text: sub }) : null, ...body)
 }
 
 // ---------- KPIs ----------
@@ -321,7 +337,7 @@ function render() {
     { label: 'Famiglia', color: color.s1, values: months.map((m) => m.family) },
     { label: 'Posto in più', color: color.s3, values: months.map((m) => m.slot) },
   ]
-  cards.append(card('Vendite Stripe per mese', 'Codici venduti; il totale in euro è una stima a prezzo di listino', 'w6',
+  cards.append(card('Vendite Stripe per mese', 'Codici venduti; il totale in euro è una stima a prezzo di listino', 'w6 pv-stripe',
     months.length ? legend(salesS) : null,
     months.length ? barChart(months.map((m) => m.month), salesS, { by: 'month', w: WIDTH.w6 }) : el('p', { class: 'empty', text: 'Nessuna vendita' }),
     table(['Mese', 'Famiglia', 'Posto in più', 'Lordo stimato'], months.map((m) => [longLabel(m.month, 'month'), n(m.family), n(m.slot), eur.format(m.eur)]))))
@@ -376,14 +392,14 @@ async function setRegistrations(open) {
 }
 
 // ---------- resources (independent of the filters: always today, this month, last 30 days) ----------
-function gauge(name, value, limit, fmt = n, per = 'oggi') {
+function gauge(name, value, limit, fmt = n, per = 'oggi', provider = null) {
   const pct = limit ? Math.min(100, (100 * value) / limit) : 0
   const level = pct >= 90 ? 'hot' : pct >= 70 ? 'warn' : ''
   const m = el('div', { class: `meter ${level}`, role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': String(limit), 'aria-valuenow': String(value), 'aria-label': name })
   const f = el('i'); f.style.width = `${pct}%`; m.append(f)
   const stateText = level === 'hot' ? 'Vicino al limite' : level === 'warn' ? 'Da tenere d’occhio' : 'Nella norma'
   return el('div', { class: 'res' },
-    el('span', { class: 'name', text: name }),
+    el('span', { class: 'name' }, providerIcon(provider), document.createTextNode(name)),
     el('b', { text: fmt(value) }), el('span', { class: 'of', text: ` su ${fmt(limit)} ${per} · ${pct.toFixed(pct < 1 ? 2 : 0)}%` }),
     m, el('span', { class: `state ${level}`, text: stateText }))
 }
@@ -399,20 +415,20 @@ function renderUsage(u) {
   const wToday = cf.worker?.find((r) => r.day === today) ?? { requests: 0, errors: 0 }
   if (cf.configured && !cf.error) {
     grid.append(
-      gauge('Richieste al Worker', wToday.requests, L.workerRequestsDay),
-      gauge('D1 · righe scritte', d1Today.rowsWritten, L.d1RowsWrittenDay),
-      gauge('D1 · righe lette', d1Today.rowsRead, L.d1RowsReadDay),
-      gauge('R2 · operazioni classe A', cf.r2.classAMonth, L.r2ClassAMonth, n, 'nel mese'),
-      gauge('R2 · operazioni classe B', cf.r2.classBMonth, L.r2ClassBMonth, n, 'nel mese'),
-      gauge('R2 · spazio occupato', cf.r2.bytes, L.r2StorageBytes, gb, ''),
+      gauge('Richieste al Worker', wToday.requests, L.workerRequestsDay, n, 'oggi', 'cloudflare'),
+      gauge('D1 · righe scritte', d1Today.rowsWritten, L.d1RowsWrittenDay, n, 'oggi', 'cloudflare'),
+      gauge('D1 · righe lette', d1Today.rowsRead, L.d1RowsReadDay, n, 'oggi', 'cloudflare'),
+      gauge('R2 · operazioni classe A', cf.r2.classAMonth, L.r2ClassAMonth, n, 'nel mese', 'cloudflare'),
+      gauge('R2 · operazioni classe B', cf.r2.classBMonth, L.r2ClassBMonth, n, 'nel mese', 'cloudflare'),
+      gauge('R2 · spazio occupato', cf.r2.bytes, L.r2StorageBytes, gb, '', 'cloudflare'),
     )
   }
   // Resend: the whole account (other projects included) from Resend itself; A/R's own share below.
   const rs = u.resend || {}
   const fromResend = !rs.error && (rs.day != null || rs.month != null)
   const mine = (v) => el('span', { class: 'state', text: `di cui inviate da A/R: ${n(v)}` })
-  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, L.emailsDay)
-  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, L.emailsMonth, n, 'nel mese')
+  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, L.emailsDay, n, 'oggi', 'resend')
+  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, L.emailsMonth, n, 'nel mese', 'resend')
   g1.append(el('br'), mine(u.emails.today)); g2.append(el('br'), mine(u.emails.month))
   grid.append(g1, g2)
   frag.append(grid)
@@ -429,9 +445,9 @@ function renderUsage(u) {
     const wr = [{ label: 'Righe scritte', color: color.s1, values: pick(cf.d1, 'rowsWritten') }]
     const rq = [{ label: 'Richieste', color: color.s2, values: pick(cf.worker, 'requests') }]
     cards.append(
-      card('D1 · righe scritte al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.d1RowsWrittenDay)} al giorno`, 'w6', barChart(days, wr, { w: WIDTH.w6 }),
+      card('D1 · righe scritte al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.d1RowsWrittenDay)} al giorno`, 'w6 pv-cloudflare', barChart(days, wr, { w: WIDTH.w6 }),
         table(['Giorno', 'Righe scritte', 'Righe lette'], days.map((d, i) => [longLabel(d, 'day'), n(wr[0].values[i]), n(pick(cf.d1, 'rowsRead')[i])]))),
-      card('Worker · richieste al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.workerRequestsDay)} al giorno`, 'w6', barChart(days, rq, { w: WIDTH.w6 }),
+      card('Worker · richieste al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.workerRequestsDay)} al giorno`, 'w6 pv-cloudflare', barChart(days, rq, { w: WIDTH.w6 }),
         table(['Giorno', 'Richieste', 'Errori'], days.map((d, i) => [longLabel(d, 'day'), n(rq[0].values[i]), n(pick(cf.worker, 'errors')[i])]))),
     )
     frag.append(cards)
