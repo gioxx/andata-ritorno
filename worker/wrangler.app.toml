@@ -26,7 +26,7 @@ MAX_TOTAL_PHOTO_BYTES = "9000000000"
 binding = "DB"
 database_name = "andata-ritorno"
 # Placeholder: create the database (`wrangler d1 create andata-ritorno`) and paste its id here.
-database_id = "REPLACE_WITH_D1_ID"
+database_id = "16d422ac-e415-4c87-98de-c815c439cbb6"
 
 [[r2_buckets]]
 binding = "PHOTOS"
