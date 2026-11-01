@@ -129,6 +129,8 @@ if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
     if (!section) throw new Error('section')
     // "Back to A/R" belongs to the app's own page; here the dialog has its close button.
     for (const el of section.querySelectorAll('script, style, iframe, [style], a.back')) el.remove()
+    // Same for the closing "see also the privacy policy" line: the site links both pages already.
+    for (const p of section.querySelectorAll('p.meta')) if (p.querySelector('a[href*="privacy"], a[href*="terms"]')) p.remove()
     // Links inside the text: same-page anchors stay, everything else opens in a new tab.
     for (const a of section.querySelectorAll('a[href]')) {
       const href = a.getAttribute('href')
