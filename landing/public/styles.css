@@ -324,3 +324,7 @@ html { scroll-behavior: smooth; } /* fallback when site.js does not run */
 .doc-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-lg); border-bottom: 1px solid var(--color-line); }
 .doc-dialog-out { font-size: var(--text-sm); }
 .doc-dialog iframe { flex: 1; width: 100%; border: 0; background: var(--color-paper); }
+
+/* An open dialog keeps the page behind it still: scrolling stays inside the dialog. */
+html:has(dialog[open]) { overflow: hidden; }
+.checkout-dialog, .doc-dialog { overscroll-behavior: contain; }
