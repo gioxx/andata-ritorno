@@ -178,6 +178,7 @@ export default {
   'menu.app': 'App',
   'menu.installApp': 'Installa app',
   'menu.uninstallHow': 'Come disinstallare',
+  'menu.guide': 'Guida all’uso',
   'menu.privacy': 'Privacy',
   'privacy.link': 'Informativa sulla privacy',
   'terms.link': 'Termini di servizio e di acquisto',

@@ -177,6 +177,7 @@ export default {
   'menu.app': 'App',
   'menu.installApp': 'Install app',
   'menu.uninstallHow': 'How to uninstall',
+  'menu.guide': 'User guide',
   'menu.privacy': 'Privacy',
   'privacy.link': 'Privacy policy',
   'terms.link': 'Terms of service and purchase',

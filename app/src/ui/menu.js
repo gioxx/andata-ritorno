@@ -9,7 +9,7 @@ import { reportError, openModal, labelDialog } from './dialogs.js'
 import { keepFocus } from './focus.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
-import { t, getLangChoice, setLang, onLangChange } from '../i18n.js'
+import { t, getLang, getLangChoice, setLang, onLangChange } from '../i18n.js'
 import { currentPlatform, isStandalone } from '../platform.js'
 import { canPromptInstall, promptInstall } from '../install.js'
 import { openInstallSteps, openUninstallSteps } from './appDialogs.js'
@@ -19,7 +19,7 @@ import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
 import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
-import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon } from './icons.js'
+import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon } from './icons.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
 let dlg = null
@@ -106,6 +106,7 @@ const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="clos
     <h4>${t('menu.app')}</h4>
     ${isStandalone() ? '' : menuItem('install', smartphoneIcon, t('menu.installApp'))}
     ${menuItem('uninstall', uninstallIcon, t('menu.uninstallHow'))}
+    ${menuItem('guide', guideIcon, t('menu.guide'))}
     ${menuItem('privacy', shieldIcon, t('menu.privacy'))}
     ${menuItem('wipe', eraseIcon, t('menu.wipe'), '', ' danger')}
     ${menuFooter()}`
@@ -132,7 +133,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => window.open(getLang() === 'it' ? 'https://ar.gioxx.org/guida/' : 'https://ar.gioxx.org/en/guide/', '_blank', 'noopener'), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
       invite: openInvite, slot: () => openCodeDialog({ buyLink: payments ? import.meta.env.VITE_STRIPE_LINK_SLOT : null }), kit: () => openKit(), leave: openLeave }[item.dataset.menu]
