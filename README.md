@@ -3,7 +3,7 @@
 A small installable web app to keep track of kids' clothes between **home** and **school** (nursery, kindergarten…).
 Take a photo of each item once; from then on every item is either *a scuola* or *a casa* and moves with a tap — no more copying photos between notes to remember what is where.
 
-**Use it:** <https://ar.gioxx.org> — open it on your phone and add it to the home screen. The UI is available in Italian and English (automatic, with a switch in the menu).
+**Use it:** <https://app.ar.gioxx.org> (product page and guide: <https://ar.gioxx.org>) — open it on your phone and add it to the home screen. The UI is available in Italian and English (automatic, with a switch in the menu).
 
 ## Features
 
@@ -20,18 +20,18 @@ Take a photo of each item once; from then on every item is either *a scuola* or 
 - **Works offline** and installs like an app (PWA).
 - Light, dark or automatic theme.
 - **App menu**: an *Install app* button (native prompt where the browser offers it, steps otherwise), *How to uninstall* instructions, and *Delete all data* (two steps, with an optional backup first and a typed confirmation).
-- **Family sharing** (optional, paid): keep the same wardrobe in sync on up to four phones, end-to-end encrypted (see Privacy). Without it the app never talks to a server.
+- **Family sharing** (optional, paid): keep the same wardrobe in sync on three phones (more with extra seats), end-to-end encrypted (see Privacy). Without it the app never talks to a server.
 - Security headers on the served app.
 
 ## Installing on iPhone
 
-Open <https://ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**. Install it: if you only use it in a Safari tab, Safari may delete the site's data after about 7 days without use. Export backups regularly anyway.
+Open <https://app.ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**. Install it: if you only use it in a Safari tab, Safari may delete the site's data after about 7 days without use. Export backups regularly anyway.
 
 ## Privacy
 
 **Free use:** everything stays on your device, in the browser's storage (IndexedDB). There is no account and nothing is sent to a server: the site only serves the app's static files. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
 
-**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://ar.gioxx.org/privacy.html> and linked from the app menu.
+**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://app.ar.gioxx.org/privacy.html> and linked from the app menu.
 
 ## Development
 
@@ -117,12 +117,12 @@ The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the AP
 
 **Andata e Ritorno (A/R)** è una piccola app installabile per tenere traccia dei vestiti dei bambini tra **casa** e **scuola**: fotografi ogni capo una volta, poi con un tocco lo sposti *a scuola* o *a casa*. Novità della 2.2: rotazione foto, categorie con filtri, italiano/inglese, accessibilità, supporto iPhone, backup verificati.
 
-**Usala:** <https://ar.gioxx.org>
+**Usala:** <https://app.ar.gioxx.org> (presentazione e guida: <https://ar.gioxx.org>)
 
 - **Android**: apri il sito in Chrome e scegli "Installa app" / "Aggiungi a schermata Home".
 - **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
 - **Menu App**: *Installa app*, *Come disinstallare* ed *Elimina tutti i dati* (con backup facoltativo e conferma scritta).
-- **Privacy**: senza condivisione in famiglia tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server. Con la condivisione (facoltativa, a pagamento) capi e foto sono cifrati sul telefono e il server non può leggerli. Informativa completa: <https://ar.gioxx.org/privacy.html>.
+- **Privacy**: senza condivisione in famiglia tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server. Con la condivisione (facoltativa, a pagamento) capi e foto sono cifrati sul telefono e il server non può leggerli. Informativa completa: <https://app.ar.gioxx.org/privacy.html>.
 - **Backup**: esporta un file `.zip` con le foto; ogni backup viene riletto e controllato prima del salvataggio. I backup sono una tua responsabilità.
 
 ## License
