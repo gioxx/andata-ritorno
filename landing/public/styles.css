@@ -275,7 +275,7 @@ html { scroll-behavior: smooth; } /* fallback when site.js does not run */
 
 /* ---- Privacy band: high contrast, right after the hero ---- */
 .privacy-band { padding: var(--space-lg) 0; }
-.privacy-band > .wrap { background: var(--color-band); color: var(--color-band-ink); border: 1px solid var(--color-band-line); border-radius: var(--radius-section); padding: var(--space-xl) var(--space-lg); }
+.privacy-band > .wrap { background: var(--color-band); color: var(--color-band-ink); border-radius: var(--radius-section); padding: var(--space-xl) var(--space-lg); }
 @media (min-width: 900px) { .privacy-band > .wrap { padding: var(--space-2xl) var(--space-xl); } }
 .privacy-band .kicker { color: var(--color-band-accent); }
 .privacy-band .lead { color: inherit; opacity: 0.8; margin: var(--space-sm) 0 0; }
