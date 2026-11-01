@@ -25,14 +25,14 @@ export async function sendEmail(env, { to, subject, text }) {
 export function codeEmail(code, kind) {
   const slot = kind === 'slot';
   return {
-    subject: slot ? 'A/R: il tuo codice posto extra / your extra slot code' : 'A/R: il tuo codice famiglia / your family code',
+    subject: slot ? 'A/R: il tuo codice per un posto in più / your extra seat code' : 'A/R: il tuo codice famiglia / your family code',
     text: [
       'Grazie per l\'acquisto!',
       '',
-      slot ? `Il tuo codice posto extra: ${code}` : `Il tuo codice famiglia: ${code}`,
+      slot ? `Il tuo codice per un posto in più: ${code}` : `Il tuo codice famiglia: ${code}`,
       '',
       slot
-        ? 'Apri A/R su un dispositivo già in famiglia, vai in Menu → Famiglia e incolla il codice.'
+        ? 'Apri A/R su un telefono già in famiglia, vai in Menu → Famiglia → "Aggiungi un posto" e incolla lì il codice.'
         : 'Apri A/R, vai in Menu → Famiglia → "Ho già un codice" e incolla il codice.',
       'Il codice si può usare una sola volta.',
       '',
@@ -40,10 +40,10 @@ export function codeEmail(code, kind) {
       '',
       'Thank you for your purchase!',
       '',
-      slot ? `Your extra slot code: ${code}` : `Your family code: ${code}`,
+      slot ? `Your extra seat code: ${code}` : `Your family code: ${code}`,
       '',
       slot
-        ? 'Open A/R on a device already in the family, go to Menu → Family and paste the code.'
+        ? 'Open A/R on a phone already in the family, go to Menu → Family → "Add a seat" and paste the code there.'
         : 'Open A/R, go to Menu → Family → "I already have a code" and paste the code.',
       'The code can be used only once.',
     ].join('\n'),

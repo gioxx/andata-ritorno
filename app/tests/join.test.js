@@ -271,6 +271,21 @@ describe('a pending redeem or restart finished in the background', () => {
     expect(server.requests.filter((r) => r.path === '/api/redeem')).toHaveLength(1) // the resume only: the typed code is never sent
   })
 
+  it('a seat code once accepted leaves only the outcome and a Close button', async () => {
+    const p = await phone()
+    initFamilyUi({ ...p, onEntered: vi.fn(), onLeft: vi.fn(), onExport: vi.fn() })
+    server.addCode(CODE)
+    await createFamily(p.db, p.api, { code: CODE, familyName: 'Famiglia Rossi', deviceName: 'Telefono 1' })
+    server.addCode('AR-SLOT-CODE-0001', 'slot')
+    await openCodeDialog()
+    dlg().querySelector('#famCode').value = 'AR-SLOT-CODE-0001'
+    dlg().querySelector('[data-go]').click()
+    await until(() => dlg()?.querySelector('[role="status"]'))
+    expect(dlg().textContent).toContain('fino a 4 telefoni')
+    expect(dlg().querySelector('input')).toBeNull()
+    expect([...dlg().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Chiudi'])
+  })
+
   it('the licence restart dialog then treats Go as done, not as a second restart', async () => {
     const owner = await phone()
     server.addCode(CODE)

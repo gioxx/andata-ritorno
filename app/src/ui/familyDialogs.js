@@ -134,7 +134,11 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
     if (inFamily) {
       if (!code) return
       const { deviceLimit } = await ctx.api.slot(code)
-      d.querySelector('.err').textContent = t('family.slotCode.done', { n: deviceLimit })
+      // Nothing left to do here: the form gives way to the outcome and a way out.
+      d.querySelector('form').innerHTML = `<h3>${t('family.slot')}</h3>
+        <p class="plain" role="status">${t('family.slotCode.done', { n: deviceLimit })}</p>
+        <button value="" class="primary">${t('common.close')}</button>`
+      d.querySelector('button').focus()
       syncNow('menu') // refreshes the devices count
       return
     }

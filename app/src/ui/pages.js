@@ -43,7 +43,7 @@ export async function renderUnlockPage(root, { api, sessionId, inSafari }) {
     body.innerHTML = `<p class="unlockCode" id="unlockCode">${esc(res.code)}</p>
       <button type="button" class="primary" data-copy>${t('page.unlock.copy')}</button>
       <p class="pageNote" role="status"></p>
-      <p>${t('page.unlock.body')}</p>${inSafari ? `<p>${t('page.unlock.ios')}</p>` : ''}`
+      <p>${t(res.kind === 'slot' ? 'page.unlock.bodySlot' : 'page.unlock.body')}</p>${inSafari ? `<p>${t('page.unlock.ios')}</p>` : ''}`
     body.querySelector('[data-copy]').addEventListener('click', () => copyInto(body.querySelector('.pageNote'), res.code, t('page.copied')))
   }
   body.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) draw() })

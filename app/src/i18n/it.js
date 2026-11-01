@@ -386,6 +386,7 @@ export default {
   'wipe.leaveFailed': 'Dati eliminati. Non sono riuscito a togliere questo telefono dalla famiglia (sei offline?): rimuovilo da un altro telefono in Menu → Famiglia → Dispositivi.',
   'page.unlock.title': 'Il tuo codice',
   'page.unlock.body': 'Apri A/R e inseriscilo in Menu → Famiglia → Ho già un codice. Te l\'abbiamo mandato anche per email.',
+  'page.unlock.bodySlot': 'Apri A/R su un telefono già in famiglia, vai in Menu → Famiglia → Aggiungi un posto e incollalo lì. Te l\'abbiamo mandato anche per email.',
   'page.unlock.ios': 'Se hai installato A/R, aprila dalla schermata Home: questa pagina è in Safari.',
   'page.unlock.copy': 'Copia',
   'page.openApp': 'Apri A/R',

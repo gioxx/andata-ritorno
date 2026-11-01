@@ -385,6 +385,7 @@ export default {
   'wipe.leaveFailed': 'Data deleted. This phone could not be removed from the family (offline?): remove it from another phone in Menu → Family → Devices.',
   'page.unlock.title': 'Your code',
   'page.unlock.body': 'Open A/R and enter it in Menu → Family → I already have a code. We also sent it to you by email.',
+  'page.unlock.bodySlot': 'Open A/R on a phone already in the family, go to Menu → Family → Add a seat and paste it there. We also sent it to you by email.',
   'page.unlock.ios': 'If you installed A/R, open it from the Home screen: this page is in Safari.',
   'page.unlock.copy': 'Copy',
   'page.openApp': 'Open A/R',
