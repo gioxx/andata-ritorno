@@ -24,7 +24,7 @@ describe('public stats', () => {
       stmts.push(env.DB.prepare("INSERT INTO families (id, licence_id, name_enc, recovery_hash, seq, created_at) VALUES (?, 'l', 'x', 'h', 0, ?)").bind(`pub-fam-${i}-xxxx`, now));
     }
     await env.DB.batch(stmts);
-    await caches.default.delete(new Request('https://ar.test/api/public/stats'));
+    await caches.default.delete(new Request('https://ar.test/api/public/stats?v=2'));
     const res = await worker.fetch(new Request('https://ar.test/api/public/stats', { headers: { origin: 'https://site.test' } }), { ...env, SITE_ORIGIN: 'https://site.test' }, {});
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toMatch(/public, max-age=\d+/);
