@@ -3,9 +3,10 @@ import { familyRoutes } from './family.js';
 import { licenceRoutes } from './licence.js';
 import { syncRoutes } from './sync.js';
 import { photoRoutes } from './photos.js';
+import { adminRoutes } from './admin.js';
 
 // Later tasks add routes here as 'METHOD /api/path/:param': async (req, env, ctx, params) => Response.
-export const routes = { ...licenceRoutes, ...familyRoutes, ...syncRoutes, ...photoRoutes };
+export const routes = { ...licenceRoutes, ...familyRoutes, ...syncRoutes, ...photoRoutes, ...adminRoutes };
 
 // Routes a device calls with its token: limited per device (requireApiDevice), never per IP. A
 // first sync sends one request per photo, and a whole family may sit behind one home IP.
