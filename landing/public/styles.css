@@ -247,7 +247,7 @@ section > .wrap > h2 { margin-bottom: var(--space-lg); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 /* ---- Motion: smooth anchors, sections that fade in, back to top ---- */
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; } /* fallback when site.js does not run */
 @media (prefers-reduced-motion: no-preference) {
   .reveal { opacity: 0; transform: translateY(24px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
   .reveal.is-visible { opacity: 1; transform: none; }

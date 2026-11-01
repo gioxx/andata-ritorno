@@ -26,7 +26,7 @@ if (toTop) {
   addEventListener('scroll', toggle, { passive: true })
   toggle()
   toTop.addEventListener('click', () => {
-    scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' })
+    glide(0)
     // The button hides at the top: hand focus to the first link in the header.
     document.querySelector('.brand')?.focus({ preventScroll: true })
   })
@@ -54,3 +54,33 @@ if (!calm && 'animate' in Element.prototype) {
     })
   }
 }
+
+// Smooth jumps to the page's own sections. Done here rather than with CSS scroll-behavior, which
+// some browsers turn off on their own (Firefox's smooth-scrolling setting, system motion settings).
+const header = document.querySelector('.site-header')
+const ease = (t) => 1 - Math.pow(1 - t, 3)
+function glide(y) {
+  const from = scrollY, dist = y - from, start = performance.now()
+  const ms = Math.min(900, 300 + Math.abs(dist) / 4)
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / ms)
+    scrollTo({ top: from + dist * ease(t), behavior: 'instant' })
+    if (t < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href*="#"]')
+  if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+  const url = new URL(a.href)
+  if (url.origin !== location.origin || url.pathname !== location.pathname || !url.hash) return
+  const target = document.getElementById(decodeURIComponent(url.hash.slice(1)))
+  if (!target) return
+  e.preventDefault()
+  const y = target.getBoundingClientRect().top + scrollY - (header?.offsetHeight ?? 0) - 16
+  glide(Math.max(0, y))
+  history.pushState(null, '', url.hash)
+  // Keyboard and screen-reader users land on the section too.
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
+  target.focus({ preventScroll: true })
+})
