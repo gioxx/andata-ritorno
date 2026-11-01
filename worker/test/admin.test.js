@@ -106,11 +106,12 @@ describe('POST /api/admin/registrations', () => {
 });
 
 describe('GET /api/admin/usage', () => {
-  const usage = async (extra = {}, graphql = null) => {
+  const usage = async (extra = { RESEND_API_KEY: 're_test' }, graphql = null) => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.url;
       if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
       if (url === 'https://api.cloudflare.com/client/v4/graphql' && graphql) return Response.json(graphql);
+      if (url.startsWith('https://api.resend.com/emails')) return Response.json({ data: [] }, { headers: { 'x-resend-daily-quota': '12', 'x-resend-monthly-quota': '345' } });
       throw new Error(`unexpected fetch ${url}`);
     });
     const res = await worker.fetch(new Request('https://ar.test/api/admin/usage', { headers: { 'cf-access-jwt-assertion': await token() } }), { ...env, ...ON, ...extra }, {});
@@ -125,12 +126,13 @@ describe('GET /api/admin/usage', () => {
     expect(out.emails.today).toBe(3);
     expect(out.emails.month).toBeGreaterThanOrEqual(3);
     expect(out.cloudflare).toEqual({ configured: false });
+    expect(out.resend).toEqual({ day: 12, month: 345 });
     expect(out.limits.d1RowsWrittenDay).toBe(100_000);
   });
 
   it('sums R2 operations into class A and B and passes D1 and Worker days through', async () => {
     const day = new Date().toISOString().slice(0, 10);
-    const out = await usage({ CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, {
+    const out = await usage({ RESEND_API_KEY: 're_test', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, {
       data: { viewer: { accounts: [{
         d1: [{ dimensions: { date: day }, sum: { readQueries: 5, writeQueries: 2, rowsRead: 900, rowsWritten: 40 } }],
         worker: [{ dimensions: { date: day }, sum: { requests: 120, errors: 1, subrequests: 3 } }],
@@ -148,7 +150,7 @@ describe('GET /api/admin/usage', () => {
   });
 
   it('reports a GraphQL error instead of failing', async () => {
-    const out = await usage({ CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { errors: [{ message: 'not authorized' }] });
+    const out = await usage({ RESEND_API_KEY: 're_test', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { errors: [{ message: 'not authorized' }] });
     expect(out.cloudflare).toEqual({ configured: true, error: 'not authorized' });
   });
 });

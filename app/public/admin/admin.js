@@ -407,11 +407,16 @@ function renderUsage(u) {
       gauge('R2 · spazio occupato', cf.r2.bytes, L.r2StorageBytes, gb, ''),
     )
   }
-  grid.append(
-    gauge('Email inviate (Resend)', u.emails.today, L.emailsDay),
-    gauge('Email inviate nel mese', u.emails.month, L.emailsMonth, n, 'nel mese'),
-  )
+  // Resend: the whole account (other projects included) from Resend itself; A/R's own share below.
+  const rs = u.resend || {}
+  const fromResend = !rs.error && (rs.day != null || rs.month != null)
+  const mine = (v) => el('span', { class: 'state', text: `di cui inviate da A/R: ${n(v)}` })
+  const g1 = gauge('Email oggi · account Resend', fromResend ? rs.day ?? 0 : u.emails.today, L.emailsDay)
+  const g2 = gauge('Email nel mese · account Resend', fromResend ? rs.month ?? 0 : u.emails.month, L.emailsMonth, n, 'nel mese')
+  g1.append(el('br'), mine(u.emails.today)); g2.append(el('br'), mine(u.emails.month))
+  grid.append(g1, g2)
   frag.append(grid)
+  if (!fromResend) frag.append(el('p', { class: 'note', text: `Dati di Resend non disponibili (${rs.error || 'nessun dato'}): le email mostrate sono solo quelle inviate da A/R.` }))
   if (!cf.configured) {
     frag.append(el('p', { class: 'note', text: 'I dati di Cloudflare (Worker, D1, R2) compaiono quando il Worker ha il secret CF_ANALYTICS_TOKEN: un token API con il permesso “Account Analytics: Read”.' }))
   } else if (cf.error) {

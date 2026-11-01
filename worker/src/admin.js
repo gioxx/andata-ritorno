@@ -191,6 +191,27 @@ const USAGE_QUERY = `query ($account: String!, $db: String!, $script: String!, $
 }`;
 
 /**
+ * Resend's account-wide usage: every API answer carries x-resend-daily-quota (free plan) and
+ * x-resend-monthly-quota, the emails used so far. A one-item list is the cheapest call that gets
+ * them; RESEND_READ_KEY (full access) is used when set, the sending key otherwise.
+ * @returns {Promise<{day: number|null, month: number|null}|{error: string}>}
+ */
+async function resendQuota(env, fetchFn) {
+  const key = env.RESEND_READ_KEY || env.RESEND_API_KEY;
+  if (!key) return { error: 'no key' };
+  try {
+    const res = await fetchFn('https://api.resend.com/emails?limit=1', { headers: { authorization: `Bearer ${key}` } });
+    const num = (h) => (res.headers.has(h) ? Number(res.headers.get(h)) : null);
+    const day = num('x-resend-daily-quota');
+    const month = num('x-resend-monthly-quota');
+    if (day === null && month === null) return { error: `no quota headers (HTTP ${res.status})` };
+    return { day, month };
+  } catch (e) {
+    return { error: String(e.message || e).slice(0, 200) };
+  }
+}
+
+/**
  * Resources used, for the dashboard: Cloudflare's own analytics (Worker requests, D1 rows, R2
  * operations and storage; needs CF_ANALYTICS_TOKEN with Account Analytics: Read and CF_ACCOUNT_ID)
  * and the emails this Worker sent through Resend. Last 30 days by day, with the free-plan limits.
@@ -206,7 +227,10 @@ async function usage(req, env, ctx, params, fetchFn = fetch) {
   const monthEmails = await env.DB.prepare('SELECT COALESCE(SUM(n), 0) AS n FROM email_usage WHERE day >= ?').bind(`${month}-01`).first();
   const out = {
     limits: LIMITS,
+    // Sent by A/R itself, counted at each send.
     emails: { byDay: emails.results, today: emails.results.find((r) => r.day === to)?.n ?? 0, month: monthEmails?.n ?? 0 },
+    // The whole Resend account (every project using it), from Resend's own quota headers.
+    resend: await resendQuota(env, fetchFn),
     cloudflare: null,
   };
   if (!env.CF_ANALYTICS_TOKEN || !env.CF_ACCOUNT_ID) return json({ ...out, cloudflare: { configured: false } });
