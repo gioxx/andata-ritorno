@@ -1,7 +1,7 @@
 import { HttpError, json, readBody, readJson, strictLimit } from './http.js';
 import { hmacHex, randomToken, requireApiDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
-import { getCheckoutSession, verifyWebhook } from './stripe.js';
+import { createEmbeddedSession, getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
 import { deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen } from './store.js';
 import { ENC, HEX64, ID, isSecret } from './validate.js';
@@ -164,6 +164,21 @@ async function slot(req, env) {
   return json({ deviceLimit: await deviceLimit(env, licenceId) });
 }
 
+/**
+ * Start a purchase shown in a modal on the landing site: a Checkout Session for the family unlock
+ * or an extra seat. New families are not sold while registrations are closed.
+ */
+async function checkout(req, env) {
+  await strictLimit(env, req);
+  const { kind } = (await readJson(req, 1024)) ?? {};
+  const price = { family: env.PRICE_FAMILY, slot: env.PRICE_SLOT }[kind];
+  if (!['family', 'slot'].includes(kind)) throw new HttpError(400, 'bad-request');
+  if (!price) throw new Error('PRICE_FAMILY / PRICE_SLOT not configured');
+  if (kind === 'family') await requireRegistrationsOpen(env);
+  const session = await createEmbeddedSession(env, price, `${env.APP_ORIGIN}/unlock?session_id={CHECKOUT_SESSION_ID}`);
+  return json({ sessionId: session.id, clientSecret: session.clientSecret });
+}
+
 async function unlockSession(req, env) {
   await strictLimit(env, req);
   const session = await getCheckoutSession(env, new URL(req.url).searchParams.get('id'));
@@ -285,6 +300,7 @@ async function licenceRestart(req, env) {
 export const licenceRoutes = {
   'POST /api/redeem': redeem,
   'POST /api/slot': slot,
+  'POST /api/checkout': checkout,
   'GET /api/unlock/session': unlockSession,
   'POST /api/stripe/webhook': stripeWebhook,
   'POST /api/licence/email': licenceEmail,

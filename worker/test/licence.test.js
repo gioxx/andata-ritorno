@@ -549,3 +549,65 @@ describe('licence recovery', () => {
     expect(emails).toHaveLength(3);
   });
 });
+
+describe('POST /api/checkout (embedded Checkout for the landing site)', () => {
+  const SITE = { SITE_ORIGIN: 'https://site.test' };
+  const created = [];
+  const mockCreate = () => {
+    created.length = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      if (url.hostname !== 'api.stripe.com' || init?.method !== 'POST') throw new Error(`unexpected fetch ${url}`);
+      if (new Headers(init.headers).get('stripe-version') !== STRIPE_VERSION) return new Response('unpinned', { status: 400 });
+      created.push(Object.fromEntries(new URLSearchParams(init.body)));
+      return Response.json({ id: 'cs_test_embedded', client_secret: 'cs_test_embedded_secret_x' });
+    });
+  };
+  const checkout = (body, headers = {}, extra = {}) =>
+    worker.fetch(
+      new Request('https://ar.test/api/checkout', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }),
+      { ...env, ...SECRETS, ...SITE, ...extra },
+      {},
+    );
+
+  it('creates an embedded, merchant-of-record session for the chosen price', async () => {
+    mockCreate();
+    const res = await checkout({ kind: 'slot' }, { origin: 'https://site.test' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sessionId: 'cs_test_embedded', clientSecret: 'cs_test_embedded_secret_x' });
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://site.test');
+    expect(created[0]).toMatchObject({
+      mode: 'payment',
+      ui_mode: 'embedded_page',
+      'line_items[0][price]': SECRETS.PRICE_SLOT,
+      'line_items[0][quantity]': '1',
+      'managed_payments[enabled]': 'true',
+      redirect_on_completion: 'if_required',
+    });
+    expect(created[0].return_url).toMatch(/\/unlock\?session_id=\{CHECKOUT_SESSION_ID\}$/);
+  });
+
+  it('answers the preflight only for the landing site', async () => {
+    const pre = (origin) => worker.fetch(new Request('https://ar.test/api/checkout', { method: 'OPTIONS', headers: { origin } }), { ...env, ...SITE }, {});
+    const ok = await pre('https://site.test');
+    expect(ok.status).toBe(204);
+    expect(ok.headers.get('access-control-allow-origin')).toBe('https://site.test');
+    expect((await pre('https://evil.example')).headers.get('access-control-allow-origin')).toBeNull();
+    mockCreate();
+    expect((await checkout({ kind: 'family' }, { origin: 'https://evil.example' })).headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('refuses unknown kinds and stops selling new families while registrations are closed', async () => {
+    mockCreate();
+    expect((await checkout({ kind: 'gold' })).status).toBe(400);
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('registrations', 'closed') ON CONFLICT(key) DO UPDATE SET value = 'closed'").run();
+    try {
+      const res = await checkout({ kind: 'family' });
+      expect(res.status).toBe(503);
+      expect((await checkout({ kind: 'slot' })).status).toBe(200);
+    } finally {
+      await env.DB.prepare("UPDATE settings SET value = 'open' WHERE key = 'registrations'").run();
+    }
+    expect(created).toHaveLength(1);
+  });
+});

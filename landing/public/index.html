@@ -26,6 +26,8 @@
 <link rel="stylesheet" href="/styles.css">
 <script src="/theme.js"></script>
 <script type="module" src="/site.js"></script>
+<script type="module" src="/checkout.js"></script>
+<meta name="ar-stripe-key" content="">
 </head>
 <body>
 <a class="skip" href="#main">Vai al contenuto</a>
@@ -35,6 +37,7 @@
       <a class="brand" href="/"><img src="/icon.svg" alt="" width="40" height="40"><span>A/R<small>Andata e Ritorno</small></span></a>
       <ul>
         <li><a href="#come-funziona">Come funziona</a></li>
+        <li><a href="#privacy">Privacy</a></li>
         <li><a href="#prezzi">Prezzi</a></li>
         <li><a href="#regala">Regala</a></li>
         <li><a href="/guida/">Guida</a></li>
@@ -108,6 +111,39 @@
     </div>
   </section>
 
+  <section id="privacy" class="privacy-band" aria-labelledby="h-privacy" data-reveal>
+    <div class="wrap">
+      <div class="privacy-head">
+        <div class="privacy-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.6 8-10V5l-8-3-8 3v7c0 6.4 8 10 8 10z"/><rect x="8.5" y="10.5" width="7" height="5.5" rx="1.2"/><path d="M10 10.5V9a2 2 0 0 1 4 0v1.5"/></svg></div>
+        <div>
+          <span class="kicker">Privacy</span>
+          <h2 id="h-privacy">I tuoi dati restano tuoi</h2>
+          <p class="lead">Le foto dei vestiti dei tuoi bimbi non sono affari di nessun altro. A/R è fatta perché non lo diventino.</p>
+        </div>
+      </div>
+      <ul class="privacy-points">
+        <li><b>Nessun account</b>Niente email, niente password, niente profilo. Apri l'app e la usi.</li>
+        <li><b>Da soli, tutto sul telefono</b>Senza famiglia nessun dato lascia il tuo telefono: non c'è un server di mezzo.</li>
+        <li><b>In famiglia, cifrato</b>Capi, foto e nomi sono cifrati sul telefono prima di partire. Il server conserva solo dati che non può leggere.</li>
+        <li><b>Niente pubblicità né tracciamento</b>Nessun cookie di profilazione, nessuno strumento di analisi, nessun dato venduto. Il codice è pubblico: chiunque può controllare.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="funzioni" aria-labelledby="h-funzioni" data-reveal>
+    <div class="wrap">
+      <h2 id="h-funzioni">Piccola, ma pensata per i giorni pieni</h2>
+      <ul class="features">
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M19 12.9a10 10 0 0 0-2.2-1.6"/><path d="M12 20h.01"/></svg></span><b>Funziona offline</b>Al nido il segnale non c'è? Nessun problema: A/R non ha bisogno di rete.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg></span><b>Una foto e via</b>Scatti, scegli dalla galleria o incolli. Le foto vengono ridotte per occupare poco.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M7 12h10M10 18h4"/></svg></span><b>Categorie e filtri</b>Body, pantaloni, felpe: filtri al volo per trovare il cambio giusto.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></span><b>Backup in un file</b>Un unico .zip con capi e foto, verificato prima di salvarlo.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span><b>Si installa come un'app</b>Su Android e iPhone, senza passare dagli store.</li>
+        <li><span class="feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></span><b>Chiaro, scuro, due lingue</b>Tema chiaro o scuro, italiano o inglese: sceglie l'app, o scegli tu.</li>
+      </ul>
+    </div>
+  </section>
+
   <section id="prezzi" data-reveal aria-labelledby="h-prezzi">
     <div class="wrap">
       <h2 id="h-prezzi">Gratis da soli. In famiglia costa meno di una colazione al bar.</h2>
@@ -131,13 +167,13 @@
             <li>Cifratura end-to-end: il server non può leggere capi, foto e nomi.</li>
             <li>Un telefono in più? Aggiungi un posto a 1,99 €.</li>
           </ul>
-          <div class="actions"><a class="btn btn-primary" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Acquista · 4,99 €</a></div>
+          <div class="actions"><a class="btn btn-primary" data-checkout="family" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Acquista · 4,99 €</a></div>
           <p class="fine">Il codice compare subito dopo il pagamento e ti arriva per email. Nell'app: Menu → Famiglia → <strong>Ho già un codice</strong>.</p>
         </div>
       </div>
       <div class="after-plans note">
         <p><strong>Ci hai ripensato?</strong> Finché non hai usato il codice, entro 14 giorni ti rimborsiamo, senza dover spiegare perché: scrivi a <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a>.</p>
-        <p>Ti serve un posto in più per una famiglia già attiva? <a href="https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01">Compra un posto a 1,99 €</a>, poi nell'app: Menu → Famiglia → <strong>Aggiungi un posto</strong>.</p>
+        <p>Ti serve un posto in più per una famiglia già attiva? <a data-checkout="slot" href="https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01">Compra un posto a 1,99 €</a>, poi nell'app: Menu → Famiglia → <strong>Aggiungi un posto</strong>.</p>
         <p>Pagamenti gestiti da Stripe. Leggi i <a href="https://app.ar.gioxx.org/terms.html">termini</a> e l'<a href="https://app.ar.gioxx.org/privacy.html">informativa sulla privacy</a>.</p>
       </div>
     </div>
@@ -155,7 +191,7 @@
             <li><b>Ricevi il codice</b> subito dopo il pagamento e per email.</li>
             <li><b>Inoltralo:</b> chi lo riceve lo incolla in Menu → Famiglia → Ho già un codice.</li>
           </ol>
-          <div class="actions"><a class="btn btn-primary" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Regala A/R · 4,99 €</a></div>
+          <div class="actions"><a class="btn btn-primary" data-checkout="family" href="https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00">Regala A/R · 4,99 €</a></div>
           <p class="fine">Il codice non scade. Il recupero della licenza passa dall'email dell'acquisto, cioè la tua: ricorda a chi lo riceve di salvare il kit di recupero.</p>
         </div>
         <div class="gift-visual" aria-hidden="true">
@@ -212,13 +248,21 @@
     </div>
   </section>
 
-  <section aria-labelledby="h-privacy" data-reveal>
-    <div class="wrap privacy">
-      <div class="privacy-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.6 8-10V5l-8-3-8 3v7c0 6.4 8 10 8 10z"/><rect x="8.5" y="10.5" width="7" height="5.5" rx="1.2"/><path d="M10 10.5V9a2 2 0 0 1 4 0v1.5"/></svg></div>
+  <section id="passaparola" aria-labelledby="h-share" data-reveal>
+    <div class="wrap share">
       <div>
-        <h2 id="h-privacy">I tuoi dati restano tuoi</h2>
-        <p class="lead">Niente account, niente pubblicità, niente tracciamento. Senza famiglia tutto resta sul telefono; in famiglia i dati sono cifrati prima di partire, con una chiave che solo i vostri telefoni conoscono.</p>
+        <h2 id="h-share">Ti è utile? Passaparola</h2>
+        <p class="lead">A/R cresce con il passaparola tra genitori. Mandala alla chat della classe, a chi ha appena iniziato il nido o a chi perde sempre un calzino.</p>
       </div>
+      <ul class="share-links">
+        <li><button type="button" class="btn btn-primary" data-share hidden>Condividi</button></li>
+        <li><a class="btn btn-ghost" href="https://wa.me/?text=A%2FR%20tiene%20traccia%20dei%20vestiti%20dei%20bimbi%20tra%20casa%20e%20scuola%3A%20https%3A%2F%2Far.gioxx.org%2F">WhatsApp</a></li>
+        <li><a class="btn btn-ghost" href="https://t.me/share/url?url=https%3A%2F%2Far.gioxx.org%2F&amp;text=A%2FR%20tiene%20traccia%20dei%20vestiti%20dei%20bimbi%20tra%20casa%20e%20scuola">Telegram</a></li>
+        <li><a class="btn btn-ghost" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Far.gioxx.org%2F">Facebook</a></li>
+        <li><a class="btn btn-ghost" href="https://bsky.app/intent/compose?text=A%2FR%20tiene%20traccia%20dei%20vestiti%20dei%20bimbi%20tra%20casa%20e%20scuola%20https%3A%2F%2Far.gioxx.org%2F">Bluesky</a></li>
+        <li><a class="btn btn-ghost" href="mailto:?subject=A%2FR%20%C2%B7%20Andata%20e%20Ritorno&amp;body=A%2FR%20tiene%20traccia%20dei%20vestiti%20dei%20bimbi%20tra%20casa%20e%20scuola%3A%20https%3A%2F%2Far.gioxx.org%2F">Email</a></li>
+        <li><button type="button" class="btn btn-ghost" data-copy-link="https://ar.gioxx.org/" data-copied="Link copiato">Copia il link</button></li>
+      </ul>
     </div>
   </section>
 </main>

@@ -51,3 +51,29 @@ export async function getCheckoutSession(env, id) {
     line_items: (s.line_items?.data ?? []).map((li) => ({ price: { id: li.price?.id ?? null } })),
   };
 }
+
+/**
+ * Create a Checkout Session for one unit of `price`, shown embedded in a page (ui_mode
+ * embedded_page) with Stripe as merchant of record. Payment methods that need a redirect come back
+ * to `returnUrl`; the others finish in place.
+ * @returns {Promise<{id: string, clientSecret: string}>}
+ */
+export async function createEmbeddedSession(env, price, returnUrl) {
+  const body = new URLSearchParams({
+    mode: 'payment',
+    ui_mode: 'embedded_page',
+    'line_items[0][price]': price,
+    'line_items[0][quantity]': '1',
+    'managed_payments[enabled]': 'true',
+    redirect_on_completion: 'if_required',
+    return_url: returnUrl,
+  });
+  const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'stripe-version': STRIPE_VERSION, 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!res.ok) throw new Error(`stripe ${res.status}`);
+  const s = await res.json();
+  return { id: s.id, clientSecret: s.client_secret };
+}

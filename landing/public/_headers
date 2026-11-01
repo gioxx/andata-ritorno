@@ -1,6 +1,6 @@
-# Static landing: scripts, styles and fonts from this origin only (theme switch, scroll polish).
+# Static landing: own scripts, styles and fonts; Stripe only for the checkout dialog (loaded on a buy click).
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com; connect-src https://app.ar.gioxx.org https://api.stripe.com https://checkout.stripe.com; style-src 'self'; font-src 'self'; img-src 'self' https://*.stripe.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   Permissions-Policy: camera=(), microphone=(), geolocation=()

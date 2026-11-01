@@ -84,3 +84,22 @@ document.addEventListener('click', (e) => {
   if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
   target.focus({ preventScroll: true })
 })
+
+// Share: the system share sheet where the browser has one, plus a copy-link button.
+const shareBtn = document.querySelector('[data-share]')
+if (shareBtn && navigator.share) {
+  shareBtn.hidden = false
+  shareBtn.addEventListener('click', () => {
+    navigator.share({ title: document.title, text: document.querySelector('meta[name="description"]')?.content, url: location.origin + location.pathname }).catch(() => {})
+  })
+}
+for (const b of document.querySelectorAll('[data-copy-link]')) {
+  b.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(b.dataset.copyLink)
+      const label = b.textContent
+      b.textContent = b.dataset.copied
+      setTimeout(() => { b.textContent = label }, 2000)
+    } catch { /* the address is in the browser bar */ }
+  })
+}
