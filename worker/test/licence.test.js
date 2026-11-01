@@ -611,3 +611,26 @@ describe('POST /api/checkout (embedded Checkout for the landing site)', () => {
     expect(created).toHaveLength(1);
   });
 });
+
+describe('GET /api/buy/:kind (every buy link goes through here)', () => {
+  const LINKS = { PAY_LINK_FAMILY: 'https://buy.stripe.test/family', PAY_LINK_SLOT: 'https://buy.stripe.test/slot' };
+  const buy = (kind) => worker.fetch(new Request(`https://ar.test/api/buy/${kind}`), { ...env, ...SECRETS, ...LINKS }, {});
+
+  it('redirects to the payment link, and stops family sales while registrations are closed', async () => {
+    let res = await buy('family');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(LINKS.PAY_LINK_FAMILY);
+    expect((await buy('slot')).headers.get('location')).toBe(LINKS.PAY_LINK_SLOT);
+    expect((await buy('gold')).status).toBe(404);
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('registrations', 'closed') ON CONFLICT(key) DO UPDATE SET value = 'closed'").run();
+    try {
+      res = await buy('family');
+      expect(res.status).toBe(503);
+      expect(res.headers.get('location')).toBeNull();
+      expect(await res.text()).toMatch(/Attivazioni sospese/);
+      expect((await buy('slot')).status).toBe(302);
+    } finally {
+      await env.DB.prepare("UPDATE settings SET value = 'open' WHERE key = 'registrations'").run();
+    }
+  });
+});

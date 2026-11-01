@@ -78,6 +78,10 @@ export async function purgePhotos(env, familyId) {
  * syncing, and a recovery kit still brings one of their phones back.
  */
 export async function requireRegistrationsOpen(env) {
+  if (!(await registrationsOpen(env))) throw new HttpError(503, 'registrations-closed');
+}
+
+export async function registrationsOpen(env) {
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'registrations'").first();
-  if (row?.value === 'closed') throw new HttpError(503, 'registrations-closed');
+  return row?.value !== 'closed';
 }

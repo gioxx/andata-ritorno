@@ -7,16 +7,18 @@
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   Permissions-Policy: camera=(self), microphone=(), geolocation=()
-# Privacy policy and terms: the landing site (ar.gioxx.org) shows them in a dialog, so it may frame them.
+# Privacy policy and terms: the landing site (ar.gioxx.org) reads them to show them in a dialog.
+# Read, not framed: a framed page would come from this app's service worker cache on phones that
+# have the app, with that copy's headers.
 /privacy.html
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://ar.gioxx.org
+  Access-Control-Allow-Origin: https://ar.gioxx.org
+  Vary: Origin
 /privacy
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://ar.gioxx.org
+  Access-Control-Allow-Origin: https://ar.gioxx.org
+  Vary: Origin
 /terms.html
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://ar.gioxx.org
+  Access-Control-Allow-Origin: https://ar.gioxx.org
+  Vary: Origin
 /terms
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://ar.gioxx.org
+  Access-Control-Allow-Origin: https://ar.gioxx.org
+  Vary: Origin

@@ -18,6 +18,9 @@ run_worker_first = ["/api/*"]
 APP_ORIGIN = "https://app.ar.gioxx.org"
 # The landing site, allowed to open Checkout (POST /api/checkout) and read the code it produced.
 SITE_ORIGIN = "https://ar.gioxx.org"
+# Stripe payment links behind GET /api/buy/family and /api/buy/slot (closed registrations stop family sales).
+PAY_LINK_FAMILY = "https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00"
+PAY_LINK_SLOT = "https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01"
 # Stripe price ids (not secret); set the real ones at deploy time.
 PRICE_FAMILY = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
 PRICE_SLOT = "price_1UX1rBCfwq1bSlj7mAr3JtPY"
