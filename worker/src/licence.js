@@ -3,7 +3,7 @@ import { hmacHex, randomToken, requireApiDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
 import { createEmbeddedSession, getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
-import { deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen } from './store.js';
+import { deviceLimit, purgePhotos, purgeStatements, registrationsOpen, requireRegistrationsOpen } from './store.js';
 import { ENC, HEX64, ID, isSecret } from './validate.js';
 
 const LINK_TTL_MS = 30 * 60 * 1000;
@@ -179,6 +179,24 @@ async function checkout(req, env) {
   return json({ sessionId: session.id, clientSecret: session.clientSecret });
 }
 
+const CLOSED_PAGE = `<!doctype html><html lang="it"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>A/R</title>
+<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 20px;line-height:1.5">
+<h1>Attivazioni sospese</h1><p>Le nuove attivazioni sono sospese per un po'. Riprova più tardi: non ti è stato addebitato nulla.</p>
+<h1 lang="en">Activations paused</h1><p lang="en">New activations are paused for a while. Try again later: you have not been charged.</p></body></html>`;
+
+/**
+ * Every "buy" link (app and landing, with or without JavaScript) goes through here to the Stripe
+ * payment link, so closing registrations also stops new family sales.
+ */
+async function buy(req, env, ctx, { kind }) {
+  const link = { family: env.PAY_LINK_FAMILY, slot: env.PAY_LINK_SLOT }[kind];
+  if (!['family', 'slot'].includes(kind) || !link) throw new HttpError(404, 'not-found');
+  if (kind === 'family' && !(await registrationsOpen(env))) {
+    return new Response(CLOSED_PAGE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" } });
+  }
+  return new Response(null, { status: 302, headers: { location: link, 'cache-control': 'no-store' } });
+}
+
 async function unlockSession(req, env) {
   await strictLimit(env, req);
   const session = await getCheckoutSession(env, new URL(req.url).searchParams.get('id'));
@@ -301,6 +319,7 @@ export const licenceRoutes = {
   'POST /api/redeem': redeem,
   'POST /api/slot': slot,
   'POST /api/checkout': checkout,
+  'GET /api/buy/:kind': buy,
   'GET /api/unlock/session': unlockSession,
   'POST /api/stripe/webhook': stripeWebhook,
   'POST /api/licence/email': licenceEmail,

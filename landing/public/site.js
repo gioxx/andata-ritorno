@@ -104,28 +104,56 @@ for (const b of document.querySelectorAll('[data-copy-link]')) {
   })
 }
 
-// Privacy policy and terms open over the page (they live on app.ar.gioxx.org), so closing them
-// leaves you here. Ctrl/Cmd-click or no JavaScript: a normal link.
+// Privacy policy and terms open over the page, so closing them leaves you here. The text is read
+// from app.ar.gioxx.org (one copy, kept with the app) and only this page's language is shown.
+// Ctrl/Cmd-click, no JavaScript or a failed read: a normal link.
 const docLinks = document.querySelectorAll('a[data-doc]')
 if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
   const it = document.documentElement.lang === 'it'
   const dlg = document.createElement('dialog')
   dlg.className = 'doc-dialog'
-  dlg.innerHTML = `<div class="doc-dialog-head"><a class="doc-dialog-out" target="_blank" rel="noopener">${it ? 'Apri in una nuova scheda ↗' : 'Open in a new tab ↗'}</a><button type="button" class="checkout-close" aria-label="${it ? 'Chiudi' : 'Close'}">✕</button></div><iframe title=""></iframe>`
+  dlg.setAttribute('aria-label', '')
+  dlg.innerHTML = `<div class="doc-dialog-head"><a class="doc-dialog-out" target="_blank" rel="noopener">${it ? 'Apri in una nuova scheda ↗' : 'Open in a new tab ↗'}</a><button type="button" class="checkout-close" aria-label="${it ? 'Chiudi' : 'Close'}">✕</button></div><div class="doc-sheet"></div>`
   document.body.append(dlg)
-  const frame = dlg.querySelector('iframe')
+  const sheet = dlg.querySelector('.doc-sheet')
   const out = dlg.querySelector('.doc-dialog-out')
   dlg.querySelector('button').addEventListener('click', () => dlg.close())
   dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close() })
-  dlg.addEventListener('close', () => { frame.src = 'about:blank' })
+  const cache = new Map()
+  async function load(url) {
+    if (!cache.has(url)) {
+      cache.set(url, fetch(url).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.text() }).catch((e) => { cache.delete(url); throw e }))
+    }
+    const doc = new DOMParser().parseFromString(await cache.get(url), 'text/html')
+    const section = doc.getElementById(it ? 'it' : 'en')
+    if (!section) throw new Error('section')
+    for (const el of section.querySelectorAll('script, style, iframe, [style]')) el.remove()
+    // Links inside the text: same-page anchors stay, everything else opens in a new tab.
+    for (const a of section.querySelectorAll('a[href]')) {
+      const href = a.getAttribute('href')
+      if (href.startsWith('#')) continue
+      a.href = new URL(href, url).href
+      a.target = '_blank'
+      a.rel = 'noopener'
+    }
+    return section
+  }
   for (const a of docLinks) {
-    a.addEventListener('click', (e) => {
+    a.addEventListener('click', async (e) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
       e.preventDefault()
-      frame.title = a.textContent.trim()
-      frame.src = a.href
-      out.href = a.href
-      dlg.showModal()
+      const page = new URL(a.href)
+      const url = page.origin + page.pathname.replace(/\.html$/, '')
+      try {
+        const section = await load(url)
+        sheet.replaceChildren(section)
+        dlg.setAttribute('aria-label', a.textContent.trim())
+        out.href = a.href
+        dlg.showModal()
+        sheet.scrollTop = 0
+      } catch {
+        location.href = a.href
+      }
     })
   }
 }
