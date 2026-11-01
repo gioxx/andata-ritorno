@@ -1,5 +1,7 @@
 # Andata e Ritorno (A/R)
 
+*[Leggi in italiano](README.it.md)*
+
 A small installable web app to keep track of kids' clothes between **home** and **school** (nursery, kindergarten…).
 Take a photo of each item once; from then on every item is either *a scuola* or *a casa* and moves with a tap — no more copying photos between notes to remember what is where.
 
@@ -62,6 +64,7 @@ Change the `routes` pattern in `worker/wrangler.app.toml` to deploy it on your o
 ```
 app/       the app (src/, tests/, public/ icons and manifest)
 worker/    the Cloudflare Worker: app hosting and the `/api/*` family sharing API
+landing/   the product page and guide on ar.gioxx.org (static, its own Worker: `cd landing && npx wrangler deploy`)
 legacy/    the first single-file prototype, kept only as reference for its backup format
 docs/      design notes and the implementation plan
 ```
@@ -76,10 +79,9 @@ Backups exported from the old prototype (`andata-ritorno-AAAA-MM-GG.json`) can s
 - [x] Offline, installable PWA
 - [x] Optional categories and a quick filter
 - [x] Photo rotation, Italian/English, iPhone support
-- [ ] Per-item movement history
 - [x] Family sharing between phones
 - [x] Privacy policy (public app, premium data on the server)
-- [ ] Landing site andata-ritorno.gioxx.org (docs, guide for parents and guardians, privacy policy)
+- [x] Landing site <https://ar.gioxx.org> (product page and guide, in Italian and English)
 
 ## Worker and API deploy notes
 
@@ -112,18 +114,6 @@ Then:
 7. **Manual codes** (Ko-fi, Satispay, PayPal, gifts), run with your Wrangler login from the repository root: `node worker/scripts/code.mjs family --remote` (or `slot`); `node worker/scripts/code.mjs recover <code> --remote` prints a licence-recovery link for a licence with no email on file.
 
 The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the API simply does not rate-limit. Never commit secret values. Tests: `npm --prefix worker test`.
-
-## In italiano
-
-**Andata e Ritorno (A/R)** è una piccola app installabile per tenere traccia dei vestiti dei bambini tra **casa** e **scuola**: fotografi ogni capo una volta, poi con un tocco lo sposti *a scuola* o *a casa*. Novità della 2.2: rotazione foto, categorie con filtri, italiano/inglese, accessibilità, supporto iPhone, backup verificati.
-
-**Usala:** <https://app.ar.gioxx.org> (presentazione e guida: <https://ar.gioxx.org>)
-
-- **Android**: apri il sito in Chrome e scegli "Installa app" / "Aggiungi a schermata Home".
-- **iPhone**: apri il sito in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati.
-- **Menu App**: *Installa app*, *Come disinstallare* ed *Elimina tutti i dati* (con backup facoltativo e conferma scritta).
-- **Privacy**: senza condivisione in famiglia tutto resta sul tuo dispositivo (IndexedDB), nessun account né archivio sul server. Con la condivisione (facoltativa, a pagamento) capi e foto sono cifrati sul telefono e il server non può leggerli. Informativa completa: <https://app.ar.gioxx.org/privacy.html>.
-- **Backup**: esporta un file `.zip` con le foto; ogni backup viene riletto e controllato prima del salvataggio. I backup sono una tua responsabilità.
 
 ## License
 
