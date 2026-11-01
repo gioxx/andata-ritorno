@@ -103,3 +103,29 @@ for (const b of document.querySelectorAll('[data-copy-link]')) {
     } catch { /* the address is in the browser bar */ }
   })
 }
+
+// Privacy policy and terms open over the page (they live on app.ar.gioxx.org), so closing them
+// leaves you here. Ctrl/Cmd-click or no JavaScript: a normal link.
+const docLinks = document.querySelectorAll('a[data-doc]')
+if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
+  const it = document.documentElement.lang === 'it'
+  const dlg = document.createElement('dialog')
+  dlg.className = 'doc-dialog'
+  dlg.innerHTML = `<div class="doc-dialog-head"><a class="doc-dialog-out" target="_blank" rel="noopener">${it ? 'Apri in una nuova scheda ↗' : 'Open in a new tab ↗'}</a><button type="button" class="checkout-close" aria-label="${it ? 'Chiudi' : 'Close'}">✕</button></div><iframe title=""></iframe>`
+  document.body.append(dlg)
+  const frame = dlg.querySelector('iframe')
+  const out = dlg.querySelector('.doc-dialog-out')
+  dlg.querySelector('button').addEventListener('click', () => dlg.close())
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close() })
+  dlg.addEventListener('close', () => { frame.src = 'about:blank' })
+  for (const a of docLinks) {
+    a.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+      e.preventDefault()
+      frame.title = a.textContent.trim()
+      frame.src = a.href
+      out.href = a.href
+      dlg.showModal()
+    })
+  }
+}
