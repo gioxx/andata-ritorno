@@ -31,3 +31,26 @@ if (toTop) {
     document.querySelector('.brand')?.focus({ preventScroll: true })
   })
 }
+
+// FAQ answers slide open and closed instead of jumping (native <details> still works without this).
+if (!calm && 'animate' in Element.prototype) {
+  for (const d of document.querySelectorAll('.doc details')) {
+    const summary = d.querySelector('summary')
+    let anim = null
+    summary.addEventListener('click', (e) => {
+      e.preventDefault()
+      anim?.cancel()
+      const start = d.offsetHeight
+      const opening = !d.open
+      if (opening) d.open = true
+      const end = opening ? d.offsetHeight : summary.offsetHeight + parseFloat(getComputedStyle(d).paddingTop) + parseFloat(getComputedStyle(d).paddingBottom)
+      d.style.overflow = 'hidden'
+      anim = d.animate({ height: [`${start}px`, `${end}px`] }, { duration: 260, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
+      anim.onfinish = () => {
+        if (!opening) d.open = false
+        d.style.overflow = ''
+        anim = null
+      }
+    })
+  }
+}

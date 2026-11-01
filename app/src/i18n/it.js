@@ -272,7 +272,7 @@ export default {
   'family.restore': 'Ripristina famiglia',
   'family.licence': 'Recupera licenza',
   'family.defaultName': 'Famiglia',
-  'family.lastSync': 'Ultima sincronizzazione: {ago}',
+  'family.lastSync': 'Sincronizzata: {ago}',
   'family.neverSynced': 'mai',
   'family.syncNow': 'Sincronizza',
   'family.devices': 'Dispositivi',

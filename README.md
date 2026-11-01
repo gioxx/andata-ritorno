@@ -115,6 +115,10 @@ Then:
 
 The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the API simply does not rate-limit. Never commit secret values. Tests: `npm --prefix worker test`.
 
+## Contributing
+
+Ideas, bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and, for vulnerabilities, [SECURITY.md](SECURITY.md). Not on GitHub? Write to hello@ar.gioxx.org. The A/R name and logo are covered by [TRADEMARK.md](TRADEMARK.md).
+
 ## License
 
 Copyright © 2026 Giovanni Solone. A/R is free software, released under the [GNU Affero General Public License v3.0](LICENSE): you may use, modify and redistribute it, and if you run a modified version as a network service you must make its source code available to its users under the same license.
