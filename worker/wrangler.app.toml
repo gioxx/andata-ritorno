@@ -21,6 +21,9 @@ PRICE_FAMILY = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
 PRICE_SLOT = "price_1UX1rBCfwq1bSlj7mAr3JtPY"
 # Global cap on stored photo bytes across all families (R2 free tier is 10 GB; default 9 GB when unset).
 MAX_TOTAL_PHOTO_BYTES = "9000000000"
+# Owner dashboard (/admin): Cloudflare Access application on app.ar.gioxx.org. Not secrets.
+ACCESS_TEAM_DOMAIN = "cerbero.cloudflareaccess.com"
+ACCESS_AUD = "b24786f2ae9c9d173e497f74d19abc40edda78dd7abc25525a2798e9d46cf2af"
 
 [[d1_databases]]
 binding = "DB"
