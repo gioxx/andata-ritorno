@@ -84,7 +84,7 @@ describe('family orchestration', () => {
     const a = await phone()
     await seed(a, 'tab-home-a', ['item-a01', 'item-a02'])
     const meta = await familyOf(a)
-    expect(meta).toMatchObject({ licenceKind: 'family', cursor: 0, lastSyncAt: null, deviceLimit: 4 })
+    expect(meta).toMatchObject({ licenceKind: 'family', cursor: 0, lastSyncAt: null, deviceLimit: 3 })
     expect(meta.pending).toBeUndefined()
     expect(meta.token).toMatch(/^tok_/)
     expect(b64url.decode(meta.keyRaw)).toHaveLength(32)
@@ -342,15 +342,15 @@ describe('family orchestration', () => {
   it('recoverFamily into a full family reports the devices with their names decrypted', async () => {
     const a = await phone()
     const meta = await familyOf(a)
-    for (let i = 2; i <= 4; i++) {
+    for (let i = 2; i <= 3; i++) {
       tick() // the server lists devices by creation time
       await join(a, await phone(), { deviceName: `Telefono ${i}` })
     }
     const c = await phone()
-    const err = await recoverFamily(c.db, c.api, kitOf(meta), 'Telefono 5').catch((e) => e)
+    const err = await recoverFamily(c.db, c.api, kitOf(meta), 'Telefono 4').catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.code).toBe('family-full')
-    expect(err.extra.devices.map((d) => d.name)).toEqual(['Telefono 1', 'Telefono 2', 'Telefono 3', 'Telefono 4'])
+    expect(err.extra.devices.map((d) => d.name)).toEqual(['Telefono 1', 'Telefono 2', 'Telefono 3'])
     expect(await getFamily(c.db)).toBeNull()
   })
 
@@ -363,7 +363,7 @@ describe('family orchestration', () => {
     await restartFromLicence(d.db, d.api, { linkToken: server.issueLicenceLink(old.familyId), familyName: 'Nuova', deviceName: 'Telefono 9' })
     const meta = await getFamily(d.db)
     expect(meta.familyId).not.toBe(old.familyId)
-    expect(meta.deviceLimit).toBe(4)
+    expect(meta.deviceLimit).toBe(3)
     await d.sync()
     expect(d.engine.status.family.name).toBe('Nuova')
     expect(server.families.get(meta.familyId).records.size).toBe(3) // tab, item, kit
@@ -894,7 +894,7 @@ describe('sync engine (two phones)', () => {
     await join(a, b, { deviceName: 'Telefono 2' })
     await a.sync()
     const { family, deviceNames } = a.engine.status
-    expect(family).toMatchObject({ name: 'Famiglia Rossi', deviceLimit: 4 })
+    expect(family).toMatchObject({ name: 'Famiglia Rossi', deviceLimit: 3 })
     expect(family.devices.map((d) => [d.name, d.isThis])).toEqual([['Telefono 1', true], ['Telefono 2', false]])
     expect(family.devices[0]).toEqual(expect.objectContaining({ id: meta.deviceId, createdAt: expect.any(String), lastSeenAt: expect.any(String) }))
     expect(deviceNames.get(meta.deviceId)).toBe('Telefono 1')

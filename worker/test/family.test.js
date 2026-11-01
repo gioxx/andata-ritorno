@@ -45,10 +45,10 @@ async function invite(token) {
 
 const joinBody = (inviteToken) => ({ inviteToken, deviceId: rid(), deviceNameEnc: 'bmV3' });
 
-/** Fill the family up to its limit (4) through invites; returns the joined devices. */
+/** Fill the family up to its limit (3) through invites; returns the joined devices. */
 async function fill(fam) {
   const joined = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const body = joinBody(await invite(fam.token));
     const res = await post('/api/join', body);
     expect(res.status).toBe(200);
@@ -71,7 +71,7 @@ describe('GET /api/family', () => {
     const res = await get('/api/family', fam.token);
     expect(res.status).toBe(200);
     const out = await res.json();
-    expect(out).toMatchObject({ familyId: fam.familyId, familyNameEnc: 'ZmFtaWx5', deviceLimit: 4, you: fam.deviceId });
+    expect(out).toMatchObject({ familyId: fam.familyId, familyNameEnc: 'ZmFtaWx5', deviceLimit: 3, you: fam.deviceId });
     expect(out.devices).toHaveLength(1);
     expect(out.devices[0]).toMatchObject({ id: fam.deviceId, nameEnc: 'ZGV2aWNlMQ' });
     expect(typeof out.devices[0].createdAt).toBe('string');
@@ -86,7 +86,7 @@ describe('invites and join', () => {
     const res = await post('/api/invites', undefined, fam.token);
     expect(res.status).toBe(200);
     const inv = await res.json();
-    expect(inv).toMatchObject({ used: 1, limit: 4 });
+    expect(inv).toMatchObject({ used: 1, limit: 3 });
     expect(inv.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(Date.parse(inv.expiresAt) - Date.now()).toBeGreaterThan(9 * 60 * 1000);
     // Only the hash is stored.
@@ -95,13 +95,13 @@ describe('invites and join', () => {
 
     const info = await get(`/api/invites/info?t=${inv.token}`);
     expect(info.status).toBe(200);
-    expect(await info.json()).toEqual({ familyNameEnc: 'ZmFtaWx5', used: 1, limit: 4 });
+    expect(await info.json()).toEqual({ familyNameEnc: 'ZmFtaWx5', used: 1, limit: 3 });
 
     const body = joinBody(inv.token);
     const join = await post('/api/join', body);
     expect(join.status).toBe(200);
     const out = await join.json();
-    expect(out.deviceLimit).toBe(4);
+    expect(out.deviceLimit).toBe(3);
     const fam2 = await (await get('/api/family', out.token)).json();
     expect(fam2.you).toBe(body.deviceId);
     expect(fam2.devices.map((d) => d.id).sort()).toEqual([fam.deviceId, body.deviceId].sort());
@@ -192,16 +192,16 @@ describe('invites and join', () => {
     const join = await post('/api/join', joinBody(late));
     expect(join.status).toBe(409);
     expect(await join.json()).toEqual({ error: 'family-full' });
-    expect(await count('devices', fam.familyId)).toBe(4);
+    expect(await count('devices', fam.familyId)).toBe(3);
   });
 
   it('lets exactly one of two concurrent joins take the last slot', async () => {
     const fam = await newFamily();
-    for (let i = 0; i < 2; i++) expect((await post('/api/join', joinBody(await invite(fam.token)))).status).toBe(200);
+    for (let i = 0; i < 1; i++) expect((await post('/api/join', joinBody(await invite(fam.token)))).status).toBe(200);
     const [a, b] = [await invite(fam.token), await invite(fam.token)];
     const results = await Promise.all([post('/api/join', joinBody(a)), post('/api/join', joinBody(b))]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-    expect(await count('devices', fam.familyId)).toBe(4);
+    expect(await count('devices', fam.familyId)).toBe(3);
   });
 
   it('rate-limits invite info and join with the strict bucket', async () => {
@@ -303,7 +303,7 @@ describe('recovery kit', () => {
     const res = await post('/api/recover', body);
     expect(res.status).toBe(200);
     const out = await res.json();
-    expect(out.deviceLimit).toBe(4);
+    expect(out.deviceLimit).toBe(3);
     expect((await (await get('/api/family', out.token)).json()).you).toBe(body.deviceId);
     // A retry with the same device id replaces its token instead of taking another slot.
     const retry = await (await post('/api/recover', body)).json();
@@ -333,7 +333,7 @@ describe('recovery kit', () => {
     expect(full.status).toBe(409);
     const out = await full.json();
     expect(out.error).toBe('family-full');
-    expect(out.devices).toHaveLength(4);
+    expect(out.devices).toHaveLength(3);
     expect(out.devices[0]).toEqual({ id: expect.any(String), nameEnc: expect.any(String), createdAt: expect.any(String), lastSeenAt: expect.any(String) });
 
     const rm = await post('/api/recover/remove-device', { familyId: fam.familyId, recoverySecret: SECRET, deviceId: joined[0].deviceId });
@@ -345,10 +345,10 @@ describe('recovery kit', () => {
 
   it('lets exactly one of two concurrent recoveries take the last slot', async () => {
     const fam = await newFamily();
-    for (let i = 0; i < 2; i++) expect((await post('/api/recover', recoverBody(fam))).status).toBe(200);
+    for (let i = 0; i < 1; i++) expect((await post('/api/recover', recoverBody(fam))).status).toBe(200);
     const results = await Promise.all([post('/api/recover', recoverBody(fam)), post('/api/recover', recoverBody(fam))]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-    expect(await count('devices', fam.familyId)).toBe(4);
+    expect(await count('devices', fam.familyId)).toBe(3);
   });
 
   it('rate-limits recovery with the strict bucket', async () => {

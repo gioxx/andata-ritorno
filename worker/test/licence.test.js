@@ -102,7 +102,7 @@ describe('POST /api/redeem', () => {
     const res = await post('/api/redeem', body);
     expect(res.status).toBe(200);
     const out = await res.json();
-    expect(out.deviceLimit).toBe(4);
+    expect(out.deviceLimit).toBe(3);
     expect(typeof out.token).toBe('string');
 
     const dev = await env.DB.prepare('SELECT family_id FROM devices WHERE token_hash = ?').bind(await sha256Hex(out.token)).first();
@@ -155,7 +155,7 @@ describe('POST /api/redeem', () => {
     const res = await post('/api/redeem', body);
     expect(res.status).toBe(200);
     const again = await res.json();
-    expect(again.deviceLimit).toBe(4);
+    expect(again.deviceLimit).toBe(3);
     expect(again.token).not.toBe(first.token);
     expect(await tokenWorks(again.token)).toBe(true);
     expect(await tokenWorks(first.token)).toBe(false);
@@ -211,7 +211,7 @@ describe('POST /api/slot', () => {
     const code = await insertCode('slot');
     const res = await post('/api/slot', { code }, auth);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ deviceLimit: 5 });
+    expect(await res.json()).toEqual({ deviceLimit: 4 });
     const again = await post('/api/slot', { code }, auth);
     expect(again.status).toBe(409);
     expect(await again.json()).toEqual({ error: 'code-used' });
@@ -228,7 +228,7 @@ describe('POST /api/slot', () => {
     const results = await Promise.all([post('/api/slot', { code }, auth), post('/api/slot', { code }, auth)]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     const third = await post('/api/slot', { code: await insertCode('slot') }, auth);
-    expect(await third.json()).toEqual({ deviceLimit: 6 });
+    expect(await third.json()).toEqual({ deviceLimit: 5 });
   });
 });
 
@@ -396,7 +396,7 @@ describe('licence recovery', () => {
     const restart = await post('/api/licence/restart', fresh);
     expect(restart.status).toBe(200);
     const out = await restart.json();
-    expect(out.deviceLimit).toBe(5);
+    expect(out.deviceLimit).toBe(4);
 
     // Old device revoked, old family purged, licence kept with its slot.
     expect((await post('/api/slot', { code: newCode() }, auth)).status).toBe(401);

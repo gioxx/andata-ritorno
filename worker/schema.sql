@@ -1,4 +1,4 @@
-CREATE TABLE licences (id TEXT PRIMARY KEY, base_limit INTEGER NOT NULL DEFAULT 4, extra_slots INTEGER NOT NULL DEFAULT 0,
+CREATE TABLE licences (id TEXT PRIMARY KEY, base_limit INTEGER NOT NULL DEFAULT 3, extra_slots INTEGER NOT NULL DEFAULT 0,
   email_hmac TEXT, family_id TEXT, created_at TEXT NOT NULL);
 CREATE INDEX licences_email ON licences(email_hmac);
 CREATE TABLE codes (hash TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('family','slot')), source TEXT NOT NULL,

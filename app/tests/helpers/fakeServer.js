@@ -199,7 +199,7 @@ export function createFakeServer({ clock = () => Date.now(), pageSize = 500 } = 
       if (code.redeemedAt) return replay(code.licenceId, f) ?? fail(409, 'code-used')
       const licenceId = crypto.randomUUID()
       Object.assign(code, { redeemedAt: nowIso(), licenceId })
-      licences.set(licenceId, { id: licenceId, baseLimit: 4, extraSlots: 0, familyId: null })
+      licences.set(licenceId, { id: licenceId, baseLimit: 3, extraSlots: 0, familyId: null })
       return createFamily(licenceId, f)
     }
     if (route === 'POST /api/slot') {

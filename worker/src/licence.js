@@ -10,6 +10,8 @@ const LINK_TTL_MS = 30 * 60 * 1000;
 // Open (unused, unexpired) links per licence beyond which recovery emails stop: protects the
 // mailbox and the Resend daily quota from repeated requests.
 const MAX_OPEN_LINKS = 3;
+// Devices a new licence allows; extra slots are bought on top.
+const BASE_LIMIT = 3;
 const PAID_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
 
 /** Validate the fields shared by redeem and restart: the new family and its first device. */
@@ -119,8 +121,8 @@ async function redeem(req, env) {
   const results = await env.DB.batch([
     env.DB.prepare('UPDATE codes SET redeemed_at = ?, licence_id = ? WHERE hash = ? AND redeemed_at IS NULL').bind(at, licenceId, code.hash),
     env.DB.prepare(
-      'INSERT INTO licences (id, email_hmac, family_id, created_at) SELECT ?, email_hmac, ?, ? FROM codes WHERE hash = ? AND licence_id = ?',
-    ).bind(licenceId, f.familyId, at, code.hash, licenceId),
+      'INSERT INTO licences (id, base_limit, email_hmac, family_id, created_at) SELECT ?, ?, email_hmac, ?, ? FROM codes WHERE hash = ? AND licence_id = ?',
+    ).bind(licenceId, BASE_LIMIT, f.familyId, at, code.hash, licenceId),
     ...insertFamilyAndDevice(env, f, licenceId, await sha256Hex(token), at, won, [code.hash, licenceId]),
   ]);
   if (results[0].meta.changes !== 1) {
