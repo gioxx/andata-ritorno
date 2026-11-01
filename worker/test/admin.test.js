@@ -133,8 +133,12 @@ describe('GET /api/admin/usage', () => {
       data: { viewer: { accounts: [{
         d1: [{ dimensions: { date: day }, sum: { readQueries: 5, writeQueries: 2, rowsRead: 900, rowsWritten: 40 } }],
         worker: [{ dimensions: { date: day }, sum: { requests: 120, errors: 1, subrequests: 3 } }],
-        r2ops: [{ dimensions: { actionType: 'PutObject' }, sum: { requests: 7 } }, { dimensions: { actionType: 'GetObject' }, sum: { requests: 30 } }],
-        r2size: [{ max: { payloadSize: 1000, metadataSize: 24, objectCount: 9 } }],
+        r2ops: [
+          { dimensions: { actionType: 'PutObject' }, sum: { requests: 7 } },
+          { dimensions: { actionType: 'GetObject' }, sum: { requests: 30 } },
+          { dimensions: { actionType: 'DeleteObject' }, sum: { requests: 5 } },
+        ],
+        r2size: [{ dimensions: { datetime: new Date().toISOString() }, max: { payloadSize: 1000, metadataSize: 24, objectCount: 9 } }],
       }] } },
     });
     expect(out.cloudflare.d1[0]).toMatchObject({ day, rowsRead: 900, rowsWritten: 40, queries: 7 });

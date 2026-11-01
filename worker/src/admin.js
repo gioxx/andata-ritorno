@@ -70,9 +70,16 @@ async function stats(req, env) {
   const days = RANGES.includes(asked) ? asked : 30;
   const now = Date.now();
   const iso = (ms) => new Date(ms).toISOString();
-  const from = iso(now - days * DAY_MS);
-  const prevFrom = iso(now - 2 * days * DAY_MS);
-  const bucket = days > 90 ? 7 : 10; // substr length: YYYY-MM or YYYY-MM-DD
+  // Calendar-aligned, like the dashboard's buckets: the last `days` UTC days including today, or
+  // the last 12 months including this one; the previous period is the same span just before.
+  const today = new Date(now);
+  const startOf = (y, m, d) => Date.UTC(y, m, d);
+  const byMonth = days > 90;
+  const fromMs = byMonth ? startOf(today.getUTCFullYear(), today.getUTCMonth() - 11, 1) : startOf(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - (days - 1));
+  const prevMs = byMonth ? startOf(today.getUTCFullYear(), today.getUTCMonth() - 23, 1) : fromMs - days * DAY_MS;
+  const from = iso(fromMs);
+  const prevFrom = iso(prevMs);
+  const bucket = byMonth ? 7 : 10; // substr length: YYYY-MM or YYYY-MM-DD
   const one = (sql, ...args) => env.DB.prepare(sql).bind(...args);
   const [families, devices, licences, codes, newFamilies, newDevices, seenDevices, codesByDay, salesByMonth, perFamily, records, photos, usage, invites, settings, budget] =
     await env.DB.batch([
@@ -136,7 +143,7 @@ async function stats(req, env) {
     },
     salesByMonth: salesByMonth.results.map((r) => ({ ...r, eur: Math.round(sold(r) * 100) / 100 })),
     distributions: {
-      phones: hist(fams.map((f) => f.phones), [['1', 1, 2], ['2', 2, 3], ['3', 3, 4], ['4', 4, 5], ['5+', 5, Infinity]]),
+      phones: hist(fams.map((f) => f.phones), [['0', 0, 1], ['1', 1, 2], ['2', 2, 3], ['3', 3, 4], ['4', 4, 5], ['5+', 5, Infinity]]),
       records: hist(fams.map((f) => f.records), [['0–49', 0, 50], ['50–199', 50, 200], ['200–499', 200, 500], ['500–1999', 500, 2000], ['2000+', 2000, Infinity]]),
       photoMB: hist(fams.map((f) => f.bytes / 1e6), [['< 10 MB', 0, 10], ['10–50', 10, 50], ['50–100', 50, 100], ['100–200', 100, 200], ['200–300', 200, Infinity]]),
     },
@@ -160,8 +167,10 @@ const LIMITS = {
   emailsDay: 100,
   emailsMonth: 3_000,
 };
-// R2 operations Cloudflare bills as class A (writes, lists); everything else counts as class B.
-const R2_CLASS_A = new Set(['PutObject', 'CopyObject', 'CompleteMultipartUpload', 'CreateMultipartUpload', 'UploadPart', 'UploadPartCopy', 'ListObjects', 'ListObjectsV2', 'ListMultipartUploads', 'ListParts', 'ListBuckets', 'PutBucket', 'DeleteBucket']);
+// R2 operations by billing class (developers.cloudflare.com/r2/pricing). Deletes and aborted
+// uploads are free and are not counted in either class.
+const R2_CLASS_A = new Set(['ListBuckets', 'PutBucket', 'ListObjects', 'ListObjectsV2', 'PutObject', 'CopyObject', 'CompleteMultipartUpload', 'CreateMultipartUpload', 'LifecycleStorageTierTransition', 'ListMultipartUploads', 'UploadPart', 'UploadPartCopy', 'ListParts', 'PutBucketEncryption', 'PutBucketCors', 'PutBucketLifecycleConfiguration']);
+const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
 
 const USAGE_QUERY = `query ($account: String!, $db: String!, $script: String!, $bucket: String!, $from: Date!, $to: Date!, $fromT: Time!, $toT: Time!) {
   viewer { accounts(filter: { accountTag: $account }) {
@@ -175,7 +184,7 @@ const USAGE_QUERY = `query ($account: String!, $db: String!, $script: String!, $
       dimensions { actionType } sum { requests }
     }
     r2size: r2StorageAdaptiveGroups(limit: 1, filter: { bucketName: $bucket, datetime_geq: $fromT, datetime_leq: $toT }, orderBy: [datetime_DESC]) {
-      max { payloadSize metadataSize objectCount }
+      dimensions { datetime } max { payloadSize metadataSize objectCount }
     }
   } }
 }`;
@@ -217,7 +226,10 @@ async function usage(req, env, ctx, params, fetchFn = fetch) {
     const acc = body.data?.viewer?.accounts?.[0] ?? {};
     const byDate = (rows, pick) => rows.map((r) => ({ day: r.dimensions.date, ...pick(r.sum) })).sort((a, b) => a.day.localeCompare(b.day));
     let classA = 0, classB = 0;
-    for (const r of acc.r2ops ?? []) (R2_CLASS_A.has(r.dimensions.actionType) ? (classA += r.sum.requests) : (classB += r.sum.requests));
+    for (const r of acc.r2ops ?? []) {
+      if (R2_CLASS_A.has(r.dimensions.actionType)) classA += r.sum.requests;
+      else if (R2_CLASS_B.has(r.dimensions.actionType)) classB += r.sum.requests;
+    }
     const size = acc.r2size?.[0]?.max ?? {};
     out.cloudflare = {
       configured: true,

@@ -107,6 +107,7 @@ function axes(g, max, labels, by) {
 /** Line chart, one tooltip listing every series at the hovered x (crosshair). */
 function lineChart(labels, series, by, w = 780) {
   W = w
+  const width = w // the pointer handler below runs after other charts have changed W
   const box = svg('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img' })
   const max = niceMax(Math.max(1, ...series.flatMap((s) => s.values)))
   const iw = W - PAD.l - PAD.r, ih = H - PAD.t - PAD.b
@@ -137,7 +138,7 @@ function lineChart(labels, series, by, w = 780) {
   }
   hit.addEventListener('pointermove', (evt) => {
     const r = box.getBoundingClientRect()
-    const x = ((evt.clientX - r.left) / r.width) * W
+    const x = ((evt.clientX - r.left) / r.width) * width
     at(Math.max(0, Math.min(labels.length - 1, Math.round(((x - PAD.l) / iw) * (labels.length - 1)))), evt)
   })
   let kb = labels.length - 1
@@ -145,7 +146,7 @@ function lineChart(labels, series, by, w = 780) {
     if (evt.key !== 'ArrowLeft' && evt.key !== 'ArrowRight') return
     kb = Math.max(0, Math.min(labels.length - 1, kb + (evt.key === 'ArrowRight' ? 1 : -1)))
     const r = box.getBoundingClientRect()
-    at(kb, { clientX: r.left + (X(kb) / W) * r.width, clientY: r.top + 20 })
+    at(kb, { clientX: r.left + (X(kb) / width) * r.width, clientY: r.top + 20 })
   })
   const off = () => { hair.setAttribute('visibility', 'hidden'); dots.forEach((d) => d.setAttribute('visibility', 'hidden')); hideTip() }
   hit.addEventListener('pointerleave', off); hit.addEventListener('blur', off)
@@ -347,7 +348,7 @@ async function load() {
   out.classList.add('loading')
   try {
     const res = await fetch(`/api/admin/stats?days=${state.days}`, { credentials: 'same-origin', cache: 'no-store' })
-    if (!res.ok) throw new Error(res.status === 404 ? 'Accesso non autorizzato o cruscotto non configurato.' : `Errore ${res.status}`)
+    if (!res.ok) throw new Error(res.status === 404 ? 'Accesso non autorizzato o dashboard non configurata.' : `Errore ${res.status}`)
     state.data = await res.json()
     render()
   } catch (e) {
