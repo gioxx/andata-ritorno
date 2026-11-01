@@ -149,6 +149,7 @@ section > .wrap > h2 { margin-bottom: var(--space-lg); }
 section > .wrap > h2:has(+ .lead) { margin-bottom: var(--space-sm); }
 section > .wrap > h2 + .lead { margin-bottom: var(--space-lg); }
 .lead { max-width: var(--measure); color: var(--color-muted); }
+.lead-wide { max-width: none; }
 .kicker { display: block; font-weight: 800; font-size: var(--text-sm); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-strong); margin-bottom: var(--space-sm); }
 
 .plans { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
