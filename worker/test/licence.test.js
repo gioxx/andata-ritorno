@@ -212,9 +212,14 @@ describe('POST /api/slot', () => {
     const res = await post('/api/slot', { code }, auth);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ deviceLimit: 4 });
+    // The same family again (a retry whose answer was lost): fine, but no second slot.
     const again = await post('/api/slot', { code }, auth);
-    expect(again.status).toBe(409);
-    expect(await again.json()).toEqual({ error: 'code-used' });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ deviceLimit: 4 });
+    // Another family: the code is spent.
+    const other = await post('/api/slot', { code }, { authorization: `Bearer ${await newFamily()}` });
+    expect(other.status).toBe(409);
+    expect(await other.json()).toEqual({ error: 'code-used' });
   });
 
   it('refuses family codes and counts concurrent uses of one slot code once', async () => {
@@ -234,10 +239,20 @@ describe('POST /api/slot', () => {
 
 describe('Stripe', () => {
   const sessionEvent = (id, type = 'checkout.session.completed') => ({ id: `evt_${id}`, type, data: { object: { id, object: 'checkout.session' } } });
-  const webhook = async (event, secret) => {
+  const webhook = async (event, secret, extra) => {
     const { body, header } = await signed(event, secret);
-    return call('/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': header }, body });
+    return call('/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': header }, body }, extra);
   };
+
+  it('fails the webhook (so Stripe retries) when a paid session matches no configured price', async () => {
+    const id = 'cs_test_unknown_price';
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      Response.json({ id, payment_status: 'paid', customer_details: { email: 'a@example.com' }, line_items: { data: [{ price: { id: 'price_renamed' } }] } }),
+    );
+    expect((await webhook(sessionEvent(id))).status).toBe(500);
+    expect((await webhook(sessionEvent(id), undefined, { PRICE_FAMILY: '', PRICE_SLOT: '' })).status).toBe(500);
+  });
 
   it('rejects bad and stale signatures', async () => {
     const res = await webhook(sessionEvent('cs_test_bad'), 'whsec_wrong');
@@ -377,6 +392,17 @@ describe('licence recovery', () => {
     const res = await post('/api/licence/email', { email: 'nobody@example.com' });
     expect(res.status).toBe(202);
     expect(emails).toHaveLength(0);
+  });
+
+  it('sends at most 5 links a day per licence, even when the earlier ones were used', async () => {
+    await paidFamily('daily@example.com');
+    const emails = mockFetch({});
+    for (let i = 0; i < 7; i++) {
+      await post('/api/licence/email', { email: 'daily@example.com' });
+      // Spent at once, so the open-links limit never stops the next one: only the daily cap can.
+      await env.DB.prepare('UPDATE licence_links SET used_at = ? WHERE used_at IS NULL').bind(now()).run();
+    }
+    expect(emails).toHaveLength(5);
   });
 
   it('emails one link for a known address and restarts the family on the same licence', async () => {

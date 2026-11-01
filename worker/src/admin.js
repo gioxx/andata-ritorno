@@ -11,8 +11,12 @@ const decodePart = (s) => JSON.parse(new TextDecoder().decode(b64urlBytes(s)));
 let certs = { domain: null, keys: null, at: 0 };
 const CERTS_TTL_MS = 60 * 60 * 1000;
 
-async function accessKeys(domain, fetchFn) {
-  if (certs.domain === domain && Date.now() - certs.at < CERTS_TTL_MS) return certs.keys;
+async function accessKeys(domain, fetchFn, kid) {
+  // A kid not in the cache means Access rotated its keys: fetch again rather than wait out the TTL.
+  // At most once a minute, so made-up kids cannot turn every request into a fetch.
+  const age = Date.now() - certs.at;
+  const fresh = certs.domain === domain && age < CERTS_TTL_MS && (certs.keys.some((k) => k.kid === kid) || age < 60 * 1000);
+  if (fresh) return certs.keys;
   const res = await fetchFn(`https://${domain}/cdn-cgi/access/certs`);
   if (!res.ok) throw new Error(`access certs ${res.status}`);
   certs = { domain, keys: (await res.json()).keys ?? [], at: Date.now() };
@@ -41,7 +45,7 @@ export async function requireAdmin(env, req, fetchFn = fetch) {
     throw hidden;
   }
   if (header.alg !== 'RS256') throw hidden;
-  const jwk = (await accessKeys(domain, fetchFn)).find((k) => k.kid === header.kid);
+  const jwk = (await accessKeys(domain, fetchFn, header.kid)).find((k) => k.kid === header.kid);
   if (!jwk) throw hidden;
   const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
   const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlBytes(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));

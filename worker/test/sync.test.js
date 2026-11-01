@@ -128,6 +128,21 @@ describe('record sync', () => {
     expect((await many.json()).error).toBe('limit-records');
   });
 
+  it('caps a family at 30 MB of record data', async () => {
+    const f = await newFamily();
+    // 15 rows of 2 MB each: 30 000 000 bytes, just under the 30 MiB cap.
+    await env.DB.batch(
+      Array.from({ length: 15 }, (_, i) =>
+        env.DB.prepare("INSERT INTO records (family_id, rid, seq, data) VALUES (?, ?, ?, substr(hex(zeroblob(1000000)), 1, 2000000))").bind(f.familyId, `bulk-${i}-xxxx`, i + 1),
+      ),
+    );
+    const big = (n) => Array.from({ length: n }, () => rec('A'.repeat(64 * 1024)));
+    const res = await post('/api/sync', { records: big(30) }, f.token);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe('limit-records');
+    expect((await post('/api/sync', { records: [rec()] }, f.token)).status).toBe(200);
+  });
+
   it('caps a family at 10 000 distinct records; updates do not count twice', async () => {
     const f = await newFamily();
     await seed(f.familyId, 'records', 9999);
@@ -526,6 +541,15 @@ describe('photos', () => {
     await put(`/api/photos/${pid}`, bytes(6), f.token);
     expect(await env.PHOTOS.get(`${f.familyId}/${pid}`)).toBeNull();
     expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(6));
+  });
+
+  it('caps a family at 1 GB of photos, whatever the global room', async () => {
+    const f = await newFamily();
+    await env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, ?, ?, 1)').bind(f.familyId, 'big-00000', 999_999_995, now()).run();
+    const res = await put(`/api/photos/${rid()}`, bytes(10), f.token);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe('limit-storage');
+    expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204);
   });
 
   it('caps a family at 2 000 photos; replacing does not count twice', async () => {

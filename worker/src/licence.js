@@ -10,6 +10,8 @@ const LINK_TTL_MS = 30 * 60 * 1000;
 // Open (unused, unexpired) links per licence beyond which recovery emails stop: protects the
 // mailbox and the Resend daily quota from repeated requests.
 const MAX_OPEN_LINKS = 3;
+// Links per licence in a day, used or not: rotating IPs still cannot flood the buyer's mailbox.
+const MAX_DAILY_LINKS = 5;
 // Devices a new licence allows; extra slots are bought on top.
 const BASE_LIMIT = 3;
 const PAID_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
@@ -45,6 +47,8 @@ function insertFamilyAndDevice(env, f, licenceId, tokenHash, at, guard, guardArg
 
 /** @returns {'family'|'slot'} the kind bought by the session's price; 404 bad-session otherwise. */
 function kindOf(env, session) {
+  // Unset prices are a deployment mistake, not someone else's session: fail loudly (500).
+  if (!env.PRICE_FAMILY || !env.PRICE_SLOT) throw new Error('PRICE_FAMILY / PRICE_SLOT not configured');
   const prices = session.line_items.map((li) => li.price?.id);
   if (env.PRICE_FAMILY && prices.includes(env.PRICE_FAMILY)) return 'family';
   if (env.PRICE_SLOT && prices.includes(env.PRICE_SLOT)) return 'slot';
@@ -143,8 +147,10 @@ async function slot(req, env) {
   const body = await readJson(req);
   const code = await findCode(env, body?.code);
   if (code.kind === 'family') throw new HttpError(409, 'code-is-family');
-  if (code.redeemed_at) throw new HttpError(409, 'code-used');
   const { licence_id: licenceId } = await env.DB.prepare('SELECT licence_id FROM families WHERE id = ?').bind(familyId).first();
+  // Already added to this very licence: a retry whose first answer was lost, not a reuse.
+  if (code.redeemed_at && code.licence_id === licenceId) return json({ deviceLimit: await deviceLimit(env, licenceId) });
+  if (code.redeemed_at) throw new HttpError(409, 'code-used');
 
   const at = new Date().toISOString();
   // changes() is the row count of the previous statement in the batch: a concurrent use of the same
@@ -178,6 +184,10 @@ async function stripeWebhook(req, env, ctx) {
     issued = await issueCodeForSession(env, session);
   } catch (e) {
     if (!(e instanceof HttpError)) throw e;
+    // Every Payment Link on this Stripe account is A/R's: a paid session for an unknown price means
+    // the price ids are out of date. Fail (500) so Stripe retries and the error shows, instead of
+    // swallowing a purchase.
+    if (session?.payment_status === 'paid' && e.code === 'bad-session') throw new Error(`paid session ${session.id} matches no configured price`);
     console.error('webhook: session not handled', event.id, e.code);
     return json({ received: true });
   }
@@ -200,9 +210,11 @@ async function licenceEmail(req, env, ctx) {
     const { results } = await env.DB.prepare(
       `SELECT l.id FROM licences l WHERE l.email_hmac = ?
        AND (SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = l.id AND k.used_at IS NULL AND k.expires_at > ?) < ?
+       AND (SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = l.id AND k.expires_at > ?) < ?
        ORDER BY l.created_at LIMIT 5`,
     )
-      .bind(await emailHmac(env, email), nowIso, MAX_OPEN_LINKS)
+      // A link created in the last 24 hours expires after now - 24 h + its lifetime.
+      .bind(await emailHmac(env, email), nowIso, MAX_OPEN_LINKS, new Date(Date.now() - 24 * 60 * 60 * 1000 + LINK_TTL_MS).toISOString(), MAX_DAILY_LINKS)
       .all();
     if (!results.length) return;
     const expires = new Date(Date.now() + LINK_TTL_MS).toISOString();

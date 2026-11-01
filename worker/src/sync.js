@@ -6,6 +6,8 @@ const PAGE = 500;
 const MAX_PUSH = 200;
 const MAX_RECORDS = 10000;
 const MAX_DATA = 64 * 1024;
+// Ciphertext bytes per family: a real wardrobe needs a few MB, this keeps one family from filling D1.
+const MAX_FAMILY_DATA = 30 * 1024 * 1024;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 // D1 allows at most 100 bound parameters per statement.
 const IN_CHUNK = 50;
@@ -53,14 +55,17 @@ async function push(req, env) {
   // only make the check stricter, never let the family past the cap.
   const rids = [...new Set(records.map((r) => r.rid))];
   const added = rids.length - (await countExisting(env, familyId, rids));
+  // Counted as if every record were new (updates are rare next to the cap): stricter, never looser.
+  const bytes = records.reduce((sum, r) => sum + r.data.length, 0);
 
   // One transaction: reserve n sequence numbers only if the new rids fit (checked inside the batch,
   // so concurrent pushes cannot both pass), then give record i the number base + i. Each insert
   // runs only if the statement before it changed a row, so a refused reservation writes nothing.
   const results = await env.DB.batch([
     env.DB.prepare(
-      'UPDATE families SET seq = seq + ?1 WHERE id = ?2 AND (SELECT COUNT(*) FROM records WHERE family_id = ?2) + ?3 <= ?4 RETURNING seq',
-    ).bind(n, familyId, added, MAX_RECORDS),
+      `UPDATE families SET seq = seq + ?1 WHERE id = ?2 AND (SELECT COUNT(*) FROM records WHERE family_id = ?2) + ?3 <= ?4
+       AND (SELECT COALESCE(SUM(length(data)), 0) FROM records WHERE family_id = ?2) + ?5 <= ?6 RETURNING seq`,
+    ).bind(n, familyId, added, MAX_RECORDS, bytes, MAX_FAMILY_DATA),
     ...records.map((r, i) =>
       env.DB.prepare(
         `INSERT INTO records (family_id, rid, seq, data) SELECT ?, ?, (SELECT seq FROM families WHERE id = ?) - ? + ?, ? WHERE changes() = 1

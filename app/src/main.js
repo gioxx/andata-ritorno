@@ -39,7 +39,9 @@ const route = routeOf(location.pathname, location.hash, location.search);
 // iOS Safari outside the installed app: its storage is not the app's.
 const inSafari = currentPlatform() === 'ios' && !isStandalone();
 if (route.page === 'unlock') {
-  // The payment success page: shows the code only, the app itself does not start here.
+  // The payment success page: shows the code only, the app itself does not start here. The session
+  // id leaves the address bar (and the history) at once: whoever has it can read the code.
+  history.replaceState(null, '', '/unlock');
   await renderUnlockPage(root, { api: createApi(), sessionId: route.sessionId, inSafari });
 } else {
   // The fragment carries a key or a token: off the address bar first, then the iOS hand-off.

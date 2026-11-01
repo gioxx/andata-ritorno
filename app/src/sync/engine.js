@@ -34,6 +34,9 @@ const PHOTO_PARALLEL = 3
 const ORPHAN_MS = 30 * 24 * 60 * 60 * 1000
 const RETRY_MS = 60 * 1000 // after a 429: the server's limits are per minute
 const REFUSED_RETRY_MS = 60 * 60 * 1000 // a photo the server refused (413) is offered again after this
+// Bump when this version learns a record kind older versions skipped: every device then pulls the
+// whole family again once, so records it passed over before are read now.
+const PULL_FORMAT = 1
 const REFUSED = 'photosRefused' // meta: {[pid]: {code, at}} photos refused by the server, still owed
 const ID = /^[A-Za-z0-9_-]{8,64}$/
 const DECODE_STEP = 50 // pulled records decoded between two progress reports
@@ -146,7 +149,7 @@ export function createSyncEngine({
   /** Pull every page, then decode; a record that cannot be decoded is skipped (and logged). */
   async function pull(api, key, meta) {
     const raw = []
-    let cursor = meta.cursor ?? 0
+    let cursor = meta.pullFormat === PULL_FORMAT ? (meta.cursor ?? 0) : 0
     // The server does not say how many records wait: no total until the last page is in.
     progress('pull', 0, null)
     for (;;) {
@@ -428,7 +431,7 @@ export function createSyncEngine({
     // from the old cursor, so the marker is never judged against a pull missing the family's tabs.
     if (!sameMembership(await getFamily(db), meta)) throw new MembershipChanged()
     const droppedTabs = await discardEmptyTabs(remote)
-    meta = await updateFamily(db, meta, { cursor, ...kit })
+    meta = await updateFamily(db, meta, { cursor, pullFormat: PULL_FORMAT, ...kit })
     if (!meta) throw new MembershipChanged()
     if ((plan && changesLocal(plan)) || droppedTabs) await onApplied()
 

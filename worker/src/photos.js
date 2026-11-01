@@ -4,6 +4,8 @@ import { ID } from './validate.js';
 
 const MAX_PHOTO = 3 * 1024 * 1024;
 const MAX_PHOTOS = 2000;
+// Photo bytes per family: a share of the global cap, so one family cannot take it all.
+const MAX_FAMILY_PHOTO_BYTES = 1_000_000_000;
 
 function checkPid(pid) {
   if (!ID.test(pid)) throw new HttpError(400, 'bad-request');
@@ -67,8 +69,10 @@ async function put(req, env, ctx, { pid }) {
   const key = objectKey(familyId, pid, token);
   const delta = '(?1 - COALESCE((SELECT size FROM photos WHERE family_id = ?2 AND pid = ?3), 0))';
   // The family must still exist: one purged while this body was arriving takes no new photos.
-  const fits =
-    '(EXISTS (SELECT 1 FROM families WHERE id = ?2) AND (EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5))';
+  // It must also fit the family's photo count and its share of bytes.
+  const fits = `(EXISTS (SELECT 1 FROM families WHERE id = ?2)
+    AND (EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)
+    AND (SELECT COALESCE(SUM(size), 0) FROM photos WHERE family_id = ?2) + ${delta} <= ?6)`;
   const results = await env.DB.batch([
     env.DB.prepare('SELECT size, uploaded_at FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
     // Which limit refused it, if one did (same snapshot as the reservation below).
@@ -82,6 +86,7 @@ async function put(req, env, ctx, { pid }) {
       pid,
       totalCap(env),
       MAX_PHOTOS,
+      MAX_FAMILY_PHOTO_BYTES,
     ),
     env.DB.prepare(
       `INSERT INTO photos (family_id, pid, size, uploaded_at, ready) SELECT ?1, ?2, ?3, ?4, 0 WHERE changes() = 1
