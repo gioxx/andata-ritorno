@@ -56,7 +56,7 @@ export default {
 
   'desktop.title': 'A/R is made for the phone',
   'desktop.lead': 'It is for photographing clothes and moving them between home and school with one tap: use it on your phone and add it to the Home screen.',
-  'desktop.qrAlt': 'QR code to open ar.gioxx.org on your phone',
+  'desktop.qrAlt': 'QR code to open app.ar.gioxx.org on your phone',
   'install.ios.1': 'In Safari, tap the <b>three lines</b> to the left of the address, then <b>Share</b>. If you already see the square with an arrow, tap that.',
   'install.ios.2': 'Tap <b>View More</b>, then choose <b>Add to Home Screen</b>.',
   'install.ios.3': 'Tap <b>Add</b> and open A/R from its icon.',
@@ -75,7 +75,7 @@ export default {
   'uninstall.ios.1': 'Press and hold the A/R icon',
   'uninstall.ios.2': 'Choose <b>Delete App</b>',
   'uninstall.notice': "Uninstalling only removes the icon: your items and photos stay on this phone. To erase them use 'Delete all data'.",
-  'desktop.step1': "Scan the code with your phone's camera, or open <b>ar.gioxx.org</b>. Then add it to the Home screen:",
+  'desktop.step1': "Scan the code with your phone's camera, or open <b>app.ar.gioxx.org</b>. Then add it to the Home screen:",
   'ios.banner': "On iPhone, Safari may delete a website's data after about 7 days without opening it. Install A/R on the Home screen to keep it safe, and back up now and then.",
   'ios.bannerLabel': 'Data notice',
   'ios.gotIt': 'Got it',

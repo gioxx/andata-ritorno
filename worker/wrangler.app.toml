@@ -5,7 +5,7 @@ compatibility_date = "2026-10-01"
 # One origin only: IndexedDB is per-origin, so a second hostname would show an empty app.
 workers_dev = false
 preview_urls = false
-routes = [{ pattern = "ar.gioxx.org", custom_domain = true }]
+routes = [{ pattern = "app.ar.gioxx.org", custom_domain = true }]
 
 [assets]
 directory = "../app/dist"
@@ -15,7 +15,7 @@ not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
 [vars]
-APP_ORIGIN = "https://ar.gioxx.org"
+APP_ORIGIN = "https://app.ar.gioxx.org"
 # Stripe price ids (not secret); set the real ones at deploy time.
 PRICE_FAMILY = ""
 PRICE_SLOT = ""

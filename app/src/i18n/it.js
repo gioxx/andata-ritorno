@@ -57,7 +57,7 @@ export default {
 
   'desktop.title': 'A/R è fatta per il telefono',
   'desktop.lead': 'Serve a fotografare i capi e spostarli tra casa e scuola con un tocco: usala sul telefono e aggiungila alla schermata Home.',
-  'desktop.qrAlt': 'QR code per aprire ar.gioxx.org sul telefono',
+  'desktop.qrAlt': 'QR code per aprire app.ar.gioxx.org sul telefono',
   'install.ios.1': "In Safari tocca le <b>tre lineette</b> a sinistra dell'indirizzo, poi <b>Condividi</b>. Se vedi già il quadrato con la freccia, tocca quello.",
   'install.ios.2': 'Tocca <b>Visualizza altro</b> e scegli <b>Aggiungi alla schermata Home</b>.',
   'install.ios.3': "Tocca <b>Aggiungi</b> e apri A/R dall'icona.",
@@ -76,7 +76,7 @@ export default {
   'uninstall.ios.1': "Tieni premuta l'icona di A/R",
   'uninstall.ios.2': 'Scegli <b>Elimina app</b>',
   'uninstall.notice': "Disinstallare toglie solo l'icona: i tuoi capi e le foto restano su questo telefono. Per cancellarli usa 'Elimina tutti i dati'.",
-  'desktop.step1': 'Inquadra il codice con la fotocamera del telefono, oppure apri <b>ar.gioxx.org</b>. Poi aggiungila alla schermata Home:',
+  'desktop.step1': 'Inquadra il codice con la fotocamera del telefono, oppure apri <b>app.ar.gioxx.org</b>. Poi aggiungila alla schermata Home:',
   'ios.banner': 'Su iPhone Safari può cancellare i dati dei siti dopo circa 7 giorni senza aprirli. Installa A/R sulla schermata Home per tenerli al sicuro e fai un backup ogni tanto.',
   'ios.bannerLabel': 'Avviso sui dati',
   'ios.gotIt': 'Ho capito',
