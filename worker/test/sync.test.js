@@ -564,32 +564,34 @@ describe('photos', () => {
     expect(new Uint8Array(await (await get(`/api/photos/${pid}`, f.token)).arrayBuffer())).toEqual(bytes(6));
   });
 
-  it('caps a family at 1 GB of photos, whatever the global room', async () => {
+  it('caps a family at 500 photos; replacing does not count twice', async () => {
     const f = await newFamily();
-    await env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at, ready) VALUES (?, ?, ?, ?, 1)').bind(f.familyId, 'big-00000', 999_999_995, now()).run();
-    const res = await put(`/api/photos/${rid()}`, bytes(10), f.token);
-    expect(res.status).toBe(413);
-    expect((await res.json()).error).toBe('limit-storage');
-    expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204);
-  });
-
-  it('caps a family at 2 000 photos; replacing does not count twice', async () => {
-    const f = await newFamily();
-    await seed(f.familyId, 'photos', 2000);
+    await seed(f.familyId, 'photos', 500);
     const res = await put(`/api/photos/${rid()}`, bytes(1), f.token);
     expect(res.status).toBe(413);
     expect((await res.json()).error).toBe('limit-photos');
     expect((await put('/api/photos/filler-0-xxxx', bytes(1), f.token)).status).toBe(204);
   });
 
+  it("caps a family at 300 MB of photos, whatever the global room, reported as the family's photo limit", async () => {
+    const f = await newFamily();
+    await env.DB.prepare('INSERT INTO photos (family_id, pid, size, uploaded_at) VALUES (?, ?, ?, ?)').bind(f.familyId, 'big-0-xxxx', 300_000_000 - 5, now()).run();
+    await env.DB.prepare("UPDATE usage SET bytes = bytes + ? WHERE key = 'photo_bytes'").bind(300_000_000 - 5).run();
+    const res = await put(`/api/photos/${rid()}`, bytes(10), f.token);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe('limit-photos');
+    expect((await put(`/api/photos/${rid()}`, bytes(5), f.token)).status).toBe(204);
+    await env.DB.prepare("UPDATE usage SET bytes = bytes - ? WHERE key = 'photo_bytes'").bind(300_000_000 - 5).run();
+  });
+
   it('holds the photo cap under concurrent uploads', async () => {
     const f = await newFamily();
-    await seed(f.familyId, 'photos', 1999);
+    await seed(f.familyId, 'photos', 499);
     const res = await Promise.all([put(`/api/photos/${rid()}`, bytes(1), f.token), put(`/api/photos/${rid()}`, bytes(1), f.token)]);
     const refused = res.filter((r) => r.status === 413);
     expect(res.map((r) => r.status).sort()).toEqual([204, 413]);
     expect((await refused[0].json()).error).toBe('limit-photos');
     const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM photos WHERE family_id = ?').bind(f.familyId).first();
-    expect(n).toBe(2000);
+    expect(n).toBe(500);
   });
 });
