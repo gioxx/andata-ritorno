@@ -5,6 +5,28 @@ export async function deviceLimit(env, licenceId) {
   return row.n;
 }
 
+// A device's daily write budget, in units: one per record pushed, PHOTO_UNITS per photo uploaded.
+// Far above a family's real use (a first sync of a large wardrobe fits), it stops one device (a
+// buggy loop, or someone with a paid code) from eating the account's daily D1 write allowance.
+export const DAILY_UNITS = 5000;
+export const PHOTO_UNITS = 4;
+
+/**
+ * The statement spending `units` of the device's budget for today: it changes a row only if they
+ * fit, so the statements after it in a batch can depend on it with changes() = 1. A new day starts
+ * from zero.
+ */
+export function spendDaily(db, deviceId, units) {
+  const day = new Date().toISOString().slice(0, 10);
+  return db
+    .prepare(
+      `INSERT INTO device_usage (device_id, day, units) SELECT ?1, ?2, ?3 WHERE ?3 <= ?4
+       ON CONFLICT(device_id) DO UPDATE SET units = CASE WHEN day = ?2 THEN units + ?3 ELSE ?3 END, day = ?2
+       WHERE (CASE WHEN day = ?2 THEN units ELSE 0 END) + ?3 <= ?4`,
+    )
+    .bind(deviceId, day, units, DAILY_UNITS);
+}
+
 /**
  * Statements deleting every row of a family (records, photos, invites, the family itself, devices)
  * and detaching it from its licence, which is kept. Each runs only if `guard` (an SQL condition)
@@ -20,6 +42,7 @@ export function purgeStatements(db, familyId, guard = '1', guardArgs = []) {
       )
       .bind(familyId, ...guardArgs),
     ...['records', 'photos', 'invites'].map((t) => db.prepare(`DELETE FROM ${t} WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs)),
+    db.prepare(`DELETE FROM device_usage WHERE device_id IN (SELECT id FROM devices WHERE family_id = ?) AND ${guard}`).bind(familyId, ...guardArgs),
     db.prepare(`UPDATE licences SET family_id = NULL WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs),
     db.prepare(`DELETE FROM families WHERE id = ? AND ${guard}`).bind(familyId, ...guardArgs),
     db.prepare(`DELETE FROM devices WHERE family_id = ? AND ${guard}`).bind(familyId, ...guardArgs),

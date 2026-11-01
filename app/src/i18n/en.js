@@ -302,6 +302,7 @@ export default {
   'family.err.limit-storage': "Photo storage on the server is full: items still sync, new photos don't. Try again later.",
   'family.err.limit-record-size': 'A name is too long to sync: shorten it.',
   'family.err.limit-records': 'The family reached its item limit.',
+  'family.err.limit-daily': 'This phone sent a lot of changes today: the rest go out tomorrow, by themselves. Meanwhile they stay saved here.',
   'family.err.too-large': 'Request too large.',
   'family.err.rate-limited': 'Too many attempts. Try again in a few minutes.',
   'family.err.unknown': 'Something went wrong. Try again.',

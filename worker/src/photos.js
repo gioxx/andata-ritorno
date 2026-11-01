@@ -1,5 +1,6 @@
 import { HttpError, json, readBody } from './http.js';
 import { randomToken, requireApiDevice } from './auth.js';
+import { PHOTO_UNITS, spendDaily } from './store.js';
 import { ID } from './validate.js';
 
 const MAX_PHOTO = 3 * 1024 * 1024;
@@ -50,7 +51,7 @@ function totalCap(env) {
 }
 
 async function put(req, env, ctx, { pid }) {
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireApiDevice(env, req);
   checkPid(pid);
   const body = await readBody(req, MAX_PHOTO, 'limit-photo-size');
   if (body.byteLength === 0) throw new HttpError(400, 'bad-request');
@@ -80,7 +81,9 @@ async function put(req, env, ctx, { pid }) {
       'SELECT EXISTS (SELECT 1 FROM families WHERE id = ?1) AS family, EXISTS (SELECT 1 FROM photos WHERE family_id = ?1 AND pid = ?2) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?1) < ?3 AS ok',
     ).bind(familyId, pid, MAX_PHOTOS),
     env.DB.prepare("INSERT OR IGNORE INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos"),
-    env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND ${fits} AND (${delta} <= 0 OR bytes + ${delta} <= ?4)`).bind(
+    // The device's daily budget comes first: the reservation below runs only if it was spent.
+    spendDaily(env.DB, deviceId, PHOTO_UNITS),
+    env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND changes() = 1 AND ${fits} AND (${delta} <= 0 OR bytes + ${delta} <= ?4)`).bind(
       size,
       familyId,
       pid,
@@ -93,7 +96,8 @@ async function put(req, env, ctx, { pid }) {
        ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at`,
     ).bind(familyId, pid, size, token),
   ]);
-  if (results[3].meta.changes !== 1) {
+  if (results[3].meta.changes !== 1) throw new HttpError(429, 'limit-daily');
+  if (results[4].meta.changes !== 1) {
     const why = results[1].results[0];
     if (!why.family) throw new HttpError(401, 'unauthorized');
     throw new HttpError(413, why.ok ? 'limit-storage' : 'limit-photos');

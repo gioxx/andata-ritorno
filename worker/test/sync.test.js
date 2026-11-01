@@ -128,6 +128,27 @@ describe('record sync', () => {
     expect((await many.json()).error).toBe('limit-records');
   });
 
+  it('caps each device at 5 000 write units a day: records 1 each, photos 4 each; a new day starts over', async () => {
+    const f = await newFamily();
+    const today = new Date().toISOString().slice(0, 10);
+    const setUnits = (day, units) =>
+      env.DB.prepare('INSERT INTO device_usage (device_id, day, units) VALUES (?1, ?2, ?3) ON CONFLICT(device_id) DO UPDATE SET day = ?2, units = ?3').bind(f.deviceId, day, units).run();
+    await setUnits(today, 4999);
+    const over = await post('/api/sync', { records: [rec(), rec()] }, f.token);
+    expect(over.status).toBe(429);
+    expect((await over.json()).error).toBe('limit-daily');
+    expect((await post('/api/sync', { records: [rec()] }, f.token)).status).toBe(200);
+    await setUnits(today, 4997);
+    const photo = await put(`/api/photos/${rid()}`, new Uint8Array(5).fill(7), f.token);
+    expect(photo.status).toBe(429);
+    expect((await photo.json()).error).toBe('limit-daily');
+    // Yesterday's spending does not count.
+    await setUnits('2000-01-01', 5000);
+    expect((await post('/api/sync', { records: [rec(), rec()] }, f.token)).status).toBe(200);
+    expect((await put(`/api/photos/${rid()}`, new Uint8Array(5).fill(7), f.token)).status).toBe(204);
+    expect((await env.DB.prepare('SELECT day, units FROM device_usage WHERE device_id = ?').bind(f.deviceId).first())).toEqual({ day: today, units: 6 });
+  });
+
   it('caps a family at 30 MB of record data', async () => {
     const f = await newFamily();
     // 15 rows of 2 MB each: 30 000 000 bytes, just under the 30 MiB cap.

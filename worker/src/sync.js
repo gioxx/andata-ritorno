@@ -1,5 +1,6 @@
 import { HttpError, json, readJson } from './http.js';
 import { requireApiDevice } from './auth.js';
+import { spendDaily } from './store.js';
 import { ID } from './validate.js';
 
 const PAGE = 500;
@@ -36,7 +37,7 @@ async function countExisting(env, familyId, rids) {
 }
 
 async function push(req, env) {
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireApiDevice(env, req);
   const body = await readJson(req, MAX_PUSH * (MAX_DATA + 128));
   const records = body?.records;
   if (!Array.isArray(records)) throw new HttpError(400, 'bad-request');
@@ -58,12 +59,13 @@ async function push(req, env) {
   // Counted as if every record were new (updates are rare next to the cap): stricter, never looser.
   const bytes = records.reduce((sum, r) => sum + r.data.length, 0);
 
-  // One transaction: reserve n sequence numbers only if the new rids fit (checked inside the batch,
+  // One transaction: spend the device's daily budget, then reserve n sequence numbers only if the new rids fit (checked inside the batch,
   // so concurrent pushes cannot both pass), then give record i the number base + i. Each insert
   // runs only if the statement before it changed a row, so a refused reservation writes nothing.
   const results = await env.DB.batch([
+    spendDaily(env.DB, deviceId, n),
     env.DB.prepare(
-      `UPDATE families SET seq = seq + ?1 WHERE id = ?2 AND (SELECT COUNT(*) FROM records WHERE family_id = ?2) + ?3 <= ?4
+      `UPDATE families SET seq = seq + ?1 WHERE id = ?2 AND changes() = 1 AND (SELECT COUNT(*) FROM records WHERE family_id = ?2) + ?3 <= ?4
        AND (SELECT COALESCE(SUM(length(data)), 0) FROM records WHERE family_id = ?2) + ?5 <= ?6 RETURNING seq`,
     ).bind(n, familyId, added, MAX_RECORDS, bytes, MAX_FAMILY_DATA),
     ...records.map((r, i) =>
@@ -73,8 +75,9 @@ async function push(req, env) {
       ).bind(familyId, r.rid, familyId, n, i + 1, r.data),
     ),
   ]);
-  if (results[0].meta.changes !== 1) throw new HttpError(413, 'limit-records');
-  return json({ seq: results[0].results[0].seq });
+  if (results[0].meta.changes !== 1) throw new HttpError(429, 'limit-daily');
+  if (results[1].meta.changes !== 1) throw new HttpError(413, 'limit-records');
+  return json({ seq: results[1].results[0].seq });
 }
 
 export const syncRoutes = {

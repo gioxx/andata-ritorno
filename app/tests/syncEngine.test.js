@@ -1012,6 +1012,17 @@ describe('final review fixes', () => {
     expect(await getFamily(a.db)).toEqual(m1)
   })
 
+  it('the daily budget used up: its own message, no quick retry, the changes stay queued', async () => {
+    const timers = []
+    const a = await phone({ setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {} })
+    await seed(a, 'tab-home-a', ['item-a01'])
+    await familyOf(a)
+    server.failNext('POST', '/api/sync', 429, 'limit-daily', { act: false })
+    await a.sync()
+    expect(a.engine.status).toMatchObject({ state: 'error', errorCode: 'limit-daily', pending: 3 })
+    expect(timers.filter((x) => x.ms === 60000)).toHaveLength(0)
+  })
+
   it('a 429 during the first upload is transient: error shown, retried by itself after a minute', async () => {
     const timers = []
     const a = await phone({ setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {} })

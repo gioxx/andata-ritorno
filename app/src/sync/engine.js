@@ -487,6 +487,10 @@ export function createSyncEngine({
         emit({ state: 'removed', errorCode: null, member: false })
       } else if (e?.status === 0) {
         emit({ state: 'offline', pending: await outboxSize() })
+      } else if (e?.code === 'limit-daily') {
+        // This phone used up today's server budget: no quick retries, the next syncs try again
+        // (and go through once the day has turned).
+        emit({ state: 'error', errorCode: 'limit-daily', pending: await outboxSize() })
       } else if (e?.status === 429) {
         // Not a failure of the data: shown, and retried by itself.
         emit({ state: 'error', errorCode: 'rate-limited', pending: await outboxSize() })

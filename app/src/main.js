@@ -33,7 +33,7 @@ import { t, onLangChange } from './i18n.js';
 initUpdateToast((handlers) => registerSW(handlers));
 initInstall(); // the browser may fire beforeinstallprompt before the UI is ready
 // How often an open app looks for the family's changes by itself.
-const POLL_MS = 30 * 1000;
+const POLL_MS = 60 * 1000;
 const root = document.getElementById('app');
 const route = routeOf(location.pathname, location.hash, location.search);
 // iOS Safari outside the installed app: its storage is not the app's.

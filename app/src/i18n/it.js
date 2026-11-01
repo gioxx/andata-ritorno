@@ -303,6 +303,7 @@ export default {
   'family.err.limit-storage': 'Spazio per le foto esaurito sul server: i capi si sincronizzano, le nuove foto no. Riprova più avanti.',
   'family.err.limit-record-size': 'Un nome è troppo lungo per essere sincronizzato: accorcialo.',
   'family.err.limit-records': 'Raggiunto il limite di elementi della famiglia.',
+  'family.err.limit-daily': 'Questo telefono ha inviato molte modifiche oggi: le altre partono domani, da sole. Intanto restano salvate qui.',
   'family.err.too-large': 'Richiesta troppo grande.',
   'family.err.rate-limited': 'Troppi tentativi. Riprova tra qualche minuto.',
   'family.err.unknown': 'Qualcosa è andato storto. Riprova.',
