@@ -123,4 +123,17 @@ describe('API hardening', () => {
     expect(prepare).not.toHaveBeenCalled();
     prepare.mockRestore();
   });
+
+  it('keeps a valid phone working when its shared IP is blocked', async () => {
+    const RL_STRICT = { limit: async ({ key }) => ({ success: !key.startsWith('auth:') }) };
+    const ip = '203.0.113.88';
+    const good = 'valid-token-shared-ip-xxxxxxxx';
+    await env.DB.prepare("INSERT INTO devices (id, family_id, token_hash, name_enc, created_at, last_seen_at) VALUES ('dev-shared-ip', 'fam-shared-ip', ?, 'x', ?, ?)")
+      .bind(await sha256Hex(good), new Date().toISOString(), new Date().toISOString())
+      .run();
+    const h = (token) => ({ headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': ip } });
+    expect((await call('/api/family', h(good), { RL_STRICT })).status).not.toBe(429);
+    expect((await call('/api/family', h('wrong-token-shared-ip-x'), { RL_STRICT })).status).toBe(429);
+    expect((await call('/api/family', h(good), { RL_STRICT })).status).not.toBe(429);
+  });
 });
