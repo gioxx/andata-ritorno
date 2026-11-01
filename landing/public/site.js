@@ -127,7 +127,8 @@ if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
     const doc = new DOMParser().parseFromString(await cache.get(url), 'text/html')
     const section = doc.getElementById(it ? 'it' : 'en')
     if (!section) throw new Error('section')
-    for (const el of section.querySelectorAll('script, style, iframe, [style]')) el.remove()
+    // "Back to A/R" belongs to the app's own page; here the dialog has its close button.
+    for (const el of section.querySelectorAll('script, style, iframe, [style], a.back')) el.remove()
     // Links inside the text: same-page anchors stay, everything else opens in a new tab.
     for (const a of section.querySelectorAll('a[href]')) {
       const href = a.getAttribute('href')
