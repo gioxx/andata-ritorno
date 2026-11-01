@@ -81,3 +81,35 @@ describe('requireDevice', async () => {
     expect(row.last_seen_at).toBe(recent);
   });
 });
+
+describe('API hardening', () => {
+  const call = (path, init = {}, extra = {}) => worker.fetch(new Request(`https://ar.test${path}`, init), { ...env, ...extra }, {});
+
+  it('refuses requests from foreign web pages, with security headers on every answer', async () => {
+    const res = await call('/api/invites/info?t=x', { headers: { origin: 'https://evil.example' } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'forbidden-origin' });
+    const own = await call('/api/invites/info?t=x', { headers: { origin: 'https://ar.test' } });
+    expect(own.status).not.toBe(403);
+    for (const r of [res, own]) {
+      expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(r.headers.get('cross-origin-resource-policy')).toBe('same-site');
+    }
+  });
+
+  it('accepts JSON bodies only when declared as JSON', async () => {
+    const body = JSON.stringify({ code: 'AR-XXXX-XXXX-XXXX' });
+    expect((await call('/api/redeem', { method: 'POST', headers: { 'content-type': 'text/plain' }, body })).status).toBe(415);
+    expect((await call('/api/redeem', { method: 'POST', body })).status).toBe(415);
+  });
+
+  it('slows down an IP that keeps sending wrong device tokens', async () => {
+    let calls = 0;
+    const RL_STRICT = { limit: async ({ key }) => ({ success: !(key.startsWith('auth:') && ++calls > 3) }) };
+    const statuses = [];
+    for (let i = 0; i < 5; i++) {
+      statuses.push((await call('/api/family', { headers: { authorization: `Bearer wrong-token-${i}xxxx`, 'cf-connecting-ip': '203.0.113.9' } }, { RL_STRICT })).status);
+    }
+    expect(statuses).toEqual([401, 401, 401, 429, 429]);
+  });
+});

@@ -305,6 +305,8 @@ export default {
   'family.err.limit-daily': 'This phone sent a lot of changes today: the rest go out tomorrow, by themselves. Meanwhile they stay saved here.',
   'family.err.too-large': 'Request too large.',
   'family.err.registrations-closed': 'New activations are paused for a while. Try again later: if you have a code, it stays valid.',
+  'family.err.unsupported-media-type': 'Invalid request. Update the app and try again.',
+  'family.err.forbidden-origin': 'Request refused: open A/R from app.ar.gioxx.org.',
   'family.err.rate-limited': 'Too many attempts. Try again in a few minutes.',
   'family.err.unknown': 'Something went wrong. Try again.',
   'family.code.title': 'Enter the code',
