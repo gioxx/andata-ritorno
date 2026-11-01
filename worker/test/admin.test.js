@@ -173,3 +173,69 @@ describe('GET /api/admin/usage', () => {
     expect(out.cloudflare).toEqual({ configured: true, error: 'not authorized' });
   });
 });
+
+describe('Telegram on the dashboard', () => {
+  const TG = { TELEGRAM_BOT_TOKEN: 'tg-secret-token', TELEGRAM_CHAT_ID: '42' };
+  const send = async (extra, telegram, { jwt, origin = 'https://ar.test' } = {}) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
+      if (url.startsWith('https://api.telegram.org/')) return telegram(url, init);
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const headers = { 'content-type': 'application/json', origin, ...(jwt ? { 'cf-access-jwt-assertion': jwt } : {}) };
+    return worker.fetch(new Request('https://ar.test/api/admin/telegram/test', { method: 'POST', headers, body: '{}' }), { ...env, ...ON, ...extra }, {});
+  };
+
+  it('shows in the stats whether the bot is configured', async () => {
+    expect((await (await stats(await token())).json()).telegram).toEqual({ configured: false });
+    expect((await (await stats(await token(), { ...ON, ...TG })).json()).telegram).toEqual({ configured: true });
+  });
+
+  it('sends a test message to the configured chat', async () => {
+    const calls = [];
+    const res = await send(TG, (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return Response.json({ ok: true }); }, { jwt: await token() });
+    expect(await res.json()).toEqual({ configured: true, sent: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('https://api.telegram.org/bottg-secret-token/sendMessage');
+    expect(calls[0].body.chat_id).toBe('42');
+  });
+
+  it("reports Telegram's reason, and never the token or a stack trace", async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const jwt = await token();
+    const refused = await (await send(TG, () => Response.json({ ok: false, description: 'Bad Request: chat not found' }, { status: 400 }), { jwt })).json();
+    expect(refused).toEqual({ configured: true, sent: false, error: 'telegram 400: Bad Request: chat not found' });
+    const crashed = await (await send(TG, (url) => { throw new TypeError(`network down for ${url}`); }, { jwt })).json();
+    expect(crashed).toEqual({ configured: true, sent: false, error: 'unexpected error (see the Worker logs)' });
+    expect(logged).toHaveBeenCalled();
+    for (const call of logged.mock.calls) expect(call.map(String).join(' ')).not.toContain('tg-secret-token');
+  });
+
+  it('says when the bot is not configured', async () => {
+    const res = await send({}, () => Response.json({ ok: true }), { jwt: await token() });
+    expect(await res.json()).toEqual({ configured: false, sent: false, error: 'not-configured' });
+  });
+
+  it('looks absent without a valid token and refuses cross-site requests', async () => {
+    const ok = () => Response.json({ ok: true });
+    expect((await send(TG, ok)).status).toBe(404);
+    expect((await send(TG, ok, { jwt: await token(), origin: 'https://evil.example' })).status).toBe(403);
+  });
+});
+
+describe('usage errors', () => {
+  it('hides unexpected errors behind a generic message', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url === `https://${DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
+      throw new Error('internal detail at /some/path.js:12');
+    });
+    await caches.default.delete(new Request('https://resend-usage.internal/v2'));
+    const res = await worker.fetch(new Request('https://ar.test/api/admin/usage', { headers: { 'cf-access-jwt-assertion': await token() } }), { ...env, ...ON, RESEND_READ_KEY: 're', CF_ANALYTICS_TOKEN: 't', CF_ACCOUNT_ID: 'a' }, {});
+    const out = await res.json();
+    expect(out.resend).toEqual({ error: 'unexpected error (see the Worker logs)' });
+    expect(out.cloudflare).toEqual({ configured: true, error: 'unexpected error (see the Worker logs)' });
+  });
+});
