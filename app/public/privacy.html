@@ -19,10 +19,10 @@
 
 <section id="it" lang="it" aria-labelledby="it-h">
 <h1 id="it-h">Informativa sulla privacy</h1>
-<p class="meta">Andata e Ritorno (A/R) · ar.gioxx.org · aggiornata a ottobre 2026 (versione 3.0.0)</p>
+<p class="meta">Andata e Ritorno (A/R) · ar.gioxx.org · aggiornata a novembre 2026 (versione 3.0.0)</p>
 
 <h2>In breve</h2>
-<p>Se usi A/R da sola, tutto resta sul tuo telefono e a noi non arriva nulla. Se attivi la condivisione in famiglia, capi e foto vengono caricati su un server in forma cifrata, e solo i telefoni della tua famiglia possono leggerli. Nessun tracciamento, nessuna analisi, nessuna pubblicità.</p>
+<p>Se usi A/R senza famiglia, tutto resta sul tuo telefono e a noi non arriva nulla. Se attivi la condivisione in famiglia, capi e foto vengono caricati su un server in forma cifrata, e solo i telefoni della tua famiglia possono leggerli. Nessun tracciamento, nessuna analisi, nessuna pubblicità.</p>
 
 <h2>Uso gratuito: tutto sul dispositivo</h2>
 <p>Schede, capi, foto, categorie e preferenze sono salvati nella memoria del browser del tuo telefono (IndexedDB). Non c'è nessun account e questi dati non vengono inviati a nessuno. Il sito si limita a consegnarti i file dell'app. I backup <code>.zip</code> li crei e li conservi tu.</p>
@@ -35,7 +35,7 @@
 
 <h2>Pagamento e indirizzo email</h2>
 <ul>
-<li><strong>Stripe</strong> incassa il pagamento ed è il venditore (merchant of record, tramite Managed Payments). Dati di carta e di pagamento li tratta Stripe secondo la propria informativa; A/R non li riceve.</li>
+<li>Il pagamento passa da <strong>Stripe Managed Payments</strong>: il venditore verso di te è <strong>Link</strong> (Link, LLC, società del gruppo Stripe), che incassa, emette ricevuta e fattura e versa l'IVA. Dati di carta e di pagamento li trattano Stripe e Link secondo la propria informativa; A/R non li riceve.</li>
 <li>L'indirizzo email indicato al pagamento serve a due cose: spedirti il codice di sblocco e, conservato <em>solo come hash con chiave segreta (HMAC)</em>, riconoscere la tua licenza se devi recuperarla. Non conserviamo l'indirizzo in chiaro e non lo usiamo per altro (niente newsletter, niente marketing).</li>
 <li><strong>Resend</strong> spedisce le email (codice di sblocco e link di recupero licenza) dall'indirizzo noreply@ar.gioxx.org e vede quindi l'indirizzo del destinatario e il testo del messaggio.</li>
 <li>I codici che ti diamo a mano (senza pagamento online) non hanno nessun indirizzo email associato.</li>
@@ -44,7 +44,7 @@
 <h2>Chi tratta i dati</h2>
 <ul>
 <li><strong>Cloudflare</strong>: hosting del sito, database D1 e archivio R2. Come ogni fornitore di rete può trattare dati tecnici di connessione (come l'indirizzo IP) per far funzionare e proteggere il servizio; usiamo l'indirizzo IP solo per limitare gli abusi.</li>
-<li><strong>Stripe</strong>: pagamenti, come sopra.</li>
+<li><strong>Stripe</strong> e <strong>Link</strong>: pagamenti, come sopra.</li>
 <li><strong>Resend</strong>: invio delle email, come sopra.</li>
 </ul>
 <p>Non vendiamo né cediamo dati a nessun altro.</p>
@@ -57,8 +57,16 @@
 <li>Uscire dalla famiglia o usare "Elimina tutti i dati" non cancella i dati degli altri telefoni. I dati sul tuo telefono li cancelli tu, dal menu.</li>
 </ul>
 
+<h2>Titolare, basi giuridiche e trasferimenti</h2>
+<ul>
+<li>Titolare del trattamento: Giovanni Solone (Gioxx), Italia, <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</li>
+<li>Sincronizzazione, codici, licenza ed email del codice: servono a fornirti il servizio che hai chiesto (esecuzione del contratto, art. 6.1.b GDPR). Indirizzo IP e limiti di frequenza: legittimo interesse a proteggere il servizio dagli abusi (art. 6.1.f).</li>
+<li>Per far funzionare il servizio guardiamo solo numeri aggregati (quante famiglie, telefoni, record e byte di foto ci sono), mai il contenuto, che resta cifrato.</li>
+<li>Cloudflare, Stripe, Link e Resend possono trattare dati anche fuori dall'UE (per esempio negli USA), con le garanzie previste dal GDPR (clausole contrattuali standard o EU-US Data Privacy Framework).</li>
+</ul>
+
 <h2>I tuoi diritti</h2>
-<p>Puoi chiedere accesso, rettifica o cancellazione dei dati che ci riguardano (in pratica: il record della licenza e l'hash dell'email) e puoi proporre reclamo al Garante per la protezione dei dati personali. I dati cifrati della famiglia li cancelli da solo uscendo dalla famiglia con l'ultimo telefono. Per ogni richiesta scrivi a <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</p>
+<p>Puoi chiedere accesso, rettifica o cancellazione dei dati che ci riguardano (in pratica: il record della licenza e l'hash dell'email) e puoi proporre reclamo al Garante per la protezione dei dati personali. I dati cifrati della famiglia li cancelli tu, uscendo dalla famiglia con l'ultimo telefono. Per ogni richiesta scrivi a <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</p>
 
 <h2>Cookie e tracciamento</h2>
 <p>Nessun cookie, nessuno strumento di analisi, nessuna pubblicità, nessun contenuto di terzi incorporato. Il codice dell'app è pubblico (licenza AGPL-3.0) su <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, quindi quanto scritto qui è verificabile.</p>
@@ -69,7 +77,7 @@
 
 <section id="en" lang="en" aria-labelledby="en-h">
 <h1 id="en-h">Privacy policy</h1>
-<p class="meta">Andata e Ritorno (A/R) · ar.gioxx.org · updated October 2026 (version 3.0.0)</p>
+<p class="meta">Andata e Ritorno (A/R) · ar.gioxx.org · updated November 2026 (version 3.0.0)</p>
 
 <h2>In short</h2>
 <p>If you use A/R on its own, everything stays on your phone and nothing reaches us. If you turn on family sharing, items and photos are uploaded to a server in encrypted form, and only your family's phones can read them. No tracking, no analytics, no ads.</p>
@@ -85,7 +93,7 @@
 
 <h2>Payment and email address</h2>
 <ul>
-<li><strong>Stripe</strong> takes the payment and is the seller (merchant of record, through Managed Payments). Stripe handles card and payment data under its own privacy policy; A/R never receives it.</li>
+<li>Payments go through <strong>Stripe Managed Payments</strong>: the seller towards you is <strong>Link</strong> (Link, LLC, a Stripe company), which takes the payment, issues receipt and invoice and pays the VAT. Stripe and Link handle card and payment data under their own privacy policies; A/R never receives it.</li>
 <li>The email address given at checkout is used for two things: sending you the unlock code and, kept <em>only as a keyed hash (HMAC)</em>, recognising your licence if you need to recover it. We do not store the address in plaintext and do not use it for anything else (no newsletters, no marketing).</li>
 <li><strong>Resend</strong> sends the emails (unlock code and licence-recovery link) from noreply@ar.gioxx.org, so it sees the recipient's address and the message text.</li>
 <li>Codes we hand out manually (no online payment) have no email address attached.</li>
@@ -94,7 +102,7 @@
 <h2>Who processes the data</h2>
 <ul>
 <li><strong>Cloudflare</strong>: hosting of the site, D1 database and R2 storage. Like any network provider it may process technical connection data (such as the IP address) to run and protect the service; we use the IP address only to limit abuse.</li>
-<li><strong>Stripe</strong>: payments, as above.</li>
+<li><strong>Stripe</strong> and <strong>Link</strong>: payments, as above.</li>
 <li><strong>Resend</strong>: email delivery, as above.</li>
 </ul>
 <p>We do not sell or share data with anyone else.</p>
@@ -105,6 +113,14 @@
 <li>Photos no longer used by any item are deleted from the server after 30 days.</li>
 <li>The licence record (kind, number of phones, code hash, email hash and, for codes bought online, the Stripe Checkout session id as the payment reference) is kept so the purchase is honoured if you change phone.</li>
 <li>Leaving the family or using "Delete all data" does not delete the other phones' data. Data on your own phone is deleted by you, from the menu.</li>
+</ul>
+
+<h2>Controller, legal bases and transfers</h2>
+<ul>
+<li>Data controller: Giovanni Solone (Gioxx), Italy, <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</li>
+<li>Sync, codes, licence and the code email are needed to provide the service you asked for (performance of a contract, art. 6(1)(b) GDPR). IP addresses and rate limits: legitimate interest in protecting the service from abuse (art. 6(1)(f)).</li>
+<li>To run the service we only look at aggregate numbers (how many families, phones, records and photo bytes there are), never the content, which stays encrypted.</li>
+<li>Cloudflare, Stripe, Link and Resend may process data outside the EU too (for example in the US), with the safeguards the GDPR requires (standard contractual clauses or the EU-US Data Privacy Framework).</li>
 </ul>
 
 <h2>Your rights</h2>

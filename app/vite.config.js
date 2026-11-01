@@ -15,7 +15,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
         navigateFallback: 'index.html',
         // The static policy page is its own document, not an app route.
-        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/api\//],
+        navigateFallbackDenylist: [/^\/privacy\.html$/, /^\/terms\.html$/, /^\/api\//],
       },
     }),
   ],

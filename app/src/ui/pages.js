@@ -27,6 +27,7 @@ export async function renderUnlockPage(root, { api, sessionId, inSafari }) {
     <div id="unlockBody"><p>${t('sync.syncing')}</p></div>
     <a class="pageLink" href="/">${t('page.openApp')}</a>
     <a class="pageLink" href="/privacy.html" target="_blank" rel="noopener">${t('privacy.link')}</a>
+    <a class="pageLink" href="/terms.html" target="_blank" rel="noopener">${t('terms.link')}</a>
   </div>`
   const body = root.querySelector('#unlockBody')
   const draw = async () => {

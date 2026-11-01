@@ -180,6 +180,7 @@ export default {
   'menu.uninstallHow': 'Come disinstallare',
   'menu.privacy': 'Privacy',
   'privacy.link': 'Informativa sulla privacy',
+  'terms.link': 'Termini di servizio e di acquisto',
   'menu.wipe': 'Elimina tutti i dati',
   'wipe.title': 'Elimina tutti i dati',
   'wipe.body': 'Verranno cancellati da questo telefono schede, capi, foto, categorie e preferenze. Non si può annullare.',
