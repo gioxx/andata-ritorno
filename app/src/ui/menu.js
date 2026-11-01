@@ -58,7 +58,7 @@ function renderThemeSeg() {
 function renderLangSeg() {
   const cur = getLangChoice()
   const seg = dlg.querySelector('#langSeg')
-  keepFocus(seg, () => { seg.innerHTML = langs().map(([v, l]) => `<button type="button" data-lang-choice="${v}" class="${v === cur ? 'active' : ''}" aria-pressed="${v === cur}">${l}</button>`).join('') })
+  keepFocus(seg, () => { seg.innerHTML = langs().map(([v, l]) => `<button type="button" data-lang-choice="${v}"${v === 'auto' ? '' : ` lang="${v}"`} class="${v === cur ? 'active' : ''}" aria-pressed="${v === cur}">${l}</button>`).join('') })
 }
 
 /** Fill the dynamic parts (info lines, todo badge, segmented controls). */

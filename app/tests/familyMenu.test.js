@@ -38,7 +38,7 @@ describe('familyMenuHtml', () => {
     const on = familyMenuHtml({ family, info, payments: true, now: NOW })
     expect(acts(on)).toEqual(['sync', 'devices', 'invite', 'slot', 'kit', 'leave'])
     expect(on).toContain('Famiglia Rossi')
-    expect(on).toContain('Ultima sync: 5 min fa')
+    expect(on).toContain('Ultima sincronizzazione: 5 min fa')
     expect(on).toContain('2 / 4')
     expect(on).toContain('1,99 €')
     expect(familyMenuHtml({ family, info, payments: false, now: NOW })).not.toContain('1,99')
@@ -57,7 +57,7 @@ describe('familyMenuHtml', () => {
 
   it('active before the first sync: no name or count yet, never throws', () => {
     const html = familyMenuHtml({ family, info: null, payments: false, now: NOW })
-    expect(html).toContain('Ultima sync: mai')
+    expect(html).toContain('Ultima sincronizzazione: mai')
     expect(html).toContain('– / 4')
   })
 

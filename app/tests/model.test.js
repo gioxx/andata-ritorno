@@ -15,12 +15,12 @@ describe('ui model', () => {
   })
   it('in an active family the backup line says the server keeps an encrypted copy, and nothing nags', async () => {
     const { setLang } = await import('../src/i18n.js')
-    expect(backupInfoLine(3, null, true)).toBe('I dati sono sincronizzati e cifrati sul server. Tieni al sicuro il kit di recupero: senza, la copia sul server non è leggibile.')
+    expect(backupInfoLine(3, null, true)).toBe('La condivisione in famiglia è attiva e i dati viaggiano cifrati. Tieni al sicuro il kit di recupero: senza, la copia sul server non è leggibile.')
     expect(persistLine(false, true)).toBe('')
     expect(persistLine(true, true)).toBe('Memoria protetta ✓')
     setLang('en')
     try {
-      expect(backupInfoLine(3, null, true)).toBe("Your data is synced and encrypted on the server. Keep your recovery kit safe: without it the server copy can't be read.")
+      expect(backupInfoLine(3, null, true)).toBe("Family sharing is on and data travels encrypted. Keep your recovery kit safe: without it the server copy can't be read.")
     } finally { setLang('it') }
   })
   it('mapping rows: new tab first, then existing', () => {

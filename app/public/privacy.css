@@ -2,7 +2,7 @@
 :root {
   color-scheme: light;
   --bg: #fbf7f1; --fg: #2b2620; --muted: #6a6052; --chip: #efe7db; --tile: #fff;
-  --accent-strong: #b4532f;
+  --accent-strong: #a34a2a;
   --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 @media (prefers-color-scheme: dark) {

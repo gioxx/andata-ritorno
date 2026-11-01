@@ -3,7 +3,7 @@
 import { renderSVG } from 'uqr'
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
-import { openModal, reportError } from './dialogs.js'
+import { openModal, reportError, labelDialog } from './dialogs.js'
 import { familyError } from './familyMenu.js'
 import { ago, enableSyncLine } from './syncLine.js'
 import { scanButton, scanQr } from './scan.js'
@@ -86,6 +86,20 @@ function wireScan(d, input) {
  * @param {{retry?: boolean}} [o] retry: this dialog joins or restores
  * @returns {Promise<boolean>} true when refused (a dialog says why)
  */
+/** A success message: read out politely, not as an error (and any error shown before goes). */
+function say(d, msg) {
+  const err = d.querySelector('.err')
+  let ok = d.querySelector('.ok')
+  if (!ok) {
+    ok = document.createElement('p')
+    ok.className = 'plain ok'
+    ok.setAttribute('role', 'status')
+    err.before(ok)
+  }
+  err.textContent = ''
+  ok.textContent = msg
+}
+
 async function refusedByMembership(title, { retry = false } = {}) {
   const meta = await getFamily(ctx.db)
   if (!meta) return false
@@ -138,6 +152,7 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
       d.querySelector('form').innerHTML = `<h3>${t('family.slot')}</h3>
         <p class="plain" role="status">${t('family.slotCode.done', { n: deviceLimit })}</p>
         <button value="" class="primary">${t('common.close')}</button>`
+      labelDialog(d)
       d.querySelector('button').focus()
       syncNow('menu') // refreshes the devices count
       return
@@ -251,7 +266,7 @@ export async function openInvite() {
     setError(d, null)
     try {
       if (navigator.share) await navigator.share({ url: link })
-      else { await navigator.clipboard.writeText(link); d.querySelector('.err').textContent = t('family.invite.copied') }
+      else { await navigator.clipboard.writeText(link); say(d, t('family.invite.copied')) }
     } catch (err) {
       if (err?.name !== 'AbortError') d.querySelector('.err').textContent = t('family.copyFailed')
     }
@@ -276,7 +291,7 @@ export async function openKit({ first = false } = {}) {
     <p class="plain err" role="alert"></p><button value="" class="cancel">${t(first ? 'common.ok' : 'common.close')}</button></form>`)
   d.addEventListener('click', async (e) => {
     if (e.target.closest('[data-copy]')) {
-      try { await navigator.clipboard.writeText(kit); d.querySelector('.err').textContent = t('family.kit.copied') } catch { d.querySelector('.err').textContent = t('family.copyFailed') }
+      try { await navigator.clipboard.writeText(kit); say(d, t('family.kit.copied')) } catch { d.querySelector('.err').textContent = t('family.copyFailed') }
     } else if (e.target.closest('[data-save]')) {
       const url = URL.createObjectURL(new Blob([`${kit}\n`], { type: 'text/plain' }))
       const a = Object.assign(document.createElement('a'), { href: url, download: t('family.kit.file') })
@@ -487,7 +502,7 @@ export async function openLicence({ error = '' } = {}) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { d.querySelector('.err').textContent = t('family.licence.badEmail'); return }
     await ctx.api.licenceEmail(v)
     // The answer is the same whether or not the email matched a licence.
-    d.querySelector('.err').textContent = t('family.licence.sent')
+    say(d, t('family.licence.sent'))
   }))
   d.querySelector('[data-link]').addEventListener('click', () => {
     let token

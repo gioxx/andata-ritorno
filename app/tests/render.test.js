@@ -74,7 +74,7 @@ describe('tag row', () => {
     const root = document.createElement('div')
     renderApp(root, state([]))
     expect(root.querySelectorAll('.tags .chip')).toHaveLength(0)
-    expect(root.querySelector('.tags').textContent).toContain('Nessun capo in questo tab')
+    expect(root.querySelector('.tags').textContent).toContain('Nessun capo in questa scheda')
     setLang('en')
     try {
       renderApp(root, state([]))

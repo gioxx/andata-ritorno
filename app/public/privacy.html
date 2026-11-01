@@ -14,7 +14,7 @@
 <main>
 <nav class="langs" aria-label="Lingua / Language">
   <a href="#it" hreflang="it">Italiano</a>
-  <a href="#en" hreflang="en">English</a>
+  <a href="#en" hreflang="en" lang="en">English</a>
 </nav>
 
 <section id="it" lang="it" aria-labelledby="it-h">
@@ -28,7 +28,7 @@
 <p>Schede, capi, foto, categorie e preferenze sono salvati nella memoria del browser del tuo telefono (IndexedDB). Non c'è nessun account e questi dati non vengono inviati a nessuno. Il sito si limita a consegnarti i file dell'app. I backup <code>.zip</code> li crei e li conservi tu.</p>
 
 <h2>Condivisione in famiglia (a pagamento)</h2>
-<p>Solo se inserisci un codice di sblocco e crei una famiglia, i dati vengono sincronizzati tra i telefoni tramite Cloudflare (database D1 e archivio R2). Prima di partire dal telefono, capi, schede, categorie, foto, nome della famiglia e nomi dei telefoni sono cifrati (AES-GCM 256 bit) con una chiave generata sul tuo telefono. Quella chiave e il segreto del kit di recupero non vengono mai inviati al server in chiaro: chi gestisce il servizio non può leggere i tuoi dati.</p>
+<p>Solo se crei una famiglia, accetti un invito o ripristini una famiglia con il kit, i dati vengono sincronizzati tra i telefoni tramite Cloudflare (database D1 e archivio R2). Prima di partire dal telefono, capi, schede, categorie, foto, nome della famiglia e nomi dei telefoni sono cifrati (AES-GCM 256 bit) con una chiave generata sul tuo telefono. Quella chiave e il segreto del kit di recupero non vengono mai inviati al server in chiaro: chi gestisce il servizio non può leggere i tuoi dati.</p>
 <p>Il server vede invece questi metadati: identificatori casuali (famiglia, telefono, record, foto), numeri di sequenza, dimensioni, orari di caricamento delle foto, numero di telefoni collegati e, per ogni telefono, quando è stato aggiunto e quando è stato attivo l'ultima volta. Conserva inoltre solo l'impronta (hash) dei codici e dei token di accesso, non i valori.</p>
 <p>La sede fisica dei dati è decisa da Cloudflare (UE o USA, secondo la sua infrastruttura).</p>
 <p><strong>Attenzione:</strong> se perdi tutti i telefoni e anche il kit di recupero, la copia sul server non si può più leggere, nemmeno da noi. Per questo conserva il kit e fai ogni tanto un backup. I backup fatti mentre sei in una famiglia contengono il kit di recupero e non sono cifrati: tienili al sicuro.</p>
@@ -66,7 +66,7 @@
 </ul>
 
 <h2>I tuoi diritti</h2>
-<p>Puoi chiedere accesso, rettifica o cancellazione dei dati che ci riguardano (in pratica: il record della licenza e l'hash dell'email) e puoi proporre reclamo al Garante per la protezione dei dati personali. I dati cifrati della famiglia li cancelli tu, uscendo dalla famiglia con l'ultimo telefono. Per ogni richiesta scrivi a <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</p>
+<p>Puoi chiedere accesso, rettifica o cancellazione dei dati che ti riguardano (in pratica: il record della licenza e l'hash dell'email) e puoi proporre reclamo al Garante per la protezione dei dati personali. I dati cifrati della famiglia li cancelli tu, uscendo dalla famiglia con l'ultimo telefono. Per ogni richiesta scrivi a <a href="mailto:privacy@gioxx.org">privacy@gioxx.org</a>.</p>
 
 <h2>Cookie e tracciamento</h2>
 <p>Nessun cookie, nessuno strumento di analisi, nessuna pubblicità, nessun contenuto di terzi incorporato. Il codice dell'app è pubblico (licenza AGPL-3.0) su <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, quindi quanto scritto qui è verificabile.</p>
@@ -86,7 +86,7 @@
 <p>Tabs, items, photos, categories and preferences are saved in your phone's browser storage (IndexedDB). There is no account, and this data is not sent to anyone. The site only delivers the app's files. You create and keep the <code>.zip</code> backups yourself.</p>
 
 <h2>Family sharing (paid)</h2>
-<p>Only if you enter an unlock code and create a family is data synced between phones, through Cloudflare (D1 database and R2 storage). Before it leaves the phone, items, tabs, categories, photos, the family name and the phone names are encrypted (AES-GCM, 256-bit) with a key generated on your phone. That key and the recovery kit secret are never sent to the server in plaintext: whoever runs the service cannot read your data.</p>
+<p>Only if you create a family, accept an invite or restore a family with the kit is data synced between phones, through Cloudflare (D1 database and R2 storage). Before it leaves the phone, items, tabs, categories, photos, the family name and the phone names are encrypted (AES-GCM, 256-bit) with a key generated on your phone. That key and the recovery kit secret are never sent to the server in plaintext: whoever runs the service cannot read your data.</p>
 <p>The server does see this metadata: random identifiers (family, phone, record, photo), sequence numbers, sizes, photo upload times, how many phones are connected and, for each phone, when it was added and when it was last active. It also keeps only hashes of codes and access tokens, never the values themselves.</p>
 <p>Where the data physically sits is decided by Cloudflare (EU or US, depending on its infrastructure).</p>
 <p><strong>Note:</strong> if you lose every phone and the recovery kit too, the server copy can no longer be read, not even by us. Keep the kit safe and make a backup now and then. Backups made while you are in a family contain the recovery kit and are not encrypted: store them safely.</p>
