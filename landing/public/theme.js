@@ -29,3 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
     show(current)
   })
 })
+
+// Language: the Italian pages send browsers with no Italian among their languages to the English
+// ones, once. Choosing IT or EN by hand is remembered and always wins. Runs before the first paint.
+const LANG_KEY = 'ar-landing-lang'
+const EN_PAGE = { '/': '/en/', '/guida/': '/en/guide/' }
+const chosen = (() => { try { return localStorage.getItem(LANG_KEY) } catch { return null } })()
+const target = EN_PAGE[location.pathname]
+const speaksItalian = (navigator.languages?.length ? navigator.languages : [navigator.language]).some((l) => /^it\b/i.test(l || ''))
+if (target && !chosen && !speaksItalian) location.replace(target + location.search + location.hash)
+
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[hreflang]')
+  if (!a) return
+  try { localStorage.setItem(LANG_KEY, a.hreflang) } catch { /* private mode: no memory, no redirect loop either */ }
+})
