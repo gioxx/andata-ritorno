@@ -15,7 +15,7 @@ const MAX_PUSH = 200
 const MAX_RECORDS = 10000
 const MAX_DATA = 64 * 1024
 const MAX_PHOTO = 3 * 1024 * 1024
-const MAX_PHOTOS = 2000
+const MAX_PHOTOS = 500
 
 class HttpError extends Error {
   constructor(status, code, extra) {
