@@ -31,6 +31,16 @@ const SEEN_EVERY_MS = 10 * 60 * 1000;
 const blockedIps = new Map();
 const BLOCK_MS = 60 * 1000;
 const MAX_BLOCKED = 10_000;
+// Token hashes this isolate recently found valid: a phone that shares its IP with a misbehaving
+// client (mobile carriers, offices) keeps working while that IP is blocked.
+const knownTokens = new Map();
+const KNOWN_MS = 30 * 60 * 1000;
+const MAX_KNOWN = 10_000;
+
+function remember(map, key, until, max) {
+  if (map.size >= max && !map.has(key)) map.delete(map.keys().next().value);
+  map.set(key, until);
+}
 
 export async function requireDevice(env, req) {
   // Device routes skip the per-IP limit (a family's phones may share one IP). Failed attempts do
@@ -38,21 +48,24 @@ export async function requireDevice(env, req) {
   // and the database is not used as a punching bag.
   const ip = clientIp(req);
   const now = Date.now();
-  if ((blockedIps.get(ip) ?? 0) > now) throw new HttpError(429, 'rate-limited');
+  const m = /^Bearer ([A-Za-z0-9_-]{8,200})$/.exec(req.headers.get('authorization') || '');
+  const hash = m ? await sha256Hex(m[1]) : null;
+  // A blocked IP is turned away before the database, unless the token was valid here recently.
+  if ((blockedIps.get(ip) ?? 0) > now && !((knownTokens.get(hash) ?? 0) > now)) throw new HttpError(429, 'rate-limited');
   const refuse = async () => {
     if (await limited(env.RL_STRICT, `auth:${ip}`)) {
-      if (blockedIps.size >= MAX_BLOCKED) blockedIps.delete(blockedIps.keys().next().value);
-      blockedIps.set(ip, now + BLOCK_MS);
+      remember(blockedIps, ip, now + BLOCK_MS, MAX_BLOCKED);
       throw new HttpError(429, 'rate-limited');
     }
     throw new HttpError(401, 'unauthorized');
   };
-  const m = /^Bearer ([A-Za-z0-9_-]{8,200})$/.exec(req.headers.get('authorization') || '');
-  if (!m) return refuse();
-  const row = await env.DB.prepare('SELECT id, family_id, last_seen_at FROM devices WHERE token_hash = ?')
-    .bind(await sha256Hex(m[1]))
-    .first();
-  if (!row) return refuse();
+  if (!hash) return refuse();
+  const row = await env.DB.prepare('SELECT id, family_id, last_seen_at FROM devices WHERE token_hash = ?').bind(hash).first();
+  if (!row) {
+    knownTokens.delete(hash);
+    return refuse();
+  }
+  remember(knownTokens, hash, now + KNOWN_MS, MAX_KNOWN);
   if (!(now - Date.parse(row.last_seen_at) < SEEN_EVERY_MS)) {
     await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?')
       .bind(new Date(now).toISOString(), row.id)
