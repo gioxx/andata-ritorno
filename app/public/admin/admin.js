@@ -393,7 +393,7 @@ function render() {
     }
     $('#out-local').replaceChildren(
       card('Telefoni attivi senza famiglia', 'Un telefono conta una volta per settimana ISO; l’ultima colonna è la settimana in corso, ancora parziale', 'w8',
-        barChart(lu.weeks.map((w) => w.week), weekS, { labelOf: (w) => `S${Number(w.slice(6))}`, w: WIDTH.w8 }),
+        barChart(lu.weeks.map((w) => w.week), weekS, { labelOf: (w) => `S${Number(w.slice(6))}`, w: cw('w8') }),
         table(['Settimana', 'Telefoni'], lu.weeks.map((w) => [wk(w.week), n(w.n)]))),
       card(`Settimana scorsa: ${n(sumLast)} telefoni`, `${wk(lu.lastWeek)} · per fascia`, 'w4',
         sumLast ? split('Capi', sorted(lu.items)) : el('p', { class: 'empty', text: 'Nessun dato' }),

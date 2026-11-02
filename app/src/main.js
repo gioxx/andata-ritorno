@@ -140,11 +140,13 @@ async function startApp() {
     if (await getFamily(db)) await startSync();
     // Opened from an invite or a licence link: its screen goes over the app (or the welcome screen).
     // Anonymous weekly count (issue #35): only without a family, only after the one-time notice.
+    // Never in the way: a failed storage read just means no notice and no ping this time.
     const alone = async () => { const f = await getFamily(db); return !f || !!f.removed };
-    const ping = async () => maybePing({ version: VERSION, items: store.items, inFamily: !(await alone()) });
-    const checkNotice = initStatsNotice({ shouldShow: async () => store.items.length > 0 && await alone(), onAnswered: ping });
+    const ping = () => alone().then((ok) => maybePing({ version: VERSION, items: store.items, inFamily: !ok })).catch(() => false);
+    const check = initStatsNotice({ shouldShow: async () => store.items.length > 0 && await alone(), onAnswered: ping });
+    const checkNotice = () => { check().catch(() => {}) };
     hooks.onStatsChange = () => { checkNotice(); ping() };
-    subscribe(() => { checkNotice() });
+    subscribe(checkNotice);
     checkNotice();
     setTimeout(ping, 5000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ping() });
