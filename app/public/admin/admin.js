@@ -440,6 +440,10 @@ async function load() {
 
 async function setRegistrations(open) {
   if (!open && !confirm('Bloccare le nuove registrazioni? Le famiglie esistenti non ne risentono.')) return
+  // While saving, nothing else may start a load: the save's own outcome (its error, or the load
+  // that follows it) is the only thing that writes the status.
+  const locked = [$('#reload'), ...$('#range').querySelectorAll('button'), ...out.querySelectorAll('#reg-toggle')]
+  for (const b of locked) b.disabled = true
   status('Salvataggio…', { busy: true })
   try {
     const res = await fetch('/api/admin/registrations', {
@@ -449,10 +453,13 @@ async function setRegistrations(open) {
       body: JSON.stringify({ open }),
     })
     if (!res.ok) throw new Error(`Errore ${res.status}`)
-    await load()
   } catch (e) {
     status(e.message, { error: true })
+    return
+  } finally {
+    for (const b of locked) b.disabled = false
   }
+  await load()
 }
 
 async function testTelegram(btn) {
