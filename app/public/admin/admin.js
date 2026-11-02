@@ -556,6 +556,11 @@ $('.jump').addEventListener('click', (e) => {
   target.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
   history.replaceState(null, '', a.hash)
 })
+// Jumps land below the sticky header at whatever height it wraps to (narrow phones, larger text).
+const top = $('.top')
+const setTopH = () => document.documentElement.style.setProperty('--top-h', `${top.offsetHeight}px`)
+setTopH()
+if ('ResizeObserver' in window) new ResizeObserver(setTopH).observe(top)
 // The section on screen is marked in the header.
 const jumpLinks = new Map([...document.querySelectorAll('.jump a')].map((a) => [a.hash.slice(1), a]))
 // The last section, in page order, whose top has passed the band under the header wins.
