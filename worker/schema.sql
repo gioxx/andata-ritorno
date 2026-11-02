@@ -21,3 +21,5 @@ CREATE TABLE device_usage (device_id TEXT PRIMARY KEY, day TEXT NOT NULL, units 
 INSERT INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos;
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE email_usage (day TEXT PRIMARY KEY, n INTEGER NOT NULL);
+CREATE TABLE usage_weekly (week TEXT NOT NULL, metric TEXT NOT NULL, bucket TEXT NOT NULL, n INTEGER NOT NULL,
+  PRIMARY KEY (week, metric, bucket));

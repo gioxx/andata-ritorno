@@ -24,7 +24,7 @@ Take a photo of each item once; from then on every item is either *a scuola* or 
 - **Works offline** and installs like an app (PWA).
 - Light, dark or automatic theme.
 - **App menu**: an *Install app* button (native prompt where the browser offers it, steps otherwise), *How to uninstall* instructions, and *Delete all data* (two steps, with an optional backup first and a typed confirmation).
-- **Family sharing** (optional, paid): keep the same wardrobe in sync on three phones (more with extra seats), end-to-end encrypted (see Privacy). Without it the app never talks to a server.
+- **Family sharing** (optional, paid): keep the same wardrobe in sync on three phones (more with extra seats), end-to-end encrypted (see Privacy). Without it your data never reaches a server (only an anonymous weekly count, which you can turn off).
 - Security headers on the served app.
 
 ## Installing on iPhone
@@ -33,7 +33,7 @@ Open <https://app.ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**.
 
 ## Privacy
 
-**Free use:** everything stays on your device, in the browser's storage (IndexedDB). There is no account and nothing is sent to a server: the site only serves the app's static files. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
+**Free use:** everything stays on your device, in the browser's storage (IndexedDB). There is no account and your data is never sent to a server: the site only serves the app's static files. The one exception is an **anonymous usage count**, on by default and off with one tap (Menu → Anonymous statistics): at most once a week the app sends its version and two numbers in broad ranges (items, items moved in the last week), with no identifier; the server only adds one to weekly counters. Nothing is sent before the app has shown a one-time notice. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
 
 **Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://app.ar.gioxx.org/privacy.html> and linked from the app menu.
 
