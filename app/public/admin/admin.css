@@ -34,7 +34,7 @@ body { margin: 0; font-family: var(--font); font-weight: 500; background: var(--
 /* Last update: a small balloon under the refresh button, on hover or keyboard focus.
    An error keeps it open (.alert) so it is never missed. */
 .refresh { position: relative; }
-.balloon { position: absolute; top: calc(100% + 10px); right: 0; z-index: 6; margin: 0; padding: 7px 11px; border-radius: 10px; background: var(--fg); color: var(--bg); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 24px rgb(0 0 0 / 0.22); opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity 140ms, transform 140ms; }
+.balloon { position: absolute; top: calc(100% + 10px); right: 0; z-index: 6; margin: 0; padding: 7px 11px; border-radius: 10px; background: var(--fg); color: var(--bg); font-size: 0.8125rem; font-weight: 600; width: max-content; max-width: min(26rem, calc(100vw - 40px)); line-height: 1.4; box-shadow: 0 8px 24px rgb(0 0 0 / 0.22); opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity 140ms, transform 140ms; }
 .balloon::before { content: ''; position: absolute; top: -5px; right: 22px; width: 10px; height: 10px; background: inherit; transform: rotate(45deg); border-radius: 2px; }
 .refresh:hover .balloon, .refresh:focus-within .balloon, .refresh.alert .balloon { opacity: 1; transform: none; }
 .balloon .err { color: inherit; font-weight: 800; }
