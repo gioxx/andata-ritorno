@@ -12,8 +12,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
 // Only browsers: Node's experimental global localStorage prints a warning when touched.
 const storage = () => (typeof window === 'undefined' ? null : window.localStorage)
 const read = (k) => { try { return storage()?.getItem(k) ?? null } catch { return null } }
+/** @returns {boolean} false when the browser refused the write (blocked storage, quota full) */
 const write = (k, v) => {
-  try { if (v == null) storage()?.removeItem(k); else storage()?.setItem(k, v) } catch { /* blocked storage: this session only */ }
+  try { if (v == null) storage()?.removeItem(k); else storage()?.setItem(k, v); return true } catch { return false }
 }
 
 export const statsOn = () => read(OFF_KEY) !== '1'
@@ -49,6 +50,10 @@ export function pingBody({ version, items, now = new Date() }) {
 // A claim older than this belongs to a tab that closed mid-request: the week is free again.
 const CLAIM_MS = 60 * 1000
 let inFlight = null
+// The week this tab already sent, kept in memory too: a write that fails later cannot cause a resend.
+let sentWeek = null
+/** Tests only: forget this tab's memory, as a fresh page load would. */
+export function resetSession() { sentWeek = null; inFlight = null }
 
 /**
  * Send this week's ping if everything allows it; never throws, never retries in a loop.
@@ -68,13 +73,14 @@ async function attempt({ version, items, inFamily, fetchFn = (...a) => fetch(...
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false
   const week = isoWeek(now)
   const seen = read(WEEK_KEY)
-  if (seen === week) return false
+  if (seen === week || sentWeek === week) return false
   const [claimWeek, claimAt] = (seen ?? '').split('@')
   if (claimWeek === week && Date.now() - Number(claimAt) < CLAIM_MS) return false // another tab is sending
   const body = pingBody({ version, items, now })
   if (!body.v) return false
   const claim = `${week}@${Date.now()}`
-  write(WEEK_KEY, claim)
+  // No claim that other tabs and later openings can see, no send: better a missing count than a double one.
+  if (!write(WEEK_KEY, claim) || read(WEEK_KEY) !== claim) return false
   try {
     const res = await fetchFn('/api/public/ping', {
       method: 'POST',
@@ -84,7 +90,7 @@ async function attempt({ version, items, inFamily, fetchFn = (...a) => fetch(...
       keepalive: true,
     })
     // Accepted, or refused (bad request, rate limit): the week is done, no second try with the same data.
-    if (res.ok || (res.status >= 400 && res.status < 500)) write(WEEK_KEY, week)
+    if (res.ok || (res.status >= 400 && res.status < 500)) { sentWeek = week; write(WEEK_KEY, week) }
     else if (read(WEEK_KEY) === claim) write(WEEK_KEY, seen)
     return res.ok
   } catch {

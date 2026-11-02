@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { bucket, shortVersion, isoWeek, pingBody, maybePing, statsOn, setStatsOn, markNoticeSeen } from '../src/stats.js'
+import { bucket, shortVersion, isoWeek, pingBody, maybePing, statsOn, setStatsOn, markNoticeSeen, resetSession } from '../src/stats.js'
 
 const now = new Date('2026-11-04T10:00:00Z')
 const day = (n) => new Date(now.getTime() - n * 864e5).toISOString()
 const okFetch = () => vi.fn(async () => ({ ok: true, status: 204 }))
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => { localStorage.clear(); resetSession() })
 
 describe('anonymous statistics: what is sent', () => {
   it('only coarse buckets', () => {
@@ -111,6 +111,32 @@ describe('anonymous statistics: overlapping attempts', () => {
     const down = vi.fn(async () => { throw new TypeError('offline') })
     expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn: down, now })).toBe(false)
     expect(localStorage.getItem('ar-stats-week')).toBe('2026-W44')
+  })
+})
+
+describe('anonymous statistics: storage that refuses writes', () => {
+  const items = [{ createdAt: day(30), movedAt: day(2) }]
+  it('sends nothing when the week cannot be claimed', async () => {
+    markNoticeSeen()
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError') })
+    const fetchFn = okFetch()
+    expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn, now })).toBe(false)
+    expect(fetchFn).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+  it('a week already sent is not sent again even if recording it failed', async () => {
+    markNoticeSeen()
+    const later = new Date('2026-12-01T10:00:00Z')
+    const fetchFn = vi.fn(async () => {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError') })
+      return { ok: true, status: 204 }
+    })
+    expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn, now: later })).toBe(true)
+    vi.restoreAllMocks()
+    localStorage.removeItem('ar-stats-week')
+    const again = okFetch()
+    expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn: again, now: later })).toBe(false)
+    expect(again).not.toHaveBeenCalled()
   })
 })
 
