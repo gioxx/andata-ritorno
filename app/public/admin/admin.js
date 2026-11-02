@@ -411,21 +411,30 @@ function render() {
   for (const tbl of $('main').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
 }
 
+// Only the latest load counts: a new one (another period, Aggiorna again) aborts the previous
+// request, and an answer that arrives late is dropped, so it can neither show the old period's data
+// nor stop the spinner or report an error while the newer request is still running.
+let inflight = null
 async function load() {
+  inflight?.abort()
+  const ctl = new AbortController()
+  inflight = ctl
   status('Caricamento…', { busy: true })
   out.classList.add('loading')
   try {
-    const res = await fetch(`/api/admin/stats?days=${state.days}`, { credentials: 'same-origin', cache: 'no-store' })
+    const res = await fetch(`/api/admin/stats?days=${state.days}`, { credentials: 'same-origin', cache: 'no-store', signal: ctl.signal })
     if (!res.ok) throw new Error(res.status === 404 ? 'Accesso non autorizzato o dashboard non configurata.' : `Errore ${res.status}`)
-    state.data = await res.json()
+    const data = await res.json()
+    if (inflight !== ctl) return
+    state.data = data
     render()
     // Only a request that succeeded changes the status: redraws from cached data (filter, theme,
     // resize) leave an error, or a request still in flight, as they are.
     status(`Ultimo aggiornamento: ${new Date(state.data.at).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}`)
   } catch (e) {
-    status(e.message, { error: true })
+    if (inflight === ctl) status(e.message, { error: true })
   } finally {
-    out.classList.remove('loading')
+    if (inflight === ctl) { inflight = null; out.classList.remove('loading') }
   }
 }
 
