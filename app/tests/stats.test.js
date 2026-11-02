@@ -82,6 +82,38 @@ describe('anonymous statistics: when it is sent', () => {
   })
 })
 
+describe('anonymous statistics: overlapping attempts', () => {
+  const items = [{ createdAt: day(30), movedAt: day(2) }]
+  it('calls that overlap in this tab share one request', async () => {
+    markNoticeSeen()
+    let release
+    const fetchFn = vi.fn(() => new Promise((r) => { release = r }))
+    const a = maybePing({ version: '3.1.0', items, inFamily: false, fetchFn, now })
+    const b = maybePing({ version: '3.1.0', items, inFamily: false, fetchFn, now })
+    release({ ok: true, status: 204 })
+    expect(await a).toBe(true)
+    expect(await b).toBe(true)
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+  })
+  it('another tab sending the same week (fresh claim) is not duplicated; a stale claim is', async () => {
+    markNoticeSeen()
+    const fetchFn = okFetch()
+    localStorage.setItem('ar-stats-week', `2026-W45@${Date.now()}`)
+    expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn, now })).toBe(false)
+    expect(fetchFn).not.toHaveBeenCalled()
+    localStorage.setItem('ar-stats-week', `2026-W45@${Date.now() - 5 * 60 * 1000}`)
+    expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn, now })).toBe(true)
+    expect(localStorage.getItem('ar-stats-week')).toBe('2026-W45')
+  })
+  it('a network failure releases the claim', async () => {
+    markNoticeSeen()
+    localStorage.setItem('ar-stats-week', '2026-W44')
+    const down = vi.fn(async () => { throw new TypeError('offline') })
+    expect(await maybePing({ version: '3.1.0', items, inFamily: false, fetchFn: down, now })).toBe(false)
+    expect(localStorage.getItem('ar-stats-week')).toBe('2026-W44')
+  })
+})
+
 describe('one-time notice', () => {
   it('shows once, and its answer sets the choice', async () => {
     const { initStatsNotice } = await import('../src/ui/statsNotice.js')

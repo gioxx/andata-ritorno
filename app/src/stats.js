@@ -46,18 +46,35 @@ export function pingBody({ version, items, now = new Date() }) {
   return { v: shortVersion(version), items: bucket(items.length), moves: bucket(moved) }
 }
 
+// A claim older than this belongs to a tab that closed mid-request: the week is free again.
+const CLAIM_MS = 60 * 1000
+let inFlight = null
+
 /**
  * Send this week's ping if everything allows it; never throws, never retries in a loop.
+ * Overlapping calls (startup timer, tab shown again, menu, another tab) send at most one ping per
+ * week: this tab shares its attempt in flight, and the week is claimed in localStorage before the
+ * request leaves, so other tabs skip it. A network failure releases the claim for a later try.
  * @param {{ version: string, items: any[], inFamily: boolean, fetchFn?: typeof fetch, now?: Date }} a
  * @returns {Promise<boolean>} true when a ping was sent and accepted
  */
-export async function maybePing({ version, items, inFamily, fetchFn = (...a) => fetch(...a), now = new Date() }) {
+export function maybePing(a) {
+  if (!inFlight) inFlight = attempt(a).finally(() => { inFlight = null })
+  return inFlight
+}
+
+async function attempt({ version, items, inFamily, fetchFn = (...a) => fetch(...a), now = new Date() }) {
   if (inFamily || !statsOn() || !noticeSeen()) return false
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false
   const week = isoWeek(now)
-  if (read(WEEK_KEY) === week) return false
+  const seen = read(WEEK_KEY)
+  if (seen === week) return false
+  const [claimWeek, claimAt] = (seen ?? '').split('@')
+  if (claimWeek === week && Date.now() - Number(claimAt) < CLAIM_MS) return false // another tab is sending
   const body = pingBody({ version, items, now })
   if (!body.v) return false
+  const claim = `${week}@${Date.now()}`
+  write(WEEK_KEY, claim)
   try {
     const res = await fetchFn('/api/public/ping', {
       method: 'POST',
@@ -66,10 +83,12 @@ export async function maybePing({ version, items, inFamily, fetchFn = (...a) => 
       credentials: 'omit',
       keepalive: true,
     })
-    // Refused (bad request, rate limit): skip the week anyway, no second try with the same data.
+    // Accepted, or refused (bad request, rate limit): the week is done, no second try with the same data.
     if (res.ok || (res.status >= 400 && res.status < 500)) write(WEEK_KEY, week)
+    else if (read(WEEK_KEY) === claim) write(WEEK_KEY, seen)
     return res.ok
   } catch {
-    return false // offline or blocked: next opening tries again
+    if (read(WEEK_KEY) === claim) write(WEEK_KEY, seen) // offline or blocked: next opening tries again
+    return false
   }
 }
