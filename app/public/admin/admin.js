@@ -409,7 +409,6 @@ function render() {
   }
 
   for (const tbl of $('main').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
-  status(`Ultimo aggiornamento: ${new Date(s.at).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}`)
 }
 
 async function load() {
@@ -420,6 +419,9 @@ async function load() {
     if (!res.ok) throw new Error(res.status === 404 ? 'Accesso non autorizzato o dashboard non configurata.' : `Errore ${res.status}`)
     state.data = await res.json()
     render()
+    // Only a request that succeeded changes the status: redraws from cached data (filter, theme,
+    // resize) leave an error, or a request still in flight, as they are.
+    status(`Ultimo aggiornamento: ${new Date(state.data.at).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}`)
   } catch (e) {
     status(e.message, { error: true })
   } finally {
