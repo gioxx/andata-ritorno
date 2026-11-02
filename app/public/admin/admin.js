@@ -4,6 +4,12 @@
 const $ = (sel, root = document) => root.querySelector(sel)
 const out = $('main')
 const at = $('#at')
+/** Text of the balloon under "Aggiorna"; an error keeps the balloon open until the next success. */
+function status(text, { error = false, busy = false } = {}) {
+  at.replaceChildren(error ? el('span', { class: 'err', text }) : document.createTextNode(text))
+  $('.refresh').classList.toggle('alert', error)
+  $('#reload').classList.toggle('spin', busy)
+}
 const tip = $('#tip')
 const nf = new Intl.NumberFormat('it-IT')
 const eur = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
@@ -403,11 +409,11 @@ function render() {
   }
 
   for (const tbl of $('main').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
-  at.textContent = `Aggiornato: ${new Date(s.at).toLocaleString('it-IT')}`
+  status(`Ultimo aggiornamento: ${new Date(s.at).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}`)
 }
 
 async function load() {
-  at.textContent = 'Caricamento…'
+  status('Caricamento…', { busy: true })
   out.classList.add('loading')
   try {
     const res = await fetch(`/api/admin/stats?days=${state.days}`, { credentials: 'same-origin', cache: 'no-store' })
@@ -415,7 +421,7 @@ async function load() {
     state.data = await res.json()
     render()
   } catch (e) {
-    at.replaceChildren(el('span', { class: 'err', text: e.message }))
+    status(e.message, { error: true })
   } finally {
     out.classList.remove('loading')
   }
@@ -423,7 +429,7 @@ async function load() {
 
 async function setRegistrations(open) {
   if (!open && !confirm('Bloccare le nuove registrazioni? Le famiglie esistenti non ne risentono.')) return
-  at.textContent = 'Salvataggio…'
+  status('Salvataggio…', { busy: true })
   try {
     const res = await fetch('/api/admin/registrations', {
       method: 'POST',
@@ -434,7 +440,7 @@ async function setRegistrations(open) {
     if (!res.ok) throw new Error(`Errore ${res.status}`)
     await load()
   } catch (e) {
-    at.replaceChildren(el('span', { class: 'err', text: e.message }))
+    status(e.message, { error: true })
   }
 }
 
@@ -577,9 +583,23 @@ try {
   for (const d of blocks) if (folded.has(d.id)) d.open = false
 } catch { /* nothing stored */ }
 for (const d of blocks) d.addEventListener('toggle', saveFolds)
-const foldAll = (open) => { for (const d of blocks) d.open = open; saveFolds() }
-$('#fold-all').addEventListener('click', () => foldAll(false))
-$('#unfold-all').addEventListener('click', () => foldAll(true))
+// One button: folds everything while any section is open, unfolds everything once all are folded.
+const foldBtn = $('#fold-toggle')
+const syncFoldBtn = () => {
+  const anyOpen = blocks.some((d) => d.open)
+  const label = anyOpen ? 'Comprimi tutte le sezioni' : 'Espandi tutte le sezioni'
+  foldBtn.classList.toggle('folded', !anyOpen)
+  foldBtn.setAttribute('aria-label', label)
+  foldBtn.title = label
+}
+for (const d of blocks) d.addEventListener('toggle', syncFoldBtn)
+foldBtn.addEventListener('click', () => {
+  const open = !blocks.some((d) => d.open)
+  for (const d of blocks) d.open = open
+  saveFolds()
+  syncFoldBtn()
+})
+syncFoldBtn()
 $('.jump').addEventListener('click', (e) => {
   const a = e.target.closest('a[href^="#"]')
   const target = a && document.getElementById(a.hash.slice(1))
