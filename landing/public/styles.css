@@ -256,7 +256,8 @@ section > .wrap > h2 + .lead { margin-bottom: var(--space-lg); }
   .nav.has-toggle { flex-wrap: wrap; }
   .nav.has-toggle .nav-toggle:not([hidden]) { display: inline-flex; margin-left: auto; }
   .nav.has-toggle ul { display: none; margin: 0; padding: 6px 0 12px; width: 100%; flex-direction: column; align-items: stretch; gap: 2px; overflow: visible; }
-  .nav.has-toggle.is-open ul { display: flex; }
+  /* Short screens (a small phone held sideways): the open menu scrolls instead of running off the bottom. */
+  .nav.has-toggle.is-open ul { display: flex; max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain; }
   .nav.has-toggle ul a { min-height: 44px; padding: 0 14px; border-radius: 12px; }
   .nav.has-toggle ul .nav-cta-item { display: block; margin-top: 6px; }
   .nav.has-toggle ul .nav-cta { justify-content: center; width: 100%; }
