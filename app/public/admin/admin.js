@@ -96,7 +96,18 @@ const niceMax = (v) => {
 // Charts are drawn at roughly their on-screen width, so 11px labels stay 11px in narrow cards.
 let W = 640
 const H = 220, PAD = { l: 34, r: 16, t: 14, b: 26 }
-const WIDTH = { w4: 380, w6: 580, w8: 780, w12: 1180 }
+// Width of a card's chart in CSS pixels, from the layout it will land in: wide screens use the card's
+// span (w4, w6, w8, w12 of 12 columns, 12px gaps), narrower ones give every card the full row.
+// Drawing at the real width keeps the 220px height and 11px labels readable on phones too.
+const GAP = 12, CARD_PAD = 34 // 16px padding + 1px border on each side
+function cw(cls) {
+  const main = $('main')
+  const cs = getComputedStyle(main)
+  const inner = main.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+  const span = innerWidth >= 900 ? Number(cls.slice(1)) : 12
+  const col = (inner - 11 * GAP) / 12
+  return Math.max(260, Math.round(col * span + GAP * (span - 1) - CARD_PAD))
+}
 
 function axes(g, max, labels, by) {
   const ih = H - PAD.t - PAD.b
@@ -316,13 +327,13 @@ function render() {
     { label: 'Telefoni nuovi', color: color.s2, values: labels.map((x) => dev.get(x) || 0) },
   ]
   activity.append(card('Crescita', `Famiglie e telefoni aggiunti ${period}, per ${by === 'month' ? 'mese' : 'giorno'}`, 'w8',
-    legend(growth, 'line'), lineChart(labels, growth, by, WIDTH.w8),
+    legend(growth, 'line'), lineChart(labels, growth, by, cw('w8')),
     table([by === 'month' ? 'Mese' : 'Giorno', ...growth.map((g) => g.label)], labels.map((x, i) => [longLabel(x, by), ...growth.map((g) => n(g.values[i]))]))))
 
   // Last seen
   const seenS = [{ label: 'Telefoni visti per l’ultima volta', color: color.s1, values: labels.map((x) => seen.get(x) || 0) }]
   activity.append(card('Ultimo accesso', 'Telefoni per giorno del loro ultimo contatto', 'w4',
-    barChart(labels, seenS, { by, w: WIDTH.w4 }),
+    barChart(labels, seenS, { by, w: cw('w4') }),
     table([by === 'month' ? 'Mese' : 'Giorno', 'Telefoni'], labels.map((x, i) => [longLabel(x, by), n(seenS[0].values[i])]))))
 
   $('#out-activity').replaceChildren(activity)
@@ -336,7 +347,7 @@ function render() {
     { label: 'Manuali', color: color.s2, values: bySource('manual') },
   ]
   codesBox.append(card(`Codici emessi${state.kind === 'all' ? '' : ` · ${KIND[state.kind]}`}`, `Per origine, ${period}`, 'w8',
-    legend(codeSeries), barChart(labels, codeSeries, { by, w: WIDTH.w8 }),
+    legend(codeSeries), barChart(labels, codeSeries, { by, w: cw('w8') }),
     table([by === 'month' ? 'Mese' : 'Giorno', 'Stripe', 'Manuali'], labels.map((x, i) => [longLabel(x, by), n(codeSeries[0].values[i]), n(codeSeries[1].values[i])]))))
 
   // Codes summary table
@@ -352,7 +363,7 @@ function render() {
   ]
   codesBox.append(card('Vendite Stripe per mese', 'Codici venduti; il totale in euro è una stima a prezzo di listino', 'w12 pv-stripe',
     months.length ? legend(salesS) : null,
-    months.length ? barChart(months.map((m) => m.month), salesS, { by: 'month', w: WIDTH.w12 }) : el('p', { class: 'empty', text: 'Nessuna vendita' }),
+    months.length ? barChart(months.map((m) => m.month), salesS, { by: 'month', w: cw('w12') }) : el('p', { class: 'empty', text: 'Nessuna vendita' }),
     table(['Mese', 'Famiglia', 'Posto in più', 'Lordo stimato'], months.map((m) => [longLabel(m.month, 'month'), n(m.family), n(m.slot), eur.format(m.eur)]))))
 
   $('#out-codes').replaceChildren(codesBox)
@@ -361,7 +372,7 @@ function render() {
   const dist = (title, sub, rows, unit) => {
     const ser = [{ label: unit, color: color.s1, values: rows.map((r) => r.n) }]
     return card(title, sub, 'w4',
-      barChart(rows.map((r) => r.label), ser, { labelOf: (x) => x, w: WIDTH.w4 }),
+      barChart(rows.map((r) => r.label), ser, { labelOf: (x) => x, w: cw('w4') }),
       table(['Fascia', 'Famiglie'], rows.map((r) => [r.label, n(r.n)])))
   }
   $('#out-dist').replaceChildren(
@@ -490,9 +501,9 @@ function renderUsage(u) {
     const wr = [{ label: 'Righe scritte', color: color.s1, values: pick(cf.d1, 'rowsWritten') }]
     const rq = [{ label: 'Richieste', color: color.s2, values: pick(cf.worker, 'requests') }]
     cards.append(
-      card('D1 · righe scritte al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.d1RowsWrittenDay)} al giorno`, 'w6 pv-cloudflare', barChart(days, wr, { w: WIDTH.w6 }),
+      card('D1 · righe scritte al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.d1RowsWrittenDay)} al giorno`, 'w6 pv-cloudflare', barChart(days, wr, { w: cw('w6') }),
         table(['Giorno', 'Righe scritte', 'Righe lette'], days.map((d, i) => [longLabel(d, 'day'), n(wr[0].values[i]), n(pick(cf.d1, 'rowsRead')[i])]))),
-      card('Worker · richieste al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.workerRequestsDay)} al giorno`, 'w6 pv-cloudflare', barChart(days, rq, { w: WIDTH.w6 }),
+      card('Worker · richieste al giorno', `Ultimi 30 giorni · limite gratuito ${n(L.workerRequestsDay)} al giorno`, 'w6 pv-cloudflare', barChart(days, rq, { w: cw('w6') }),
         table(['Giorno', 'Richieste', 'Errori'], days.map((d, i) => [longLabel(d, 'day'), n(rq[0].values[i]), n(pick(cf.worker, 'errors')[i])]))),
     )
     frag.append(cards)
@@ -573,5 +584,16 @@ const spy = new IntersectionObserver((entries) => {
 }, { rootMargin: '-30% 0px -60% 0px' })
 for (const id of jumpLinks.keys()) { const t = document.getElementById(id); if (t) spy.observe(t) }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { render(); if (state.usage) renderUsage(state.usage) })
+// Charts are drawn for the width they get: redraw when the window settles at a different width.
+let drawnAt = innerWidth, resizeTimer = 0
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    if (Math.abs(innerWidth - drawnAt) < 24) return
+    drawnAt = innerWidth
+    render()
+    if (state.usage) renderUsage(state.usage)
+  }, 200)
+})
 load()
 loadUsage()

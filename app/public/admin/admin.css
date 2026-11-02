@@ -156,6 +156,7 @@ h3.section-h { font-size: 1.0625rem; }
 @media (max-width: 640px) {
   .meta { order: 3; width: 100%; margin: 0; text-align: left; font-size: 0.8125rem; }
   .top-actions { margin-left: auto; }
+  .seg button { padding: 0 10px; white-space: nowrap; }
   .section-h .sub { display: block; margin: 2px 0 0; }
 }
 @media (prefers-reduced-motion: reduce) { .block > summary::after { transition: none; } }
