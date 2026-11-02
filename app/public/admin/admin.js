@@ -449,8 +449,9 @@ async function setRegistrations(open) {
   inflight?.abort()
   inflight = null
   out.classList.remove('loading')
-  const locked = [$('#reload'), ...$('#range').querySelectorAll('button'), ...out.querySelectorAll('#reg-toggle')]
-  for (const b of locked) b.disabled = true
+  // Looked up each time: a redraw during the save replaces #reg-toggle with a new button.
+  const lockable = () => [$('#reload'), ...$('#range').querySelectorAll('button'), ...out.querySelectorAll('#reg-toggle')]
+  for (const b of lockable()) b.disabled = true
   status('Salvataggio…', { busy: true })
   try {
     const res = await fetch('/api/admin/registrations', {
@@ -465,7 +466,7 @@ async function setRegistrations(open) {
     return
   } finally {
     saving = false
-    for (const b of locked) b.disabled = false
+    for (const b of lockable()) b.disabled = false
   }
   await load()
 }
