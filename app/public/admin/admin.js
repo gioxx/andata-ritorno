@@ -2,7 +2,7 @@
 // KPIs with the change against the previous period, interactive SVG charts with a table view each,
 // and the switch that closes new registrations in an emergency. Plain DOM, no libraries (CSP: self).
 const $ = (sel, root = document) => root.querySelector(sel)
-const out = $('#out')
+const out = $('main')
 const at = $('#at')
 const tip = $('#tip')
 const nf = new Intl.NumberFormat('it-IT')
@@ -96,7 +96,7 @@ const niceMax = (v) => {
 // Charts are drawn at roughly their on-screen width, so 11px labels stay 11px in narrow cards.
 let W = 640
 const H = 220, PAD = { l: 34, r: 16, t: 14, b: 26 }
-const WIDTH = { w4: 380, w6: 580, w8: 780 }
+const WIDTH = { w4: 380, w6: 580, w8: 780, w12: 1180 }
 
 function axes(g, max, labels, by) {
   const ih = H - PAD.t - PAD.b
@@ -267,10 +267,8 @@ function render() {
   const p = s.photos
   const used = p.cap ? Math.min(100, (100 * p.counted) / p.cap) : 0
 
-  const frag = document.createDocumentFragment()
-
   // KPI row
-  frag.append(el('div', { class: 'kpis' },
+  $('#kpis').replaceChildren(el('div', { class: 'kpis' },
     kpi(n(s.families.total), `famiglie · ${n(s.families.inRange)} nuove ${period}`, delta(s.families.inRange, s.families.prevRange)),
     kpi(n(s.devices.total), `telefoni · ${n(s.devices.inRange)} nuovi ${period}`, delta(s.devices.inRange, s.devices.prevRange)),
     kpi(n(s.devices.activeInRange), `telefoni attivi ${period}`),
@@ -279,17 +277,19 @@ function render() {
     kpi(gb(p.counted), `spazio foto · ${used.toFixed(1)}% del tetto`),
   ))
 
-  const cards = el('div', { class: 'cards' })
+  // Each section's grid is filled on its own, so the <details> around it keep their open state.
+  // Rows add up to 12 columns: 3+3+3+3 · 8+4 · 8+4 then 12 · 4+4+4.
+  const cards = document.createDocumentFragment()
 
   // Registrations switch
-  const sw = card(`Nuove registrazioni: ${reg ? 'aperte' : 'bloccate'}`, null, `w4 switch ${reg ? '' : 'closed'}`,
+  const sw = card(`Nuove registrazioni: ${reg ? 'aperte' : 'bloccate'}`, null, `w3 switch ${reg ? '' : 'closed'}`,
     el('p', { text: reg ? 'Si possono creare famiglie nuove e aggiungere telefoni con un invito.' : 'Nessuna famiglia nuova, nessun telefono nuovo, nessuna vendita di famiglie. Le famiglie esistenti si sincronizzano e il kit di recupero funziona.' }),
     el('button', { type: 'button', class: 'primary', id: 'reg-toggle', 'data-open': reg ? 'false' : 'true', text: reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni' }))
   cards.append(sw)
 
   // Telegram purchase notifications
   const tg = s.telegram?.configured
-  cards.append(card(`Notifiche Telegram: ${tg ? 'configurate' : 'non configurate'}`, null, 'w4',
+  cards.append(card(`Notifiche Telegram: ${tg ? 'configurate' : 'non configurate'}`, null, 'w3',
     el('p', { class: 'sub', text: tg ? 'A ogni acquisto arriva un messaggio, senza dati personali.' : 'Imposta i secret TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID del Worker per riceverle.' }),
     el('button', { type: 'button', class: 'ghost', id: 'tg-test', ...(tg ? {} : { disabled: '' }), text: 'Invia messaggio di prova' }),
     el('p', { class: 'sub', id: 'tg-result', role: 'status' })))
@@ -297,14 +297,17 @@ function render() {
   // Storage meter
   const meter = el('div', { class: `meter ${used > 85 ? 'hot' : ''}`, role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': used.toFixed(1), 'aria-label': 'Spazio foto usato' })
   const fill = el('i'); fill.style.width = `${used}%`; meter.append(fill)
-  cards.append(card('Spazio foto sul server', `${gb(p.counted)} su ${gb(p.cap)} · ${n(p.ready)} foto, ${n(p.pending)} in caricamento`, 'w4', meter,
+  cards.append(card('Spazio foto sul server', `${gb(p.counted)} su ${gb(p.cap)} · ${n(p.ready)} foto, ${n(p.pending)} in caricamento`, 'w3', meter,
     el('p', { class: 'sub', text: `${n(s.records)} record cifrati · ${n(s.openInvites)} inviti aperti` })))
 
   // Today's write budget
   const b = s.budgetToday || {}
-  cards.append(card('Scritture di oggi', 'Budget giornaliero per telefono: 5.000 unità (record 1, foto 4)', 'w4',
+  cards.append(card('Scritture di oggi', 'Budget giornaliero per telefono: 5.000 unità (record 1, foto 4)', 'w3',
     el('div', { class: 'kpis' }, kpi(n(b.devices), 'telefoni che hanno scritto'), kpi(n(b.top), 'unità del più attivo')),
   ))
+
+  $('#controls').replaceChildren(cards)
+  const activity = document.createDocumentFragment()
 
   // Growth
   const fam = toMap(s.series.newFamilies), dev = toMap(s.series.newDevices), seen = toMap(s.series.lastSeen)
@@ -312,15 +315,18 @@ function render() {
     { label: 'Famiglie nuove', color: color.s1, values: labels.map((x) => fam.get(x) || 0) },
     { label: 'Telefoni nuovi', color: color.s2, values: labels.map((x) => dev.get(x) || 0) },
   ]
-  cards.append(card('Crescita', `Famiglie e telefoni aggiunti ${period}, per ${by === 'month' ? 'mese' : 'giorno'}`, 'w8',
+  activity.append(card('Crescita', `Famiglie e telefoni aggiunti ${period}, per ${by === 'month' ? 'mese' : 'giorno'}`, 'w8',
     legend(growth, 'line'), lineChart(labels, growth, by, WIDTH.w8),
     table([by === 'month' ? 'Mese' : 'Giorno', ...growth.map((g) => g.label)], labels.map((x, i) => [longLabel(x, by), ...growth.map((g) => n(g.values[i]))]))))
 
   // Last seen
   const seenS = [{ label: 'Telefoni visti per l’ultima volta', color: color.s1, values: labels.map((x) => seen.get(x) || 0) }]
-  cards.append(card('Ultimo accesso', 'Telefoni per giorno del loro ultimo contatto', 'w4',
+  activity.append(card('Ultimo accesso', 'Telefoni per giorno del loro ultimo contatto', 'w4',
     barChart(labels, seenS, { by, w: WIDTH.w4 }),
     table([by === 'month' ? 'Mese' : 'Giorno', 'Telefoni'], labels.map((x, i) => [longLabel(x, by), n(seenS[0].values[i])]))))
+
+  $('#out-activity').replaceChildren(activity)
+  const codesBox = document.createDocumentFragment()
 
   // Codes over time, stacked by source
   const codeRows = s.series.codes.filter((c) => state.kind === 'all' || c.kind === state.kind)
@@ -329,14 +335,14 @@ function render() {
     { label: 'Stripe', color: color.s1, values: bySource('stripe') },
     { label: 'Manuali', color: color.s2, values: bySource('manual') },
   ]
-  cards.append(card(`Codici emessi${state.kind === 'all' ? '' : ` · ${KIND[state.kind]}`}`, `Per origine, ${period}`, 'w8',
+  codesBox.append(card(`Codici emessi${state.kind === 'all' ? '' : ` · ${KIND[state.kind]}`}`, `Per origine, ${period}`, 'w8',
     legend(codeSeries), barChart(labels, codeSeries, { by, w: WIDTH.w8 }),
     table([by === 'month' ? 'Mese' : 'Giorno', 'Stripe', 'Manuali'], labels.map((x, i) => [longLabel(x, by), n(codeSeries[0].values[i]), n(codeSeries[1].values[i])]))))
 
   // Codes summary table
   const t = table(['Tipo · origine', 'Emessi', 'Usati', `Nel periodo`], codes.map((c) => [`${KIND[c.kind] ?? c.kind} · ${SOURCE[c.source] ?? c.source}`, n(c.issued), n(c.redeemed), n(c.inRange)]))
   t.hidden = false
-  cards.append(card('Codici in totale', 'Emessi da sempre e usati; l’ultima colonna segue il periodo scelto', 'w4', codes.length ? t : el('p', { class: 'empty', text: 'Nessun codice' })))
+  codesBox.append(card('Codici in totale', 'Emessi da sempre e usati; l’ultima colonna segue il periodo scelto', 'w4', codes.length ? t : el('p', { class: 'empty', text: 'Nessun codice' })))
 
   // Sales by month
   const months = [...s.salesByMonth].reverse()
@@ -344,25 +350,26 @@ function render() {
     { label: 'Famiglia', color: color.s1, values: months.map((m) => m.family) },
     { label: 'Posto in più', color: color.s3, values: months.map((m) => m.slot) },
   ]
-  cards.append(card('Vendite Stripe per mese', 'Codici venduti; il totale in euro è una stima a prezzo di listino', 'w6 pv-stripe',
+  codesBox.append(card('Vendite Stripe per mese', 'Codici venduti; il totale in euro è una stima a prezzo di listino', 'w12 pv-stripe',
     months.length ? legend(salesS) : null,
-    months.length ? barChart(months.map((m) => m.month), salesS, { by: 'month', w: WIDTH.w6 }) : el('p', { class: 'empty', text: 'Nessuna vendita' }),
+    months.length ? barChart(months.map((m) => m.month), salesS, { by: 'month', w: WIDTH.w12 }) : el('p', { class: 'empty', text: 'Nessuna vendita' }),
     table(['Mese', 'Famiglia', 'Posto in più', 'Lordo stimato'], months.map((m) => [longLabel(m.month, 'month'), n(m.family), n(m.slot), eur.format(m.eur)]))))
+
+  $('#out-codes').replaceChildren(codesBox)
 
   // Distributions
   const dist = (title, sub, rows, unit) => {
     const ser = [{ label: unit, color: color.s1, values: rows.map((r) => r.n) }]
-    return card(title, sub, 'w6',
-      barChart(rows.map((r) => r.label), ser, { labelOf: (x) => x, w: WIDTH.w6 }),
+    return card(title, sub, 'w4',
+      barChart(rows.map((r) => r.label), ser, { labelOf: (x) => x, w: WIDTH.w4 }),
       table(['Fascia', 'Famiglie'], rows.map((r) => [r.label, n(r.n)])))
   }
-  cards.append(dist('Telefoni per famiglia', 'Quante famiglie hanno 1, 2, 3… telefoni', s.distributions.phones, 'Famiglie'))
-  cards.append(dist('Spazio foto per famiglia', 'Famiglie per fascia di MB occupati (tetto 300 MB)', s.distributions.photoMB, 'Famiglie'))
-  cards.append(dist('Elementi per famiglia', 'Record cifrati per famiglia (capi, schede, categorie)', s.distributions.records, 'Famiglie'))
+  $('#out-dist').replaceChildren(
+    dist('Telefoni per famiglia', 'Quante famiglie hanno 1, 2, 3… telefoni', s.distributions.phones, 'Famiglie'),
+    dist('Spazio foto per famiglia', 'Famiglie per fascia di MB occupati (tetto 300 MB)', s.distributions.photoMB, 'Famiglie'),
+    dist('Elementi per famiglia', 'Record cifrati per famiglia (capi, schede, categorie)', s.distributions.records, 'Famiglie'))
 
-  frag.append(cards)
-  out.replaceChildren(frag)
-  for (const tbl of out.querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
+  for (const tbl of $('#utilizzo').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
   at.textContent = `Aggiornato: ${new Date(s.at).toLocaleString('it-IT')}`
 }
 
@@ -525,6 +532,41 @@ out.addEventListener('click', (e) => {
   if (tg) testTelegram(tg)
 })
 $('#reload').addEventListener('click', () => { load(); loadUsage() })
+
+// ---------- sections: fold/unfold, remembered per browser; header links open what they point to ----------
+const FOLD_KEY = 'ar-admin-folded'
+const blocks = [...document.querySelectorAll('details.block')]
+const saveFolds = () => {
+  try { localStorage.setItem(FOLD_KEY, JSON.stringify(blocks.filter((d) => !d.open).map((d) => d.id))) } catch { /* private mode */ }
+}
+try {
+  const folded = new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'))
+  for (const d of blocks) if (folded.has(d.id)) d.open = false
+} catch { /* nothing stored */ }
+for (const d of blocks) d.addEventListener('toggle', saveFolds)
+const foldAll = (open) => { for (const d of blocks) d.open = open; saveFolds() }
+$('#fold-all').addEventListener('click', () => foldAll(false))
+$('#unfold-all').addEventListener('click', () => foldAll(true))
+$('.jump').addEventListener('click', (e) => {
+  const a = e.target.closest('a[href^="#"]')
+  const target = a && document.getElementById(a.hash.slice(1))
+  if (!target) return
+  e.preventDefault()
+  if (target instanceof HTMLDetailsElement) target.open = true
+  target.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  history.replaceState(null, '', a.hash)
+})
+// The section on screen is marked in the header.
+const jumpLinks = new Map([...document.querySelectorAll('.jump a')].map((a) => [a.hash.slice(1), a]))
+// The last section, in page order, whose top has passed the band under the header wins.
+const inBand = new Set()
+const spy = new IntersectionObserver((entries) => {
+  for (const e of entries) inBand[e.isIntersecting ? 'add' : 'delete'](e.target.id)
+  const current = [...jumpLinks.keys()].filter((id) => inBand.has(id)).pop()
+  if (!current) return
+  for (const [id, a] of jumpLinks) id === current ? a.setAttribute('aria-current', 'location') : a.removeAttribute('aria-current')
+}, { rootMargin: '-30% 0px -60% 0px' })
+for (const id of jumpLinks.keys()) { const t = document.getElementById(id); if (t) spy.observe(t) }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { render(); if (state.usage) renderUsage(state.usage) })
 load()
 loadUsage()

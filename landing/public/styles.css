@@ -84,6 +84,12 @@ p { margin: 0 0 var(--space-md); }
 .nav ul a.nav-cta:hover { background: var(--color-ink); }
 .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: var(--radius-pill); background: var(--color-chip); color: var(--color-ink); cursor: pointer; }
 .theme-toggle svg { width: 20px; height: 20px; }
+.nav-toggle { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: var(--radius-pill); background: var(--color-chip); color: var(--color-ink); cursor: pointer; }
+.nav-toggle svg { width: 22px; height: 22px; }
+.nav-toggle path { transform-origin: 12px 12px; transition: transform 0.2s ease, opacity 0.2s ease; }
+.nav.is-open .nav-toggle .l1 { transform: translateY(5px) rotate(45deg); }
+.nav.is-open .nav-toggle .l2 { opacity: 0; }
+.nav.is-open .nav-toggle .l3 { transform: translateY(-5px) rotate(-45deg); }
 .theme-toggle .i-light, .theme-toggle .i-dark { display: none; }
 .theme-toggle[data-state="light"] .i-auto, .theme-toggle[data-state="dark"] .i-auto { display: none; }
 .theme-toggle[data-state="light"] .i-light, .theme-toggle[data-state="dark"] .i-dark { display: inline; }
@@ -246,6 +252,15 @@ section > .wrap > h2 + .lead { margin-bottom: var(--space-lg); }
   .theme-toggle { width: 40px; height: 40px; }
   .nav ul .nav-cta-item { display: none; }
   .plan .price small { display: block; }
+  /* With JavaScript the scrolling row becomes a hamburger: links drop down in a column under the brand. */
+  .nav.has-toggle { flex-wrap: wrap; }
+  .nav.has-toggle .nav-toggle:not([hidden]) { display: inline-flex; margin-left: auto; }
+  .nav.has-toggle ul { display: none; margin: 0; padding: 6px 0 12px; width: 100%; flex-direction: column; align-items: stretch; gap: 2px; overflow: visible; }
+  .nav.has-toggle.is-open ul { display: flex; }
+  .nav.has-toggle ul a { min-height: 44px; padding: 0 14px; border-radius: 12px; }
+  .nav.has-toggle ul .nav-cta-item { display: block; margin-top: 6px; }
+  .nav.has-toggle ul .nav-cta { justify-content: center; width: 100%; }
+  .nav.has-toggle ul li:has(.theme-toggle) { padding: 4px 6px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 

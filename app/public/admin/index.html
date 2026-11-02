@@ -10,36 +10,77 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand"><img src="/icons/icon.svg" alt="" width="32" height="32"><span>A/R<small>Dashboard</small></span></div>
-  <p class="meta" id="at" role="status">Caricamento…</p>
-  <button type="button" class="ghost" id="reload">Aggiorna</button>
+  <div class="top-row">
+    <a class="brand" href="#"><img src="/icons/icon.svg" alt="" width="32" height="32"><span>A/R<small>Dashboard</small></span></a>
+    <p class="meta" id="at" role="status">Caricamento…</p>
+    <div class="top-actions">
+      <button type="button" class="ghost icon" id="fold-all" aria-label="Comprimi tutte le sezioni" title="Comprimi tutte le sezioni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>
+      </button>
+      <button type="button" class="ghost icon" id="unfold-all" aria-label="Espandi tutte le sezioni" title="Espandi tutte le sezioni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
+      </button>
+      <button type="button" class="ghost" id="reload">Aggiorna</button>
+    </div>
+  </div>
+  <nav class="jump" aria-label="Sezioni">
+    <a href="#stato">Stato</a>
+    <a href="#risorse">Risorse</a>
+    <a href="#utilizzo">Utilizzo</a>
+    <a href="#attivita">Attività</a>
+    <a href="#codici">Codici e vendite</a>
+    <a href="#distribuzioni">Distribuzioni</a>
+  </nav>
 </header>
 
 <main>
-  <section class="resources" aria-labelledby="res-h">
-    <h2 id="res-h" class="section-h">Risorse consumate <span class="sub">rispetto ai limiti dei piani gratuiti</span></h2>
+  <details class="block" id="stato" open>
+    <summary><h2 class="section-h">Stato e controlli <span class="sub">registrazioni, notifiche, spazio, scritture</span></h2></summary>
+    <div class="cards" id="controls"></div>
+  </details>
+
+  <details class="block" id="risorse" open>
+    <summary><h2 class="section-h">Risorse consumate <span class="sub">rispetto ai limiti dei piani gratuiti</span></h2></summary>
     <div id="res"></div>
-  </section>
+  </details>
 
-  <h2 class="section-h">Utilizzo di A/R</h2>
-  <div class="filters" role="group" aria-label="Filtri">
-    <div class="seg" id="range" role="radiogroup" aria-label="Periodo">
-      <button type="button" role="radio" data-days="7" aria-checked="false">7 giorni</button>
-      <button type="button" role="radio" data-days="30" aria-checked="true">30 giorni</button>
-      <button type="button" role="radio" data-days="90" aria-checked="false">90 giorni</button>
-      <button type="button" role="radio" data-days="365" aria-checked="false">12 mesi</button>
+  <section class="usage" id="utilizzo" aria-labelledby="use-h">
+    <div class="usage-head">
+      <h2 id="use-h" class="section-h">Utilizzo di A/R</h2>
+      <div class="filters" role="group" aria-label="Filtri">
+        <div class="seg" id="range" role="radiogroup" aria-label="Periodo">
+          <button type="button" role="radio" data-days="7" aria-checked="false">7 giorni</button>
+          <button type="button" role="radio" data-days="30" aria-checked="true">30 giorni</button>
+          <button type="button" role="radio" data-days="90" aria-checked="false">90 giorni</button>
+          <button type="button" role="radio" data-days="365" aria-checked="false">12 mesi</button>
+        </div>
+        <label class="select">Codici
+          <select id="kind">
+            <option value="all">Tutti</option>
+            <option value="family">Famiglia</option>
+            <option value="slot">Posto in più</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="tables"> Mostra tabelle</label>
+      </div>
     </div>
-    <label class="select">Codici
-      <select id="kind">
-        <option value="all">Tutti</option>
-        <option value="family">Famiglia</option>
-        <option value="slot">Posto in più</option>
-      </select>
-    </label>
-    <label class="check"><input type="checkbox" id="tables"> Mostra tabelle</label>
-  </div>
+    <div id="kpis" aria-live="polite"></div>
 
-  <div id="out" aria-live="polite"></div>
+    <details class="block" id="attivita" open>
+      <summary><h3 class="section-h">Attività <span class="sub">crescita e ultimo accesso dei telefoni</span></h3></summary>
+      <div class="cards" id="out-activity"></div>
+    </details>
+
+    <details class="block" id="codici" open>
+      <summary><h3 class="section-h">Codici e vendite <span class="sub">emissioni, totali, vendite Stripe</span></h3></summary>
+      <div class="cards" id="out-codes"></div>
+    </details>
+
+    <details class="block" id="distribuzioni" open>
+      <summary><h3 class="section-h">Distribuzioni <span class="sub">come si dividono le famiglie</span></h3></summary>
+      <div class="cards" id="out-dist"></div>
+    </details>
+  </section>
 </main>
 
 <div class="tip" id="tip" role="tooltip" hidden></div>

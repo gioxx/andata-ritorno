@@ -20,6 +20,30 @@ if (!calm && 'IntersectionObserver' in window) {
   }
 }
 
+// Phone-width header: the row of links folds behind a hamburger button. Without this script the
+// row scrolls sideways instead, so every link stays reachable.
+const nav = document.querySelector('.nav')
+const navBtn = nav?.querySelector('[data-nav-toggle]')
+if (nav && navBtn) {
+  const it = document.documentElement.lang === 'it'
+  const labels = it ? ['Apri il menu', 'Chiudi il menu'] : ['Open menu', 'Close menu']
+  const setOpen = (open) => {
+    nav.classList.toggle('is-open', open)
+    navBtn.setAttribute('aria-expanded', String(open))
+    navBtn.setAttribute('aria-label', labels[open ? 1 : 0])
+  }
+  nav.classList.add('has-toggle')
+  navBtn.hidden = false
+  navBtn.addEventListener('click', () => setOpen(!nav.classList.contains('is-open')))
+  // A link chosen, Escape, a tap outside or a wider window: the menu folds away.
+  nav.querySelector('ul').addEventListener('click', (e) => { if (e.target.closest('a')) setOpen(false) })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && nav.classList.contains('is-open')) { setOpen(false); navBtn.focus() }
+  })
+  document.addEventListener('click', (e) => { if (!nav.contains(e.target)) setOpen(false) })
+  matchMedia('(max-width: 640px)').addEventListener('change', (m) => { if (!m.matches) setOpen(false) })
+}
+
 const toTop = document.querySelector('[data-to-top]')
 if (toTop) {
   const toggle = () => toTop.classList.toggle('is-shown', scrollY > innerHeight * 0.8)
