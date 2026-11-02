@@ -191,8 +191,8 @@ const numbers = document.querySelector('[data-numbers]')
 if (numbers) {
   const it = document.documentElement.lang === 'it'
   const fmt = new Intl.NumberFormat(it ? 'it-IT' : 'en-GB')
-  // Versioned URL: answers cached by browsers before the ten-family rule are never reused.
-  fetch('https://app.ar.gioxx.org/api/public/stats?v=2')
+  // Versioned URL: answers cached by browsers before the last change (v3: local weekly use) are never reused.
+  fetch('https://app.ar.gioxx.org/api/public/stats?v=3')
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
     .then((s) => {
       let shown = 0

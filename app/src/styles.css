@@ -280,6 +280,11 @@ input, textarea, select { font-size: max(1rem, 16px); }
 .install-strip button { flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: var(--r-pill); font-weight: 700; }
 .install-strip .strip-go { background: var(--accent-strong); color: var(--bg); }
 .install-strip .strip-x { background: none; color: var(--muted); font-size: 1.125rem; }
+.stats-strip { flex-wrap: wrap; }
+.stats-strip p { flex: 1 1 16rem; }
+.stats-strip a { color: inherit; font-weight: 700; }
+.stats-strip .strip-off { background: none; color: var(--fg); }
+#menu .menuItem[role="switch"][aria-checked="false"] .badge { background: var(--holder); color: var(--muted); }
 dialog .steps-title { margin: 12px 0 4px; font-size: 0.875rem; font-weight: 700; }
 dialog ol.steps { margin: 0 0 8px; padding-left: 20px; font-size: 0.875rem; line-height: 1.5; }
 dialog p.warn { color: var(--danger); font-weight: 600; }

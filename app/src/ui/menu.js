@@ -19,7 +19,8 @@ import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
 import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
-import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon } from './icons.js'
+import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon, statsIcon } from './icons.js'
+import { statsOn, setStatsOn, markNoticeSeen } from '../stats.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
 let dlg = null
@@ -55,6 +56,13 @@ function renderThemeSeg() {
   keepFocus(seg, () => { seg.innerHTML = themes().map(([v, icon, l]) => `<button type="button" data-theme-choice="${v}" class="${v === cur ? 'active' : ''}" aria-pressed="${v === cur}">${icon}${l}</button>`).join('') })
 }
 
+function renderStatsSwitch() {
+  const b = dlg.querySelector('#statsSwitch')
+  const on = statsOn()
+  b.setAttribute('aria-checked', String(on))
+  b.querySelector('.badge').textContent = t(on ? 'menu.statsOn' : 'menu.statsOff')
+}
+
 function renderLangSeg() {
   const cur = getLangChoice()
   const seg = dlg.querySelector('#langSeg')
@@ -77,6 +85,7 @@ async function refresh() {
   todoBtn.querySelector('.badge').textContent = todo.length
   renderThemeSeg()
   renderLangSeg()
+  renderStatsSwitch()
   await renderFamily()
   persistence().then((p) => { dlg.querySelector('#persistInfo').textContent = persistLine(p, synced) })
 }
@@ -108,6 +117,7 @@ const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="clos
     ${menuItem('uninstall', uninstallIcon, t('menu.uninstallHow'))}
     ${menuItem('guide', guideIcon, t('menu.guide'))}
     ${menuItem('privacy', shieldIcon, t('menu.privacy'))}
+    <button type="button" class="menuItem" id="statsSwitch" role="switch" aria-checked="false"><span class="ic">${statsIcon}</span><span class="txt">${t('menu.stats')}<small>${t('menu.statsHint')}</small></span><span class="badge"></span></button>
     ${menuItem('wipe', eraseIcon, t('menu.wipe'), '', ' danger')}
     ${menuFooter()}`
 
@@ -130,6 +140,8 @@ function build() {
     if (theme) { setTheme(theme.dataset.themeChoice); renderThemeSeg(); return } // stay open to see the result
     const lang = e.target.closest('[data-lang-choice]')
     if (lang) { setLang(lang.dataset.langChoice); return } // onLangChange redraws the drawer
+    // A choice made here also answers the one-time notice.
+    if (e.target.closest('#statsSwitch')) { setStatsOn(!statsOn()); markNoticeSeen(); renderStatsSwitch(); hooks.onStatsChange?.(); return }
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()

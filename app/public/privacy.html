@@ -31,13 +31,24 @@
 
 <section id="it" lang="it" aria-labelledby="it-h">
 <h1 id="it-h">Informativa sulla privacy</h1>
-<p class="meta">Andata e Ritorno (A/R) · app.ar.gioxx.org · aggiornata a novembre 2026 (versione 3.0.0)</p>
+<p class="meta">Andata e Ritorno (A/R) · app.ar.gioxx.org · aggiornata a novembre 2026 (versione 3.2.0)</p>
 
 <h2>In breve</h2>
-<p>Se usi A/R senza famiglia, tutto resta sul tuo telefono e a noi non arriva nulla. Se attivi la condivisione in famiglia, capi e foto vengono caricati su un server in forma cifrata, e solo i telefoni della tua famiglia possono leggerli. Nessun tracciamento, nessuna analisi, nessuna pubblicità.</p>
+<p>Se usi A/R senza famiglia, capi, foto e nomi restano sul tuo telefono e a noi non arrivano. Arriva soltanto, una volta a settimana, un conteggio anonimo e aggregato che serve a capire quanto si usa l'app e che puoi disattivare quando vuoi (vedi <a href="#it-stats">Statistiche anonime d'uso</a>). Se attivi la condivisione in famiglia, capi e foto vengono caricati su un server in forma cifrata, e solo i telefoni della tua famiglia possono leggerli. Nessuna profilazione, nessuno strumento di analisi di terzi, nessuna pubblicità.</p>
 
 <h2>Uso gratuito: tutto sul dispositivo</h2>
-<p>Schede, capi, foto, categorie e preferenze sono salvati nella memoria del browser del tuo telefono (IndexedDB). Non c'è nessun account e questi dati non vengono inviati a nessuno. Il sito si limita a consegnarti i file dell'app. I backup <code>.zip</code> li crei e li conservi tu.</p>
+<p>Schede, capi, foto, categorie e preferenze sono salvati nella memoria del browser del tuo telefono (IndexedDB). Non c'è nessun account e questi dati non vengono inviati a nessuno. Il sito si limita a consegnarti i file dell'app; l'unica cosa che parte dal telefono è il conteggio anonimo descritto qui sotto, se lo lasci attivo. I backup <code>.zip</code> li crei e li conservi tu.</p>
+
+<h2 id="it-stats">Statistiche anonime d'uso</h2>
+<p>Per capire quante persone usano A/R senza famiglia e come lo usano, l'app invia al massimo una volta a settimana un messaggio con tre soli valori, tutti a fasce larghe:</p>
+<ul>
+<li>la versione dell'app, senza l'ultima cifra (per esempio 3.2);</li>
+<li>quanti capi ci sono: 0, da 1 a 5, da 6 a 20, più di 20;</li>
+<li>quanti capi hai spostato negli ultimi sette giorni, con le stesse fasce.</li>
+</ul>
+<p>Nient'altro: nessun identificativo del telefono o dell'installazione, nessun contenuto, nessun nome, nessuna foto, nessuna data oltre alla settimana. Il server non conserva il messaggio: aggiunge uno ad alcuni contatori della settimana (per esempio "settimana 45, da 6 a 20 capi: +1"). Quei contatori non permettono di distinguere un telefono da un altro né di risalire a te. L'indirizzo IP serve solo, nel momento della richiesta, a limitare gli abusi e non viene salvato.</p>
+<p>Le statistiche hanno uno scopo puramente conoscitivo: capire quanto e come si usa A/R, per decidere cosa migliorare. Sul sito mostriamo al massimo il totale settimanale, arrotondato per difetto alla decina e nascosto sotto dieci. Non vengono mai unite ad altri dati, vendute o usate per pubblicità.</p>
+<p>Sono attive di default, ma prima di inviare qualunque cosa l'app te lo dice con un avviso: puoi disattivarle subito da lì, o in ogni momento da Menu → Statistiche anonime. Sul telefono restano solo la tua scelta e la settimana dell'ultimo invio. I telefoni in una famiglia non inviano questo conteggio: il loro uso è già visibile, in forma aggregata, dal server della condivisione.</p>
 
 <h2>Condivisione in famiglia (a pagamento)</h2>
 <p>Solo se crei una famiglia, accetti un invito o ripristini una famiglia con il kit, i dati vengono sincronizzati tra i telefoni tramite Cloudflare (database D1 e archivio R2). Prima di partire dal telefono, capi, schede, categorie, foto, nome della famiglia e nomi dei telefoni sono cifrati (AES-GCM 256 bit) con una chiave generata sul tuo telefono. Quella chiave e il segreto del kit di recupero non vengono mai inviati al server in chiaro: chi gestisce il servizio non può leggere i tuoi dati.</p>
@@ -75,6 +86,7 @@
 <li>A/R è un progetto indipendente dal blog gioxx.org, che resta un diario online personale senza scopi commerciali: condividono solo il dominio, e i dati di A/R non vengono mai condivisi con il blog né usati per esso.</li>
 <li>Sincronizzazione, codici, licenza ed email del codice: servono a fornirti il servizio che hai chiesto (esecuzione del contratto, art. 6.1.b GDPR). Indirizzo IP e limiti di frequenza: legittimo interesse a proteggere il servizio dagli abusi (art. 6.1.f).</li>
 <li>Per far funzionare il servizio guardiamo solo numeri aggregati (quante famiglie, telefoni, record e byte di foto ci sono), mai il contenuto, che resta cifrato.</li>
+<li>Statistiche anonime d'uso: i contatori settimanali non sono dati personali, perché non si possono ricondurre a nessuno. Per l'invio dal telefono la base è il legittimo interesse a capire come si usa il servizio (art. 6.1.f GDPR): puoi opporti in ogni momento disattivandole dal menu, senza alcuna conseguenza sull'uso dell'app.</li>
 <li>Cloudflare, Stripe, Link e Resend possono trattare dati anche fuori dall'UE (per esempio negli USA), con le garanzie previste dal GDPR (clausole contrattuali standard o EU-US Data Privacy Framework).</li>
 </ul>
 
@@ -82,7 +94,7 @@
 <p>Puoi chiedere accesso, rettifica o cancellazione dei dati che ti riguardano (in pratica: il record della licenza e l'hash dell'email) e puoi proporre reclamo al Garante per la protezione dei dati personali. I dati cifrati della famiglia li cancelli tu, uscendo dalla famiglia con l'ultimo telefono. Per ogni richiesta scrivi a <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a>.</p>
 
 <h2>Cookie e tracciamento</h2>
-<p>Nessun cookie, nessuno strumento di analisi, nessuna pubblicità, nessun contenuto di terzi incorporato. Il codice dell'app è pubblico (licenza AGPL-3.0) su <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, quindi quanto scritto qui è verificabile.</p>
+<p>Nessun cookie, nessuno strumento di analisi di terzi, nessuna profilazione, nessuna pubblicità, nessun contenuto di terzi incorporato. L'unica statistica è il conteggio anonimo descritto sopra, gestito da noi e disattivabile. Il codice dell'app è pubblico (licenza AGPL-3.0) su <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, quindi quanto scritto qui è verificabile.</p>
 
 <p class="meta">Se cambieremo qualcosa di sostanziale, aggiorneremo questa pagina e la data in alto.</p>
 <a class="back" href="/">Torna ad A/R</a>
@@ -90,13 +102,24 @@
 
 <section id="en" lang="en" aria-labelledby="en-h">
 <h1 id="en-h">Privacy policy</h1>
-<p class="meta">Andata e Ritorno (A/R) · app.ar.gioxx.org · updated November 2026 (version 3.0.0)</p>
+<p class="meta">Andata e Ritorno (A/R) · app.ar.gioxx.org · updated November 2026 (version 3.2.0)</p>
 
 <h2>In short</h2>
-<p>If you use A/R on its own, everything stays on your phone and nothing reaches us. If you turn on family sharing, items and photos are uploaded to a server in encrypted form, and only your family's phones can read them. No tracking, no analytics, no ads.</p>
+<p>If you use A/R on its own, items, photos and names stay on your phone and never reach us. The only thing that does, once a week, is an anonymous, aggregate count that helps us understand how much the app is used, and you can turn it off whenever you like (see <a href="#en-stats">Anonymous usage statistics</a>). If you turn on family sharing, items and photos are uploaded to a server in encrypted form, and only your family's phones can read them. No profiling, no third-party analytics, no ads.</p>
 
 <h2>Free use: everything on the device</h2>
-<p>Tabs, items, photos, categories and preferences are saved in your phone's browser storage (IndexedDB). There is no account, and this data is not sent to anyone. The site only delivers the app's files. You create and keep the <code>.zip</code> backups yourself.</p>
+<p>Tabs, items, photos, categories and preferences are saved in your phone's browser storage (IndexedDB). There is no account, and this data is not sent to anyone. The site only delivers the app's files; the only thing that leaves the phone is the anonymous count described below, if you leave it on. You create and keep the <code>.zip</code> backups yourself.</p>
+
+<h2 id="en-stats">Anonymous usage statistics</h2>
+<p>To understand how many people use A/R without a family and how they use it, the app sends at most once a week a message with three values only, all in broad ranges:</p>
+<ul>
+<li>the app version, without the last digit (for example 3.2);</li>
+<li>how many items there are: 0, 1 to 5, 6 to 20, more than 20;</li>
+<li>how many items you moved in the last seven days, in the same ranges.</li>
+</ul>
+<p>Nothing else: no phone or installation identifier, no content, no names, no photos, no date beyond the week. The server does not keep the message: it adds one to a few counters for that week (for example "week 45, 6 to 20 items: +1"). Those counters cannot tell one phone from another or lead back to you. The IP address is used only while the request is handled, to limit abuse, and is not stored.</p>
+<p>The statistics serve one purpose only: understanding how much and how A/R is used, to decide what to improve. On the website we show at most the weekly total, rounded down to the nearest ten and hidden below ten. They are never combined with other data, sold or used for advertising.</p>
+<p>They are on by default, but before anything is sent the app tells you with a notice: you can turn them off right there, or at any time from Menu → Anonymous statistics. All that stays on the phone is your choice and the week of the last send. Phones in a family do not send this count: their use is already visible, in aggregate, from the sharing server.</p>
 
 <h2>Family sharing (paid)</h2>
 <p>Only if you create a family, accept an invite or restore a family with the kit is data synced between phones, through Cloudflare (D1 database and R2 storage). Before it leaves the phone, items, tabs, categories, photos, the family name and the phone names are encrypted (AES-GCM, 256-bit) with a key generated on your phone. That key and the recovery kit secret are never sent to the server in plaintext: whoever runs the service cannot read your data.</p>
@@ -134,6 +157,7 @@
 <li>A/R is a project independent of the gioxx.org blog, which remains a personal online diary with no commercial purpose: they only share the domain, and A/R data is never shared with the blog or used for it.</li>
 <li>Sync, codes, licence and the code email are needed to provide the service you asked for (performance of a contract, art. 6(1)(b) GDPR). IP addresses and rate limits: legitimate interest in protecting the service from abuse (art. 6(1)(f)).</li>
 <li>To run the service we only look at aggregate numbers (how many families, phones, records and photo bytes there are), never the content, which stays encrypted.</li>
+<li>Anonymous usage statistics: the weekly counters are not personal data, because they cannot be traced back to anyone. For sending them from the phone the basis is legitimate interest in understanding how the service is used (art. 6(1)(f) GDPR): you can object at any time by turning them off in the menu, with no effect on how the app works.</li>
 <li>Cloudflare, Stripe, Link and Resend may process data outside the EU too (for example in the US), with the safeguards the GDPR requires (standard contractual clauses or the EU-US Data Privacy Framework).</li>
 </ul>
 
@@ -141,7 +165,7 @@
 <p>You can ask for access, correction or deletion of the data we hold about you (in practice: the licence record and the email hash), and you may lodge a complaint with your data protection authority. You delete the family's encrypted data yourself by leaving the family with the last phone. For any request write to <a href="mailto:hello@ar.gioxx.org">hello@ar.gioxx.org</a>.</p>
 
 <h2>Cookies and tracking</h2>
-<p>No cookies, no analytics, no ads, no embedded third-party content. The app's code is public (AGPL-3.0 licence) on <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, so what is written here can be checked.</p>
+<p>No cookies, no third-party analytics, no profiling, no ads, no embedded third-party content. The only statistic is the anonymous count described above, run by us and easy to turn off. The app's code is public (AGPL-3.0 licence) on <a href="https://github.com/gioxx/andata-ritorno" rel="noopener">GitHub</a>, so what is written here can be checked.</p>
 
 <p class="meta">If something substantial changes, we will update this page and the date at the top.</p>
 <a class="back" href="/">Back to A/R</a>

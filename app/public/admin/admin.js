@@ -380,7 +380,29 @@ function render() {
     dist('Spazio foto per famiglia', 'Famiglie per fascia di MB occupati (tetto 300 MB)', s.distributions.photoMB, 'Famiglie'),
     dist('Elementi per famiglia', 'Record cifrati per famiglia (capi, schede, categorie)', s.distributions.records, 'Famiglie'))
 
-  for (const tbl of $('#utilizzo').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
+  // Anonymous weekly pings (issue #35): phones without a family, never mixed with the numbers above.
+  const lu = s.localUse
+  if (lu) {
+    const wk = (w) => `settimana ${Number(w.slice(6))} · ${w.slice(0, 4)}`
+    const weekS = [{ label: 'Telefoni', color: color.s3, values: lu.weeks.map((w) => w.n) }]
+    const sumLast = lu.weeks.find((w) => w.week === lu.lastWeek)?.n ?? 0
+    const order = ['0', '1-5', '6-20', '21+']
+    const sorted = (rows) => order.map((b) => [b, n(rows.find((r) => r.b === b)?.n ?? 0)])
+    const split = (title, rows) => {
+      const t = table([title, 'Telefoni'], rows); t.hidden = false; return t
+    }
+    $('#out-local').replaceChildren(
+      card('Telefoni attivi senza famiglia', 'Un telefono conta una volta per settimana ISO; l’ultima colonna è la settimana in corso, ancora parziale', 'w8',
+        barChart(lu.weeks.map((w) => w.week), weekS, { labelOf: (w) => `S${Number(w.slice(6))}`, w: cw('w8') }),
+        table(['Settimana', 'Telefoni'], lu.weeks.map((w) => [wk(w.week), n(w.n)]))),
+      card(`Settimana scorsa: ${n(sumLast)} telefoni`, `${wk(lu.lastWeek)} · per fascia`, 'w4',
+        sumLast ? split('Capi', sorted(lu.items)) : el('p', { class: 'empty', text: 'Nessun dato' }),
+        sumLast ? split('Spostati in 7 giorni', sorted(lu.moves)) : null,
+        sumLast ? split('Versione', lu.versions.map((r) => [r.b, n(r.n)])) : null),
+    )
+  }
+
+  for (const tbl of $('main').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
   at.textContent = `Aggiornato: ${new Date(s.at).toLocaleString('it-IT')}`
 }
 

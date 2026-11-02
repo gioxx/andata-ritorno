@@ -27,6 +27,9 @@ import { registerSW } from 'virtual:pwa-register';
 import { initUpdateToast } from './ui/updateToast.js';
 import { initInstall } from './install.js';
 import { initInstallStrip } from './ui/installStrip.js';
+import { initStatsNotice } from './ui/statsNotice.js';
+import { maybePing } from './stats.js';
+import { VERSION } from './ui/about.js';
 import { t, onLangChange } from './i18n.js';
 
 // A waiting version is announced, never applied by surprise; ignored, it applies on the next full reopen.
@@ -136,6 +139,17 @@ async function startApp() {
     initFamilyUi({ db, api, onEntered: startSync, onLeft: stopSync, onExport: runExport });
     if (await getFamily(db)) await startSync();
     // Opened from an invite or a licence link: its screen goes over the app (or the welcome screen).
+    // Anonymous weekly count (issue #35): only without a family, only after the one-time notice.
+    // Never in the way: a failed storage read just means no notice and no ping this time.
+    const alone = async () => { const f = await getFamily(db); return !f || !!f.removed };
+    const ping = () => alone().then((ok) => maybePing({ version: VERSION, items: store.items, inFamily: !ok })).catch(() => false);
+    const check = initStatsNotice({ shouldShow: async () => store.items.length > 0 && await alone(), onAnswered: ping });
+    const checkNotice = () => { check().catch(() => {}) };
+    hooks.onStatsChange = () => { checkNotice(); ping() };
+    subscribe(checkNotice);
+    checkNotice();
+    setTimeout(ping, 5000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ping() });
     if (route.page === 'join') familyHooks.onJoinInvite(route.invite).catch(reportError);
     if (route.page === 'licence') familyHooks.onLicence(route.linkToken).catch(reportError);
   }

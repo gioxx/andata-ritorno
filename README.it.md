@@ -24,7 +24,7 @@ Fotografi ogni capo una volta; da lì in poi ogni capo è *a scuola* o *a casa* 
 - **Funziona offline** e si installa come un'app (PWA).
 - Tema chiaro, scuro o automatico.
 - **Menu App**: pulsante *Installa app* (prompt nativo dove il browser lo offre, istruzioni altrimenti), istruzioni *Come disinstallare* ed *Elimina tutti i dati* (in due passaggi, con backup facoltativo prima e conferma scritta).
-- **Condivisione in famiglia** (facoltativa, a pagamento): lo stesso guardaroba sincronizzato su tre telefoni (di più con posti aggiuntivi), cifrato end-to-end (vedi Privacy). Senza condivisione l'app non parla mai con un server.
+- **Condivisione in famiglia** (facoltativa, a pagamento): lo stesso guardaroba sincronizzato su tre telefoni (di più con posti aggiuntivi), cifrato end-to-end (vedi Privacy). Senza condivisione i tuoi dati non arrivano mai a un server (solo un conteggio anonimo settimanale, disattivabile).
 - Header di sicurezza sull'app servita.
 
 ## Installazione su iPhone
@@ -33,7 +33,7 @@ Apri <https://app.ar.gioxx.org> in Safari, tocca **Condividi → Aggiungi alla s
 
 ## Privacy
 
-**Uso gratuito:** tutto resta sul tuo dispositivo, nello spazio del browser (IndexedDB). Non c'è nessun account e nulla viene inviato a un server: il sito serve solo i file statici dell'app. Il rovescio della medaglia è che **i backup sono una tua responsabilità**: l'app ti avvisa quando ci sono modifiche non ancora esportate.
+**Uso gratuito:** tutto resta sul tuo dispositivo, nello spazio del browser (IndexedDB). Non c'è nessun account e i tuoi dati non vengono mai inviati a un server: il sito serve solo i file statici dell'app. L'unica eccezione è un **conteggio anonimo d'uso**, attivo di default e disattivabile con un tocco (Menu → Statistiche anonime): al massimo una volta a settimana l'app invia la sua versione e due numeri a fasce larghe (capi, capi spostati nell'ultima settimana), senza alcun identificativo; il server si limita ad aggiungere uno a contatori settimanali. Nulla parte prima che l'app abbia mostrato un avviso una tantum. Il rovescio della medaglia è che **i backup sono una tua responsabilità**: l'app ti avvisa quando ci sono modifiche non ancora esportate.
 
 **Condivisione in famiglia** (facoltativa): capi, schede, categorie, foto e nomi vengono cifrati sul telefono (AES-GCM) con una chiave che non lascia mai i dispositivi della famiglia, poi salvati su Cloudflare (D1 e R2). Il server non può leggerli; vede solo identificativi casuali, dimensioni, orari di caricamento delle foto, il numero di dispositivi e quando ciascuno è stato attivo l'ultima volta. L'email di chi paga serve a inviare il codice di sblocco e, come hash con chiave (HMAC), a recuperare la licenza. Stripe (pagamenti), Resend (email) e Cloudflare (hosting) sono i responsabili del trattamento. Informativa completa, in italiano e in inglese: [`app/public/privacy.html`](app/public/privacy.html), pubblicata su <https://app.ar.gioxx.org/privacy.html> e raggiungibile dal menu dell'app.
 

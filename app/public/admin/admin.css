@@ -54,7 +54,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .select { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--muted); font-size: 0.875rem; }
 .select select { min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); font: inherit; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--muted); font-weight: 600; }
-main.loading :is(#controls, #kpis, #utilizzo .cards) { opacity: 0.55; transition: opacity 150ms; }
+main.loading :is(#controls, #kpis, #utilizzo .cards, #out-local) { opacity: 0.55; transition: opacity 150ms; }
 
 /* Layout */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }

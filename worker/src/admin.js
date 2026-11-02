@@ -1,5 +1,6 @@
 import { HttpError, UpstreamError, json, publicError, readJson } from './http.js';
 import { notifyOwner, telegramConfigured } from './notify.js';
+import { isoWeek } from './public.js';
 
 // The owner's dashboard: aggregate numbers only, never encrypted content, names or hashes.
 // Cloudflare Access sits in front of /admin.html and /api/admin/*; this Worker checks the Access
@@ -125,6 +126,14 @@ async function stats(req, env) {
       one('SELECT COUNT(*) AS devices, MAX(units) AS top, SUM(units) AS units FROM device_usage WHERE day = ?', iso(now).slice(0, 10)),
     ]);
   const row = (r) => r.results[0] ?? {};
+  // Anonymous weekly pings from phones without a family (issue #35): the last 12 whole weeks plus
+  // the current one, and how last week's phones split by bucket. Counters only, nothing per phone.
+  const weeks = Array.from({ length: 13 }, (_, i) => isoWeek(new Date(now - (12 - i) * 7 * 864e5)));
+  const { results: weekly } = await env.DB.prepare(
+    `SELECT week, metric, bucket, n FROM usage_weekly WHERE week IN (${weeks.map(() => '?').join(',')})`,
+  ).bind(...weeks).all();
+  const lastWeek = weeks[11];
+  const split = (metric) => weekly.filter((r) => r.week === lastWeek && r.metric === metric).map(({ bucket: b, n }) => ({ b, n }));
   const cap = Number(env.MAX_TOTAL_PHOTO_BYTES);
   const hist = (values, edges) => edges.map(([label, lo, hi]) => ({ label, n: values.filter((v) => v >= lo && v < hi).length }));
   const fams = perFamily.results;
@@ -155,6 +164,13 @@ async function stats(req, env) {
     budgetToday: row(budget),
     registrationsOpen: row(settings).value !== 'closed',
     telegram: { configured: telegramConfigured(env) },
+    localUse: {
+      weeks: weeks.map((w) => ({ week: w, n: weekly.find((r) => r.week === w && r.metric === 'phones')?.n ?? 0 })),
+      lastWeek,
+      items: split('items'),
+      moves: split('moves'),
+      versions: split('version').sort((x, y) => y.n - x.n),
+    },
   });
 }
 
