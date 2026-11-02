@@ -4,6 +4,12 @@
 const $ = (sel, root = document) => root.querySelector(sel)
 const out = $('main')
 const at = $('#at')
+/** Text of the balloon under "Aggiorna"; an error keeps the balloon open until the next success. */
+function status(text, { error = false, busy = false } = {}) {
+  at.replaceChildren(error ? el('span', { class: 'err', text }) : document.createTextNode(text))
+  $('.refresh').classList.toggle('alert', error)
+  $('#reload').classList.toggle('spin', busy)
+}
 const tip = $('#tip')
 const nf = new Intl.NumberFormat('it-IT')
 const eur = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
@@ -295,7 +301,7 @@ function render() {
   // Registrations switch
   const sw = card(`Nuove registrazioni: ${reg ? 'aperte' : 'bloccate'}`, null, `w3 switch ${reg ? '' : 'closed'}`,
     el('p', { text: reg ? 'Si possono creare famiglie nuove e aggiungere telefoni con un invito.' : 'Nessuna famiglia nuova, nessun telefono nuovo, nessuna vendita di famiglie. Le famiglie esistenti si sincronizzano e il kit di recupero funziona.' }),
-    el('button', { type: 'button', class: 'primary', id: 'reg-toggle', 'data-open': reg ? 'false' : 'true', text: reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni' }))
+    el('button', { type: 'button', class: 'primary', id: 'reg-toggle', ...(saving ? { disabled: '' } : {}), 'data-open': reg ? 'false' : 'true', text: reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni' }))
   cards.append(sw)
 
   // Telegram purchase notifications
@@ -403,27 +409,50 @@ function render() {
   }
 
   for (const tbl of $('main').querySelectorAll('table.data')) if (tbl.closest('.card')?.querySelector('svg')) tbl.hidden = !state.tables
-  at.textContent = `Aggiornato: ${new Date(s.at).toLocaleString('it-IT')}`
 }
 
+// Only the latest load counts: a new one (another period, Aggiorna again) aborts the previous
+// request, and an answer that arrives late is dropped, so it can neither show the old period's data
+// nor stop the spinner or report an error while the newer request is still running.
+let inflight = null
 async function load() {
-  at.textContent = 'Caricamento…'
+  inflight?.abort()
+  const ctl = new AbortController()
+  inflight = ctl
+  status('Caricamento…', { busy: true })
   out.classList.add('loading')
   try {
-    const res = await fetch(`/api/admin/stats?days=${state.days}`, { credentials: 'same-origin', cache: 'no-store' })
+    const res = await fetch(`/api/admin/stats?days=${state.days}`, { credentials: 'same-origin', cache: 'no-store', signal: ctl.signal })
     if (!res.ok) throw new Error(res.status === 404 ? 'Accesso non autorizzato o dashboard non configurata.' : `Errore ${res.status}`)
-    state.data = await res.json()
+    const data = await res.json()
+    if (inflight !== ctl) return
+    state.data = data
     render()
+    // Only a request that succeeded changes the status: redraws from cached data (filter, theme,
+    // resize) leave an error, or a request still in flight, as they are.
+    status(`Ultimo aggiornamento: ${new Date(state.data.at).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}`)
   } catch (e) {
-    at.replaceChildren(el('span', { class: 'err', text: e.message }))
+    if (inflight === ctl) status(e.message, { error: true })
   } finally {
-    out.classList.remove('loading')
+    if (inflight === ctl) { inflight = null; out.classList.remove('loading') }
   }
 }
 
+let saving = false
 async function setRegistrations(open) {
+  if (saving) return
   if (!open && !confirm('Bloccare le nuove registrazioni? Le famiglie esistenti non ne risentono.')) return
-  at.textContent = 'Salvataggio…'
+  // While saving, no load runs: one already in flight is aborted, and nothing can start another.
+  // The save's own outcome (its error, or the load that follows it) is the only thing that writes
+  // the status; redraws from cached data draw the toggle disabled.
+  saving = true
+  inflight?.abort()
+  inflight = null
+  out.classList.remove('loading')
+  // Looked up each time: a redraw during the save replaces #reg-toggle with a new button.
+  const lockable = () => [$('#reload'), ...$('#range').querySelectorAll('button'), ...out.querySelectorAll('#reg-toggle')]
+  for (const b of lockable()) b.disabled = true
+  status('Salvataggio…', { busy: true })
   try {
     const res = await fetch('/api/admin/registrations', {
       method: 'POST',
@@ -432,10 +461,14 @@ async function setRegistrations(open) {
       body: JSON.stringify({ open }),
     })
     if (!res.ok) throw new Error(`Errore ${res.status}`)
-    await load()
   } catch (e) {
-    at.replaceChildren(el('span', { class: 'err', text: e.message }))
+    status(e.message, { error: true })
+    return
+  } finally {
+    saving = false
+    for (const b of lockable()) b.disabled = false
   }
+  await load()
 }
 
 async function testTelegram(btn) {
@@ -577,9 +610,23 @@ try {
   for (const d of blocks) if (folded.has(d.id)) d.open = false
 } catch { /* nothing stored */ }
 for (const d of blocks) d.addEventListener('toggle', saveFolds)
-const foldAll = (open) => { for (const d of blocks) d.open = open; saveFolds() }
-$('#fold-all').addEventListener('click', () => foldAll(false))
-$('#unfold-all').addEventListener('click', () => foldAll(true))
+// One button: folds everything while any section is open, unfolds everything once all are folded.
+const foldBtn = $('#fold-toggle')
+const syncFoldBtn = () => {
+  const anyOpen = blocks.some((d) => d.open)
+  const label = anyOpen ? 'Comprimi tutte le sezioni' : 'Espandi tutte le sezioni'
+  foldBtn.classList.toggle('folded', !anyOpen)
+  foldBtn.setAttribute('aria-label', label)
+  foldBtn.title = label
+}
+for (const d of blocks) d.addEventListener('toggle', syncFoldBtn)
+foldBtn.addEventListener('click', () => {
+  const open = !blocks.some((d) => d.open)
+  for (const d of blocks) d.open = open
+  saveFolds()
+  syncFoldBtn()
+})
+syncFoldBtn()
 $('.jump').addEventListener('click', (e) => {
   const a = e.target.closest('a[href^="#"]')
   const target = a && document.getElementById(a.hash.slice(1))

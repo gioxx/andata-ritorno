@@ -12,26 +12,31 @@
 <header class="top">
   <div class="top-row">
     <a class="brand" href="#"><img src="/icons/icon.svg" alt="" width="32" height="32"><span>A/R<small>Dashboard</small></span></a>
-    <p class="meta" id="at" role="status">Caricamento…</p>
+    <span class="sep" aria-hidden="true"></span>
+    <nav class="jump" aria-label="Sezioni">
+      <a href="#stato">Stato</a>
+      <a href="#risorse">Risorse</a>
+      <a href="#utilizzo">Utilizzo</a>
+      <a href="#attivita">Attività</a>
+      <a href="#codici">Codici e vendite</a>
+      <a href="#distribuzioni">Distribuzioni</a>
+      <a href="#locale">Senza famiglia</a>
+    </nav>
+    <span class="sep" aria-hidden="true"></span>
     <div class="top-actions">
-      <button type="button" class="ghost icon" id="fold-all" aria-label="Comprimi tutte le sezioni" title="Comprimi tutte le sezioni">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>
+      <button type="button" class="ghost icon" id="fold-toggle" aria-label="Comprimi tutte le sezioni" title="Comprimi tutte le sezioni">
+        <svg class="i-fold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>
+        <svg class="i-unfold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
       </button>
-      <button type="button" class="ghost icon" id="unfold-all" aria-label="Espandi tutte le sezioni" title="Espandi tutte le sezioni">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
-      </button>
-      <button type="button" class="ghost" id="reload">Aggiorna</button>
+      <div class="refresh">
+        <button type="button" class="ghost" id="reload" aria-describedby="at">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+          Aggiorna
+        </button>
+        <p class="balloon" id="at" role="status">Caricamento…</p>
+      </div>
     </div>
   </div>
-  <nav class="jump" aria-label="Sezioni">
-    <a href="#stato">Stato</a>
-    <a href="#risorse">Risorse</a>
-    <a href="#utilizzo">Utilizzo</a>
-    <a href="#attivita">Attività</a>
-    <a href="#codici">Codici e vendite</a>
-    <a href="#distribuzioni">Distribuzioni</a>
-    <a href="#locale">Senza famiglia</a>
-  </nav>
 </header>
 
 <main>
