@@ -301,7 +301,7 @@ function render() {
   // Registrations switch
   const sw = card(`Nuove registrazioni: ${reg ? 'aperte' : 'bloccate'}`, null, `w3 switch ${reg ? '' : 'closed'}`,
     el('p', { text: reg ? 'Si possono creare famiglie nuove e aggiungere telefoni con un invito.' : 'Nessuna famiglia nuova, nessun telefono nuovo, nessuna vendita di famiglie. Le famiglie esistenti si sincronizzano e il kit di recupero funziona.' }),
-    el('button', { type: 'button', class: 'primary', id: 'reg-toggle', 'data-open': reg ? 'false' : 'true', text: reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni' }))
+    el('button', { type: 'button', class: 'primary', id: 'reg-toggle', ...(saving ? { disabled: '' } : {}), 'data-open': reg ? 'false' : 'true', text: reg ? 'Blocca le nuove registrazioni' : 'Riapri le registrazioni' }))
   cards.append(sw)
 
   // Telegram purchase notifications
@@ -438,10 +438,17 @@ async function load() {
   }
 }
 
+let saving = false
 async function setRegistrations(open) {
+  if (saving) return
   if (!open && !confirm('Bloccare le nuove registrazioni? Le famiglie esistenti non ne risentono.')) return
-  // While saving, nothing else may start a load: the save's own outcome (its error, or the load
-  // that follows it) is the only thing that writes the status.
+  // While saving, no load runs: one already in flight is aborted, and nothing can start another.
+  // The save's own outcome (its error, or the load that follows it) is the only thing that writes
+  // the status; redraws from cached data draw the toggle disabled.
+  saving = true
+  inflight?.abort()
+  inflight = null
+  out.classList.remove('loading')
   const locked = [$('#reload'), ...$('#range').querySelectorAll('button'), ...out.querySelectorAll('#reg-toggle')]
   for (const b of locked) b.disabled = true
   status('Salvataggio…', { busy: true })
@@ -457,6 +464,7 @@ async function setRegistrations(open) {
     status(e.message, { error: true })
     return
   } finally {
+    saving = false
     for (const b of locked) b.disabled = false
   }
   await load()
