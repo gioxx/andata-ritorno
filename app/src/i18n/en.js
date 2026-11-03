@@ -40,7 +40,7 @@ export default {
   'render.tabs': 'Tabs',
   'item.aria': '{label}, {place}, {category}',
   'item.noCategory': 'no category',
-  'render.tagsAll': 'All ✕',
+  'render.tagsAll': 'All',
   'render.tagsToggle': 'Category filters',
   'render.tagsNone': 'No category',
   'render.tagsEmptyTab': 'No items in this tab',

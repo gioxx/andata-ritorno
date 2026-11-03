@@ -65,7 +65,7 @@ describe('tag row', () => {
     renderApp(root, state([mk('x'), mk('y')]))
     expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Senza categoria'])
     renderApp(root, state([mk('x'), mk('y')], new Set([''])))
-    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti ✕', 'Senza categoria'])
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti', 'Senza categoria'])
     expect(root.querySelectorAll('.item')).toHaveLength(2)
   })
 
@@ -89,7 +89,7 @@ describe('tag row', () => {
     expect(root.querySelector('[data-act="toggleTags"]')).toBeNull()
   })
 
-  it('lists only the used categories, filters the grid and shows "Tutti ✕" first', () => {
+  it('lists only the used categories, filters the grid and shows "Tutti" first', () => {
     const root = document.createElement('div')
     const items = [mk('x', 'c1'), mk('y'), mk('z', 'c1')]
     renderApp(root, state(items))
@@ -97,7 +97,7 @@ describe('tag row', () => {
     expect(root.querySelectorAll('.item')).toHaveLength(3)
     renderApp(root, state(items, new Set(['c1'])))
     const pills = [...root.querySelectorAll('.tags .chip')]
-    expect(pills[0].textContent).toBe('Tutti ✕')
+    expect(pills[0].textContent).toBe('Tutti')
     expect(pills[1].classList.contains('on')).toBe(true)
     expect(root.querySelectorAll('.item')).toHaveLength(2)
     expect(root.querySelector('.count').textContent).toBe('2')
@@ -127,7 +127,7 @@ describe('tag row', () => {
     st.filter.clear()
   })
 
-  it('tapping a pill toggles the store filter; "Tutti ✕" clears it', async () => {
+  it('tapping a pill toggles the store filter; "Tutti" clears it', async () => {
     const { store: st } = await import('../src/store.js')
     Object.assign(st, { tabs: [tab], items: [mk('x', 'c1')], categories: cats, currentTabId: 'A', showTags: true })
     st.filter.clear(); st.selected.clear()
@@ -147,7 +147,7 @@ describe('tag row', () => {
     expect(root.querySelector('.item[data-id="x"] .pick').getAttribute('aria-label')).toContain('senza categoria')
     const items = [mk('x', 'c1'), mk('y', 'gone')]
     renderApp(root, state(items, new Set([''])))
-    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti ✕', 'Maglie', 'Senza categoria'])
+    expect([...root.querySelectorAll('.tags .chip')].map((b) => b.textContent)).toEqual(['Tutti', 'Maglie', 'Senza categoria'])
     expect([...root.querySelectorAll('.item')].map((n) => n.dataset.id)).toEqual(['y'])
   })
 })

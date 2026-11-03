@@ -19,7 +19,7 @@ import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
 import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
-import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon, statsIcon } from './icons.js'
+import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon, statsIcon, closeIcon } from './icons.js'
 import { statsOn, setStatsOn, markNoticeSeen } from '../stats.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
 
@@ -97,7 +97,7 @@ async function openMenu() {
   if (!dlg.open) openModal(dlg)
 }
 
-const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="close" data-menu="close" aria-label="${t('common.close')}">✕</button></h3>
+const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="close" data-menu="close" aria-label="${t('common.close')}">${closeIcon}</button></h3>
     <h4>${t('menu.family')}</h4>
     <div id="familySection"></div>
     <h4>${t('menu.backup')}</h4>

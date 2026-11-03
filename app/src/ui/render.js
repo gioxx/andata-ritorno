@@ -4,7 +4,7 @@ import { getPhoto } from '../db.js'
 import { store, knownCategoryIds, setShowTags, setCurrentTab, selectToggle, selectSection, clearSelection, move, deleteSelected, categorizeSelected, toggleFilter, clearFilter } from '../store.js'
 import { visibleItems, usableFilters, effectiveCategory, UNCATEGORISED } from './filter.js'
 import { categoryName } from '../categories.js'
-import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon, tagIcon, filterIcon } from './icons.js'
+import { menuIcon, trashIcon, checkIcon, pencilIcon, zoomInIcon, cameraIcon, pasteIcon, tagIcon, filterIcon, chipCloseIcon } from './icons.js'
 import { canShowPaste } from './clipboard.js'
 import { reportError, askCategory } from './dialogs.js'
 import { t } from '../i18n.js'
@@ -78,7 +78,7 @@ function tagRow(tabItems, s) {
   const cats = (s.categories ?? []).filter((c) => used.has(c.id))
   const filter = s.filter ?? new Set()
   const pill = (id, label, cls = '') => `<button class="chip tag${cls}${filter.has(id) ? ' on' : ''}" data-tag="${esc(id)}" aria-pressed="${filter.has(id)}">${label}</button>`
-  return `<nav class="tags" aria-label="${t('render.tags')}"><span class="tagsicon" aria-hidden="true">${filterIcon}</span>${filter.size ? `<button class="chip tag clear" data-tagclear="1">${t('render.tagsAll')}</button>` : ''}${
+  return `<nav class="tags" aria-label="${t('render.tags')}"><span class="tagsicon" aria-hidden="true">${filterIcon}</span>${filter.size ? `<button class="chip tag clear" data-tagclear="1">${t('render.tagsAll')}${chipCloseIcon}</button>` : ''}${
     cats.map((c) => pill(c.id, esc(categoryName(c)))).join('')}${used.has(UNCATEGORISED) ? pill(UNCATEGORISED, t('render.tagsNone'), ' none') : ''}</nav>`
 }
 

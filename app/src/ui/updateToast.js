@@ -3,6 +3,7 @@ import { t, onLangChange } from '../i18n.js'
 import { isBusy } from '../store.js'
 import { canApplyUpdate } from '../update.js'
 import { isAdding } from './add.js'
+import { closeSmallIcon } from './icons.js'
 
 /** Read the live app state. The busy overlay is a dialog too, so it counts as a modal. */
 const readState = () => ({
@@ -40,7 +41,7 @@ export function initUpdateToast(register, { poll = 500, reload = () => location.
   function draw() {
     el.innerHTML = `<span class="msg">${t('update.available')}<span class="hint" hidden>${t('update.busy')}</span></span>
       <button type="button" class="up-go">${t('update.action')}</button>
-      <button type="button" class="up-x" aria-label="${t('common.close')}">✕</button>`
+      <button type="button" class="up-x" aria-label="${t('common.close')}">${closeSmallIcon}</button>`
     sync()
   }
   function hide() { clearInterval(timer); el?.remove(); el = null }

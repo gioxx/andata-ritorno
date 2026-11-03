@@ -2,6 +2,7 @@
 import { t, onLangChange } from '../i18n.js'
 import { currentPlatform, isStandalone } from '../platform.js'
 import { canPromptInstall, onInstallChange, promptInstall, shouldShowInstallStrip, dismissInstallStrip } from '../install.js'
+import { closeSmallIcon } from './icons.js'
 
 export function initInstallStrip() {
   const el = document.createElement('aside')
@@ -12,7 +13,7 @@ export function initInstallStrip() {
     el.setAttribute('aria-label', t('install.stripLabel'))
     el.innerHTML = `<p>${t('install.strip')}</p>
       <button type="button" class="strip-go">${t('install.stripAction')}</button>
-      <button type="button" class="strip-x" aria-label="${t('common.close')}">✕</button>`
+      <button type="button" class="strip-x" aria-label="${t('common.close')}">${closeSmallIcon}</button>`
   }
   const sync = () => {
     const show = shouldShowInstallStrip({ platform: currentPlatform(), canPrompt: canPromptInstall(), standalone: isStandalone() })
