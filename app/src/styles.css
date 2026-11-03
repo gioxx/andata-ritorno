@@ -177,7 +177,7 @@ dialog .edit-preview[hidden] { display: none; }
 @starting-style { #menu[open]::backdrop { background: rgba(0,0,0,0); } }
 @media (prefers-reduced-motion: reduce) { #menu, #menu::backdrop { transition: none; } }
 #menu h3 { display: flex; justify-content: space-between; align-items: center; }
-#menu h3 .close { flex: none; min-width: 44px; min-height: 44px; padding: 0 4px; background: none; color: var(--muted); font-size: 1.25rem; }
+#menu h3 .close { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 4px; background: none; color: var(--muted); }
 #menu .info { font-size: 0.8125rem; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
 #menu h4 { margin: 14px 0 8px; text-align: left; font-size: 0.875rem; }
 #menu h3 + h4 { margin-top: 4px; }
@@ -213,6 +213,7 @@ dialog .row + .cancel { margin-top: 8px; }
 .tags .chip.tag { background: transparent; border: 1.5px solid var(--muted); padding: 5.5px 12.5px; }
 .tags .chip.tag.on { border-color: var(--accent-strong); color: var(--accent-strong); box-shadow: inset 0 0 0 1px var(--accent-strong); }
 .tags .chip.tag.none:not(.on) { border-style: dashed; }
+.tags .chip.clear { gap: 4px; }
 .tags .tagshint { align-self: center; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
 .tags .tagsicon { flex: none; display: flex; align-items: center; padding: 0 2px; color: var(--muted); }
 /* Wraps (no scroller): every category must be visible and tappable. */
@@ -231,7 +232,7 @@ dialog .catlist li { display: flex; gap: 4px; align-items: center; margin-bottom
 dialog .catlist .catname { flex: 1; min-width: 0; position: relative; }
 dialog .catlist input[type="text"] { margin: 0; padding-left: 10px; padding-right: 36px; }
 dialog .catlist .catcount { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-width: 24px; padding: 3px 5px; border-radius: var(--r-pill); background: var(--badge); color: var(--muted); font-size: 0.8125rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
-dialog .catlist button { flex: none; width: 44px; height: 44px; padding: 0; background: var(--chip); }
+dialog .catlist button { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; background: var(--chip); }
 dialog .catlist button.danger { width: 44px; border: 0; color: var(--danger); }
 dialog .catnew { margin-bottom: 8px; }
 dialog .catnew input[type="text"] { flex: 1; min-width: 0; margin: 0; }
@@ -279,7 +280,7 @@ input, textarea, select { font-size: max(1rem, 16px); }
 .install-strip p { margin: 0; flex: 1; }
 .install-strip button { flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: var(--r-pill); font-weight: 700; }
 .install-strip .strip-go { background: var(--accent-strong); color: var(--bg); }
-.install-strip .strip-x { background: none; color: var(--muted); font-size: 1.125rem; }
+.install-strip .strip-x { display: inline-flex; align-items: center; justify-content: center; background: none; color: var(--muted); }
 .stats-strip { flex-wrap: wrap; }
 .stats-strip p { flex: 1 1 16rem; }
 .stats-strip a { color: inherit; font-weight: 700; }
@@ -300,7 +301,7 @@ dialog .wipe-actions > button.cancel { margin-top: 0; }
 .update-toast button { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: var(--r-pill); font-weight: 700; }
 .update-toast .up-go { background: var(--accent-strong); color: var(--bg); }
 .update-toast .up-go:disabled { opacity: .5; }
-.update-toast .up-x { background: none; color: inherit; font-size: 1.125rem; }
+.update-toast .up-x { display: inline-flex; align-items: center; justify-content: center; background: none; color: inherit; }
 
 /* ---- Family dialogs ---- */
 dialog .qr svg { display: block; width: 100%; max-width: 240px; margin: 12px auto; border-radius: 12px; }

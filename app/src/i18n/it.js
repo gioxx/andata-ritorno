@@ -41,7 +41,7 @@ export default {
   'render.tabs': 'Schede',
   'item.aria': '{label}, {place}, {category}',
   'item.noCategory': 'senza categoria',
-  'render.tagsAll': 'Tutti ✕',
+  'render.tagsAll': 'Tutti',
   'render.tagsToggle': 'Filtri per categoria',
   'render.tagsNone': 'Senza categoria',
   'render.tagsEmptyTab': 'Nessun capo in questa scheda',

@@ -137,7 +137,7 @@ if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
   const dlg = document.createElement('dialog')
   dlg.className = 'doc-dialog'
   dlg.setAttribute('aria-label', '')
-  dlg.innerHTML = `<div class="doc-dialog-head"><a class="doc-dialog-out" target="_blank" rel="noopener">${it ? 'Apri in una nuova scheda ↗' : 'Open in a new tab ↗'}</a><button type="button" class="checkout-close" aria-label="${it ? 'Chiudi' : 'Close'}">✕</button></div><div class="doc-sheet"></div>`
+  dlg.innerHTML = `<div class="doc-dialog-head"><a class="doc-dialog-out" target="_blank" rel="noopener">${it ? 'Apri in una nuova scheda ↗' : 'Open in a new tab ↗'}</a><button type="button" class="checkout-close" aria-label="${it ? 'Chiudi' : 'Close'}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div class="doc-sheet"></div>`
   document.body.append(dlg)
   const sheet = dlg.querySelector('.doc-sheet')
   const out = dlg.querySelector('.doc-dialog-out')

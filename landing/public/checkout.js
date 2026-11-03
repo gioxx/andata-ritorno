@@ -22,7 +22,7 @@ const loadStripe = () => (stripeReady ??= new Promise((resolve, reject) => {
 const dlg = document.createElement('dialog')
 dlg.className = 'checkout-dialog'
 dlg.setAttribute('aria-labelledby', 'checkout-title')
-dlg.innerHTML = `<div class="checkout-head"><h2 id="checkout-title"></h2><button type="button" class="checkout-close" aria-label="${T.close}">✕</button></div><div class="checkout-body" role="status"></div><div id="checkout-mount"></div>`
+dlg.innerHTML = `<div class="checkout-head"><h2 id="checkout-title"></h2><button type="button" class="checkout-close" aria-label="${T.close}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div class="checkout-body" role="status"></div><div id="checkout-mount"></div>`
 document.body.append(dlg)
 const title = dlg.querySelector('#checkout-title')
 const body = dlg.querySelector('.checkout-body')
