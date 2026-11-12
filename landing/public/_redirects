@@ -1,10 +1,10 @@
-# Old app addresses on this origin (A/R 2.x) now live on app.ar.gioxx.org.
-/privacy.html https://app.ar.gioxx.org/privacy 301
-/privacy https://app.ar.gioxx.org/privacy 301
-/terms.html https://app.ar.gioxx.org/terms 301
-/terms https://app.ar.gioxx.org/terms 301
-/unlock https://app.ar.gioxx.org/unlock 302
-/join https://app.ar.gioxx.org/join 302
-/licence https://app.ar.gioxx.org/licence 302
-/admin https://app.ar.gioxx.org/admin/ 302
-/admin/ https://app.ar.gioxx.org/admin/ 302
+# Old app addresses on this origin (A/R 2.x) now live on app.ar.gxware.org.
+/privacy.html https://app.ar.gxware.org/privacy 301
+/privacy https://app.ar.gxware.org/privacy 301
+/terms.html https://app.ar.gxware.org/terms 301
+/terms https://app.ar.gxware.org/terms 301
+/unlock https://app.ar.gxware.org/unlock 302
+/join https://app.ar.gxware.org/join 302
+/licence https://app.ar.gxware.org/licence 302
+/admin https://app.ar.gxware.org/admin/ 302
+/admin/ https://app.ar.gxware.org/admin/ 302

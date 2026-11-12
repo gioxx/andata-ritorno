@@ -129,7 +129,7 @@ for (const b of document.querySelectorAll('[data-copy-link]')) {
 }
 
 // Privacy policy and terms open over the page, so closing them leaves you here. The text is read
-// from app.ar.gioxx.org (one copy, kept with the app) and only this page's language is shown.
+// from app.ar.gxware.org (one copy, kept with the app) and only this page's language is shown.
 // Ctrl/Cmd-click, no JavaScript or a failed read: a normal link.
 const docLinks = document.querySelectorAll('a[data-doc]')
 if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {
@@ -192,7 +192,7 @@ if (numbers) {
   const it = document.documentElement.lang === 'it'
   const fmt = new Intl.NumberFormat(it ? 'it-IT' : 'en-GB')
   // Versioned URL: answers cached by browsers before the last change (v3: local weekly use) are never reused.
-  fetch('https://app.ar.gioxx.org/api/public/stats?v=3')
+  fetch('https://app.ar.gxware.org/api/public/stats?v=3')
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
     .then((s) => {
       let shown = 0

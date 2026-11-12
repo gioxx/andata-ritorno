@@ -28,6 +28,6 @@ Before opening a bug:
 - Phone and system (for example iPhone 15, iOS 18.2 / Pixel 8, Android 15):
 - Browser, and installed as an app or not:
 - Using family sharing? yes / no
-- Hosted service (app.ar.gioxx.org) or self-hosted:
+- Hosted service (app.ar.gxware.org) or self-hosted:
 
 ## Screenshots or more context

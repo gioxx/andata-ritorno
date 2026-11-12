@@ -2,12 +2,12 @@
 
 <h1 align="center">Andata e Ritorno (A/R)</h1>
 
-<p align="center"><em><a href="README.it.md">Leggi in italiano</a></em> · <a href="https://ar.gioxx.org">ar.gioxx.org</a> · <a href="https://app.ar.gioxx.org">app.ar.gioxx.org</a></p>
+<p align="center"><em><a href="README.it.md">Leggi in italiano</a></em> · <a href="https://ar.gxware.org">ar.gxware.org</a> · <a href="https://app.ar.gxware.org">app.ar.gxware.org</a></p>
 
 A small installable web app to keep track of kids' clothes between **home** and **school** (nursery, kindergarten…).
 Take a photo of each item once; from then on every item is either *a scuola* or *a casa* and moves with a tap — no more copying photos between notes to remember what is where.
 
-**Use it:** <https://app.ar.gioxx.org> (product page and guide: <https://ar.gioxx.org>) — open it on your phone and add it to the home screen. The UI is available in Italian and English (automatic, with a switch in the menu).
+**Use it:** <https://app.ar.gxware.org> (product page and guide: <https://ar.gxware.org>) — open it on your phone and add it to the home screen. The UI is available in Italian and English (automatic, with a switch in the menu).
 
 ## Features
 
@@ -29,13 +29,13 @@ Take a photo of each item once; from then on every item is either *a scuola* or 
 
 ## Installing on iPhone
 
-Open <https://app.ar.gioxx.org> in Safari, tap **Share → Add to Home Screen**. Install it: if you only use it in a Safari tab, Safari may delete the site's data after about 7 days without use. Export backups regularly anyway.
+Open <https://app.ar.gxware.org> in Safari, tap **Share → Add to Home Screen**. Install it: if you only use it in a Safari tab, Safari may delete the site's data after about 7 days without use. Export backups regularly anyway.
 
 ## Privacy
 
 **Free use:** everything stays on your device, in the browser's storage (IndexedDB). There is no account and your data is never sent to a server: the site only serves the app's static files. The one exception is an **anonymous usage count**, on by default and off with one tap (Menu → Anonymous statistics): at most once a week the app sends its version and two numbers in broad ranges (items, items moved in the last week), with no identifier; the server only adds one to weekly counters. Nothing is sent before the app has shown a one-time notice. The flip side is that **backups are your responsibility** — the app reminds you when there are changes you haven't exported yet.
 
-**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://app.ar.gioxx.org/privacy.html> and linked from the app menu.
+**Family sharing** (optional): items, tabs, categories, photos and names are encrypted on the phone (AES-GCM) with a key that never leaves the family's devices, then stored on Cloudflare (D1 and R2). The server cannot read them; it sees only random ids, sizes, photo upload times, the device count and when each device was last active. The payer's email is used to send the unlock code and, as a keyed hash (HMAC), to recover the licence. Stripe (payments), Resend (emails) and Cloudflare (hosting) are the processors. Full policy, in Italian and English: [`app/public/privacy.html`](app/public/privacy.html), served at <https://app.ar.gxware.org/privacy.html> and linked from the app menu.
 
 ## Development
 
@@ -66,7 +66,8 @@ Change the `routes` pattern in `worker/wrangler.app.toml` to deploy it on your o
 ```
 app/       the app (src/, tests/, public/ icons and manifest)
 worker/    the Cloudflare Worker: app hosting and the `/api/*` family sharing API
-landing/   the product page and guide on ar.gioxx.org (static, its own Worker: `cd landing && npx wrangler deploy`)
+landing/   the product page and guide on ar.gxware.org (static, its own Worker: `cd landing && npx wrangler deploy`)
+redirect/  301 from the old gioxx.org addresses to gxware.org (`cd redirect && npx wrangler deploy`)
 legacy/    the first single-file prototype, kept only as reference for its backup format
 docs/      design notes and the implementation plan
 ```
@@ -83,7 +84,7 @@ Backups exported from the old prototype (`andata-ritorno-AAAA-MM-GG.json`) can s
 - [x] Photo rotation, Italian/English, iPhone support
 - [x] Family sharing between phones
 - [x] Privacy policy (public app, premium data on the server)
-- [x] Landing site <https://ar.gioxx.org> (product page and guide, in Italian and English)
+- [x] Landing site <https://ar.gxware.org> (product page and guide, in Italian and English)
 
 ## Worker and API deploy notes
 
@@ -105,9 +106,9 @@ npm run deploy:app
 
 Then:
 
-1. **Resend**: the domain `ar.gioxx.org` must be verified in Resend (DNS records); unlock-code and licence-recovery emails are sent from `noreply@ar.gioxx.org`.
-2. **Stripe**: enable Managed Payments, then create two Payment Links, each with a single price and quantity fixed to 1: the family unlock (4,99 €) and the extra device slot (1,99 €). On both, set the success URL to `https://app.ar.gioxx.org/unlock?session_id={CHECKOUT_SESSION_ID}`.
-3. **Stripe webhook**: add an endpoint `https://app.ar.gioxx.org/api/stripe/webhook` listening to `checkout.session.completed` and `checkout.session.async_payment_succeeded`; its signing secret is `STRIPE_WEBHOOK_SECRET`.
+1. **Resend**: the domain `ar.gxware.org` must be verified in Resend (DNS records); unlock-code and licence-recovery emails are sent from `noreply@ar.gxware.org`.
+2. **Stripe**: enable Managed Payments, then create two Payment Links, each with a single price and quantity fixed to 1: the family unlock (4,99 €) and the extra device slot (1,99 €). On both, set the success URL to `https://app.ar.gxware.org/unlock?session_id={CHECKOUT_SESSION_ID}`.
+3. **Stripe webhook**: add an endpoint `https://app.ar.gxware.org/api/stripe/webhook` listening to `checkout.session.completed` and `checkout.session.async_payment_succeeded`; its signing secret is `STRIPE_WEBHOOK_SECRET`.
 4. Put the two Stripe price ids in `PRICE_FAMILY` and `PRICE_SLOT` in `[vars]` of `wrangler.app.toml`.
 5. **Build-time environment** for the app (read by Vite at `npm run deploy:app`, e.g. in the shell or `app/.env.production`, not committed if you prefer): `VITE_PAYMENTS=1` shows the purchase buttons (leave it unset to keep them hidden: manual codes work either way), `VITE_STRIPE_LINK_FAMILY` and `VITE_STRIPE_LINK_SLOT` point to `https://<your app>/api/buy/family` and `/api/buy/slot`. Those routes redirect to the two Payment Links set in `PAY_LINK_FAMILY` and `PAY_LINK_SLOT` (`[vars]` of `wrangler.app.toml`), and refuse family purchases while registrations are closed from the admin page. To sell from your own landing page, also set `SITE_ORIGIN` (it may then call `POST /api/checkout`, the embedded Checkout).
 6. **Photo storage cap**: `MAX_TOTAL_PHOTO_BYTES` in `[vars]` of `wrangler.app.toml` (default 9 000 000 000 when unset) is the most photo bytes the server stores across all families, to stay inside R2's free 10 GB. Past it, new photos get `413 limit-storage` (items keep syncing, existing photos stay readable); deleting photos or purging a family frees space. The running total lives in the `usage` table (row `photo_bytes`), created and seeded by `schema.sql`. Photo rows have a `ready` flag: a row is written (not ready, hidden from list and get) when the bytes are reserved and turns ready once the R2 object exists, so an interrupted upload is simply re-sent by the next sync. The total counts every row, ready or not.
@@ -119,7 +120,7 @@ The `RL_STRICT` / `RL_API` rate-limit bindings are optional: without them the AP
 
 ## Contributing
 
-Ideas, bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and, for vulnerabilities, [SECURITY.md](SECURITY.md). Not on GitHub? Write to hello@ar.gioxx.org. The A/R name and logo are covered by [TRADEMARK.md](TRADEMARK.md).
+Ideas, bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and, for vulnerabilities, [SECURITY.md](SECURITY.md). Not on GitHub? Write to hello@ar.gxware.org. The A/R name and logo are covered by [TRADEMARK.md](TRADEMARK.md).
 
 ## License
 

@@ -4,7 +4,7 @@ This document describes how the **A/R** and **Andata e Ritorno** names, the A/R 
 
 ## Status
 
-"A/R" and "Andata e Ritorno", as names of this software and of the hosted service at ar.gioxx.org, are **unregistered trademarks** claimed by the project's author through their public use in connection with this software. This document will be updated if they are ever registered.
+"A/R" and "Andata e Ritorno", as names of this software and of the hosted service at ar.gxware.org, are **unregistered trademarks** claimed by the project's author through their public use in connection with this software. This document will be updated if they are ever registered.
 
 The GNU AGPL v3 (see [LICENSE](LICENSE)) covers the **source code**. It does **not** grant any rights to use the names, the logo or the brand identity.
 
@@ -34,7 +34,7 @@ If you are unsure whether a use is allowed, ask: a quick conversation is better 
 
 ## Requesting permission
 
-Write to [hello@ar.gioxx.org](mailto:hello@ar.gioxx.org) with a description of the intended use, its audience and scope, and mockups where relevant. Expect an answer within 14 days. Permission, when granted, is non-exclusive and may be revoked if the terms of use change materially.
+Write to [hello@ar.gxware.org](mailto:hello@ar.gxware.org) with a description of the intended use, its audience and scope, and mockups where relevant. Expect an answer within 14 days. Permission, when granted, is non-exclusive and may be revoked if the terms of use change materially.
 
 ## Changes to this policy
 

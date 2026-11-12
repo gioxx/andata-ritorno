@@ -31,6 +31,7 @@ import { initStatsNotice } from './ui/statsNotice.js';
 import { maybePing } from './stats.js';
 import { VERSION } from './ui/about.js';
 import { t, onLangChange } from './i18n.js';
+import { isOldHost, newAddressOf, renderMoved } from './ui/moved.js';
 
 // A waiting version is announced, never applied by surprise; ignored, it applies on the next full reopen.
 initUpdateToast((handlers) => registerSW(handlers));
@@ -41,7 +42,13 @@ const root = document.getElementById('app');
 const route = routeOf(location.pathname, location.hash, location.search);
 // iOS Safari outside the installed app: its storage is not the app's.
 const inSafari = currentPlatform() === 'ios' && !isStandalone();
-if (route.page === 'unlock') {
+// The old address (app.ar.gioxx.org) only hands the data over: links opened there go to the new one.
+const oldHost = isOldHost(location.hostname);
+if (oldHost && route.page !== 'app') {
+  location.replace(newAddressOf(location));
+} else if (oldHost) {
+  await startApp();
+} else if (route.page === 'unlock') {
   // The payment success page: shows the code only, the app itself does not start here. The session
   // id leaves the address bar (and the history) at once: whoever has it can read the code.
   history.replaceState(null, '', '/unlock');
@@ -99,6 +106,12 @@ async function startApp() {
     onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
     await seedSyncStatus(db); // before the first draw: no backup nag flashing on a family device
     await load(db);
+    if (oldHost) {
+      initMenu(db); // runExport works on the database handed to the menu
+      const hasData = store.tabs.length > 0 || !!(await getFamily(db));
+      renderMoved(root, { hasData, onExport: runExport });
+      return;
+    }
     // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
     initIosBanner({ onDismiss: () => draw(true) });
     initInstallStrip();

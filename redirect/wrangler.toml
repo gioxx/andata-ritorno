@@ -1,0 +1,14 @@
+# Old addresses on gioxx.org: everything goes to the same path on gxware.org with a 301.
+# Phase 1: ar.gioxx.org only. app.ar.gioxx.org still runs the app Worker (worker/wrangler.app.toml)
+# in "moved" mode, so users can save a backup of their local data before it closes.
+# Phase 2 (once users had time to move): remove app.ar.gioxx.org from the app Worker, add it below,
+# deploy both. Phase 3: delete this Worker and the DNS records.
+name = "andata-ritorno-redirect"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+routes = [
+  { pattern = "ar.gioxx.org", custom_domain = true },
+  # { pattern = "app.ar.gioxx.org", custom_domain = true },
+]

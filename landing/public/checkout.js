@@ -2,7 +2,7 @@
 // Stripe.js is loaded only when someone presses a buy button, so the page sends nothing to Stripe
 // before that. Without JavaScript, or if anything here fails, the buttons stay plain links to the
 // Stripe payment pages.
-const API = 'https://app.ar.gioxx.org'
+const API = 'https://app.ar.gxware.org'
 const KEY = document.querySelector('meta[name="ar-stripe-key"]')?.content
 const lang = document.documentElement.lang === 'it' ? 'it' : 'en'
 const T = {
@@ -60,7 +60,7 @@ async function showCode(kind, sessionId) {
     const res = await fetch(`${API}/api/unlock/session?id=${encodeURIComponent(sessionId)}`)
     if (!res.ok) throw new Error(String(res.status))
     const { code } = await res.json()
-    body.innerHTML = `<p class="checkout-label">${T.code}</p><p class="checkout-code"></p><div class="actions"><button type="button" class="btn btn-ghost checkout-copy">${T.copy}</button><a class="btn btn-primary" href="https://app.ar.gioxx.org/">${T.app}</a></div><p class="fine"></p>`
+    body.innerHTML = `<p class="checkout-label">${T.code}</p><p class="checkout-code"></p><div class="actions"><button type="button" class="btn btn-ghost checkout-copy">${T.copy}</button><a class="btn btn-primary" href="https://app.ar.gxware.org/">${T.app}</a></div><p class="fine"></p>`
     body.querySelector('.checkout-code').textContent = code
     body.querySelector('.fine').textContent = kind === 'slot' ? T.nextSlot : T.next
     const copy = body.querySelector('.checkout-copy')
