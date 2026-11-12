@@ -145,7 +145,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => window.open(getLang() === 'it' ? 'https://ar.gioxx.org/guida/' : 'https://ar.gioxx.org/en/guide/', '_blank', 'noopener'), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => window.open(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/', '_blank', 'noopener'), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
       invite: openInvite, slot: () => openCodeDialog({ buyLink: payments ? import.meta.env.VITE_STRIPE_LINK_SLOT : null }), kit: () => openKit(), leave: openLeave }[item.dataset.menu]

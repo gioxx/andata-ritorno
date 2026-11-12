@@ -31,6 +31,7 @@ import { initStatsNotice } from './ui/statsNotice.js';
 import { maybePing } from './stats.js';
 import { VERSION } from './ui/about.js';
 import { t, onLangChange } from './i18n.js';
+import { isOldHost, newAddressOf, renderMoved } from './ui/moved.js';
 
 // A waiting version is announced, never applied by surprise; ignored, it applies on the next full reopen.
 initUpdateToast((handlers) => registerSW(handlers));
@@ -41,7 +42,13 @@ const root = document.getElementById('app');
 const route = routeOf(location.pathname, location.hash, location.search);
 // iOS Safari outside the installed app: its storage is not the app's.
 const inSafari = currentPlatform() === 'ios' && !isStandalone();
-if (route.page === 'unlock') {
+// The old address (app.ar.gioxx.org) only hands the data over: links opened there go to the new one.
+const oldHost = isOldHost(location.hostname);
+if (oldHost && route.page !== 'app') {
+  location.replace(newAddressOf(location));
+} else if (oldHost) {
+  await startApp();
+} else if (route.page === 'unlock') {
   // The payment success page: shows the code only, the app itself does not start here. The session
   // id leaves the address bar (and the history) at once: whoever has it can read the code.
   history.replaceState(null, '', '/unlock');
@@ -61,6 +68,7 @@ async function startApp() {
 
   // `force` = redraw even the welcome screen (language change); it keeps the typed name.
   function draw(force = false) {
+    if (oldHost) return; // the move screen owns the page there (a sync reload must not draw the app)
     if (store.tabs.length) renderApp(root, store);
     else if (force || !root.querySelector('.welcome')) { // draw once: a redraw would drop focus while typing
       renderWelcome(root, {
@@ -99,6 +107,22 @@ async function startApp() {
     onLangChange(() => draw(true)); // dialogs rebuild themselves lazily
     await seedSyncStatus(db); // before the first draw: no backup nag flashing on a family device
     await load(db);
+    if (oldHost) {
+      initMenu(db); // runExport works on the database handed to the menu
+      // In a family: one sync first. It finishes a join/recovery left pending (only this origin
+      // holds its device id), brings the recovery kit to an invited phone and the latest changes,
+      // so the backup carries what the new address needs to rejoin.
+      const fam = await getFamily(db);
+      if (fam && !fam.removed) {
+        await initSync({ db, api: createApi({ getToken: async () => (await getFamily(db))?.token }) }).catch(() => {});
+        await syncNow('start');
+      }
+      const now = await getFamily(db);
+      const kitMissing = !!now && !now.removed && (!!now.pending || !now.recoverySecret);
+      const hasData = store.tabs.length > 0 || !!now;
+      renderMoved(root, { hasData, kitMissing, onExport: runExport });
+      return;
+    }
     // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
     initIosBanner({ onDismiss: () => draw(true) });
     initInstallStrip();

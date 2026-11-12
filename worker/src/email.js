@@ -1,4 +1,4 @@
-const FROM = 'A/R <noreply@ar.gioxx.org>';
+const FROM = 'A/R <noreply@ar.gxware.org>';
 
 /**
  * Send a plain-text email through Resend. Never throws: a failure is logged and reported as false,
@@ -48,7 +48,7 @@ export function codeEmail(code, kind) {
       slot
         ? 'IMPORTANTE: se non l\'hai ancora fatto, salva il kit di recupero della famiglia (Menu → Famiglia → Kit di recupero) in un posto sicuro, per esempio un password manager.'
         : 'IMPORTANTE: appena creata la famiglia, A/R ti mostra il kit di recupero. Salvalo subito in un posto sicuro, per esempio un password manager: se perdi tutti i telefoni è l\'unico modo per rientrare nella famiglia e ritrovare i dati, perché il codice non si può riusare.',
-      'Come funziona il kit: https://ar.gioxx.org/guida/#kit',
+      'Come funziona il kit: https://ar.gxware.org/guida/#kit',
       '',
       '---',
       '',
@@ -64,7 +64,7 @@ export function codeEmail(code, kind) {
       slot
         ? 'IMPORTANT: if you have not done it yet, save the family\'s recovery kit (Menu → Family → Recovery kit) somewhere safe, such as a password manager.'
         : 'IMPORTANT: right after creating the family, A/R shows you the recovery kit. Save it at once somewhere safe, such as a password manager: if you lose every phone it is the only way back into the family and its data, because the code cannot be used again.',
-      'How the kit works: https://ar.gioxx.org/en/guide/#kit',
+      'How the kit works: https://ar.gxware.org/en/guide/#kit',
     ].join('\n'),
   };
 }

@@ -10,7 +10,7 @@ This Code of Conduct applies within all project spaces (repository, issues, pull
 
 ## Reporting
 
-Reports of unacceptable behavior may be sent privately to the maintainer at [hello@ar.gioxx.org](mailto:hello@ar.gioxx.org).
+Reports of unacceptable behavior may be sent privately to the maintainer at [hello@ar.gxware.org](mailto:hello@ar.gxware.org).
 
 All reports are reviewed promptly and fairly, and the privacy and safety of the reporter are respected.
 

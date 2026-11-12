@@ -12,7 +12,7 @@ import { randomToken, sha256Hex } from '../src/auth.js';
 const LINK_TTL_MS = 30 * 60 * 1000;
 const args = process.argv.slice(2);
 const test = args.includes('--test');
-const APP_ORIGIN = process.env.APP_ORIGIN || (test ? 'https://ar-test.gioxx.org' : 'https://app.ar.gioxx.org');
+const APP_ORIGIN = process.env.APP_ORIGIN || (test ? 'https://ar-test.gioxx.org' : 'https://app.ar.gxware.org');
 const DB_NAME = test ? 'andata-ritorno-test' : 'andata-ritorno';
 const workerDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 

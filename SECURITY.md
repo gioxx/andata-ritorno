@@ -4,13 +4,13 @@ A/R stores families' encrypted wardrobes, handles purchase codes and talks to St
 
 ## Supported versions
 
-Only the latest version on `main`, which is what runs at [app.ar.gioxx.org](https://app.ar.gioxx.org), is supported. There are no long-term branches.
+Only the latest version on `main`, which is what runs at [app.ar.gxware.org](https://app.ar.gxware.org), is supported. There are no long-term branches.
 
 ## Reporting a vulnerability
 
 **Please do not open a public GitHub issue for security vulnerabilities.**
 
-Use GitHub's private vulnerability reporting: on the repository page open **Security → Report a vulnerability**. If that is not available, write to [hello@ar.gioxx.org](mailto:hello@ar.gioxx.org) and ask for a private channel; do not include vulnerability details in that first message.
+Use GitHub's private vulnerability reporting: on the repository page open **Security → Report a vulnerability**. If that is not available, write to [hello@ar.gxware.org](mailto:hello@ar.gxware.org) and ask for a private channel; do not include vulnerability details in that first message.
 
 Include:
 

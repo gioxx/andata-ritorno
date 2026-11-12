@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Write by email (Italian or English)
-    url: mailto:hello@ar.gioxx.org
-    about: Not on GitHub, or prefer email? Write to hello@ar.gioxx.org.
+    url: mailto:hello@ar.gxware.org
+    about: Not on GitHub, or prefer email? Write to hello@ar.gxware.org.
   - name: Security vulnerability
     url: https://github.com/gioxx/andata-ritorno/security/advisories/new
     about: Do not open a public issue for security reports. Report privately; see SECURITY.md.
   - name: User guide
-    url: https://ar.gioxx.org/guida/
+    url: https://ar.gxware.org/guida/
     about: How to use A/R, family sharing and the recovery kit.

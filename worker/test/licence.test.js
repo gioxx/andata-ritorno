@@ -300,7 +300,7 @@ describe('Stripe', () => {
     expect(rows.results[0].email_hmac).toBe(await hmacHex(SECRETS.EMAIL_HMAC_KEY, 'payer@example.com'));
     expect(emails).toHaveLength(2);
     expect(emails[0].to).toEqual(['Payer@Example.com']);
-    expect(emails[0].from).toBe('A/R <noreply@ar.gioxx.org>');
+    expect(emails[0].from).toBe('A/R <noreply@ar.gxware.org>');
     expect(emails[0].text).toContain(first.code);
   });
 

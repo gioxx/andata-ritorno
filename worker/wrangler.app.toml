@@ -5,7 +5,12 @@ compatibility_date = "2026-10-01"
 # One origin only: IndexedDB is per-origin, so a second hostname would show an empty app.
 workers_dev = false
 preview_urls = false
-routes = [{ pattern = "app.ar.gioxx.org", custom_domain = true }]
+# app.ar.gioxx.org is the old address, kept only while users move their data: there the app shows
+# the "moved" screen (app/src/ui/moved.js) instead of running. Then it goes to redirect/wrangler.toml.
+routes = [
+  { pattern = "app.ar.gxware.org", custom_domain = true },
+  { pattern = "app.ar.gioxx.org", custom_domain = true },
+]
 
 [assets]
 directory = "../app/dist"
@@ -15,9 +20,9 @@ not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
 [vars]
-APP_ORIGIN = "https://app.ar.gioxx.org"
+APP_ORIGIN = "https://app.ar.gxware.org"
 # The landing site, allowed to open Checkout (POST /api/checkout) and read the code it produced.
-SITE_ORIGIN = "https://ar.gioxx.org"
+SITE_ORIGIN = "https://ar.gxware.org"
 # Stripe payment links behind GET /api/buy/family and /api/buy/slot (closed registrations stop family sales).
 PAY_LINK_FAMILY = "https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00"
 PAY_LINK_SLOT = "https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01"
@@ -26,7 +31,7 @@ PRICE_FAMILY = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
 PRICE_SLOT = "price_1UX1rBCfwq1bSlj7mAr3JtPY"
 # Global cap on stored photo bytes across all families (R2 free tier is 10 GB; default 9 GB when unset).
 MAX_TOTAL_PHOTO_BYTES = "9000000000"
-# Owner dashboard (/admin): Cloudflare Access application on app.ar.gioxx.org. Not secrets.
+# Owner dashboard (/admin): Cloudflare Access application on app.ar.gxware.org. Not secrets.
 ACCESS_TEAM_DOMAIN = "cerbero.cloudflareaccess.com"
 ACCESS_AUD = "b24786f2ae9c9d173e497f74d19abc40edda78dd7abc25525a2798e9d46cf2af"
 # Resource usage on the dashboard (Cloudflare GraphQL Analytics; the token is the CF_ANALYTICS_TOKEN secret).

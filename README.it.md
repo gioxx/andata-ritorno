@@ -2,12 +2,12 @@
 
 <h1 align="center">Andata e Ritorno (A/R)</h1>
 
-<p align="center"><em><a href="README.md">Read in English</a></em> · <a href="https://ar.gioxx.org">ar.gioxx.org</a> · <a href="https://app.ar.gioxx.org">app.ar.gioxx.org</a></p>
+<p align="center"><em><a href="README.md">Read in English</a></em> · <a href="https://ar.gxware.org">ar.gxware.org</a> · <a href="https://app.ar.gxware.org">app.ar.gxware.org</a></p>
 
 Una piccola web app installabile per tenere traccia dei vestiti dei bambini tra **casa** e **scuola** (nido, materna…).
 Fotografi ogni capo una volta; da lì in poi ogni capo è *a scuola* o *a casa* e si sposta con un tocco. Basta foto copiate nelle note per ricordare cosa è dove.
 
-**Usala:** <https://app.ar.gioxx.org> (presentazione e guida: <https://ar.gioxx.org>). Aprila sul telefono e aggiungila alla schermata Home. L'interfaccia è in italiano e in inglese (scelta automatica, con un selettore nel menu).
+**Usala:** <https://app.ar.gxware.org> (presentazione e guida: <https://ar.gxware.org>). Aprila sul telefono e aggiungila alla schermata Home. L'interfaccia è in italiano e in inglese (scelta automatica, con un selettore nel menu).
 
 ## Funzioni
 
@@ -29,13 +29,13 @@ Fotografi ogni capo una volta; da lì in poi ogni capo è *a scuola* o *a casa* 
 
 ## Installazione su iPhone
 
-Apri <https://app.ar.gioxx.org> in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati del sito. Esporta comunque un backup ogni tanto.
+Apri <https://app.ar.gxware.org> in Safari, tocca **Condividi → Aggiungi alla schermata Home**. Installala: se la usi solo in una scheda di Safari, dopo circa 7 giorni senza uso Safari può cancellare i dati del sito. Esporta comunque un backup ogni tanto.
 
 ## Privacy
 
 **Uso gratuito:** tutto resta sul tuo dispositivo, nello spazio del browser (IndexedDB). Non c'è nessun account e i tuoi dati non vengono mai inviati a un server: il sito serve solo i file statici dell'app. L'unica eccezione è un **conteggio anonimo d'uso**, attivo di default e disattivabile con un tocco (Menu → Statistiche anonime): al massimo una volta a settimana l'app invia la sua versione e due numeri a fasce larghe (capi, capi spostati nell'ultima settimana), senza alcun identificativo; il server si limita ad aggiungere uno a contatori settimanali. Nulla parte prima che l'app abbia mostrato un avviso una tantum. Il rovescio della medaglia è che **i backup sono una tua responsabilità**: l'app ti avvisa quando ci sono modifiche non ancora esportate.
 
-**Condivisione in famiglia** (facoltativa): capi, schede, categorie, foto e nomi vengono cifrati sul telefono (AES-GCM) con una chiave che non lascia mai i dispositivi della famiglia, poi salvati su Cloudflare (D1 e R2). Il server non può leggerli; vede solo identificativi casuali, dimensioni, orari di caricamento delle foto, il numero di dispositivi e quando ciascuno è stato attivo l'ultima volta. L'email di chi paga serve a inviare il codice di sblocco e, come hash con chiave (HMAC), a recuperare la licenza. Stripe (pagamenti), Resend (email) e Cloudflare (hosting) sono i responsabili del trattamento. Informativa completa, in italiano e in inglese: [`app/public/privacy.html`](app/public/privacy.html), pubblicata su <https://app.ar.gioxx.org/privacy.html> e raggiungibile dal menu dell'app.
+**Condivisione in famiglia** (facoltativa): capi, schede, categorie, foto e nomi vengono cifrati sul telefono (AES-GCM) con una chiave che non lascia mai i dispositivi della famiglia, poi salvati su Cloudflare (D1 e R2). Il server non può leggerli; vede solo identificativi casuali, dimensioni, orari di caricamento delle foto, il numero di dispositivi e quando ciascuno è stato attivo l'ultima volta. L'email di chi paga serve a inviare il codice di sblocco e, come hash con chiave (HMAC), a recuperare la licenza. Stripe (pagamenti), Resend (email) e Cloudflare (hosting) sono i responsabili del trattamento. Informativa completa, in italiano e in inglese: [`app/public/privacy.html`](app/public/privacy.html), pubblicata su <https://app.ar.gxware.org/privacy.html> e raggiungibile dal menu dell'app.
 
 ## Sviluppo
 
@@ -66,7 +66,8 @@ Cambia il pattern `routes` in `worker/wrangler.app.toml` per pubblicarla su un t
 ```
 app/       l'app (src/, tests/, public/ icone e manifest)
 worker/    il Cloudflare Worker: hosting dell'app e API `/api/*` della condivisione in famiglia
-landing/   pagina di presentazione e guida su ar.gioxx.org (statica, con un suo Worker: `cd landing && npx wrangler deploy`)
+landing/   pagina di presentazione e guida su ar.gxware.org (statica, con un suo Worker: `cd landing && npx wrangler deploy`)
+redirect/  301 dai vecchi indirizzi su gioxx.org a gxware.org (`cd redirect && npx wrangler deploy`)
 legacy/    il primo prototipo in un solo file, tenuto solo come riferimento per il suo formato di backup
 docs/      note di progetto e piano di implementazione
 ```
@@ -83,7 +84,7 @@ I backup esportati dal vecchio prototipo (`andata-ritorno-AAAA-MM-GG.json`) si p
 - [x] Rotazione foto, italiano/inglese, supporto iPhone
 - [x] Condivisione in famiglia tra telefoni
 - [x] Informativa privacy (app pubblica, dati premium sul server)
-- [x] Sito di presentazione <https://ar.gioxx.org> (pagina prodotto e guida, in italiano e in inglese)
+- [x] Sito di presentazione <https://ar.gxware.org> (pagina prodotto e guida, in italiano e in inglese)
 
 ## Note di pubblicazione del Worker e dell'API
 
@@ -105,9 +106,9 @@ npm run deploy:app
 
 Poi:
 
-1. **Resend**: il dominio `ar.gioxx.org` deve essere verificato in Resend (record DNS); le email con il codice di sblocco e il recupero licenza partono da `noreply@ar.gioxx.org`.
-2. **Stripe**: attiva Managed Payments, poi crea due Payment Link, ciascuno con un solo prezzo e quantità fissa a 1: lo sblocco famiglia (4,99 €) e il posto dispositivo aggiuntivo (1,99 €). Su entrambi imposta come URL di successo `https://app.ar.gioxx.org/unlock?session_id={CHECKOUT_SESSION_ID}`.
-3. **Webhook Stripe**: aggiungi un endpoint `https://app.ar.gioxx.org/api/stripe/webhook` in ascolto su `checkout.session.completed` e `checkout.session.async_payment_succeeded`; il suo signing secret è `STRIPE_WEBHOOK_SECRET`.
+1. **Resend**: il dominio `ar.gxware.org` deve essere verificato in Resend (record DNS); le email con il codice di sblocco e il recupero licenza partono da `noreply@ar.gxware.org`.
+2. **Stripe**: attiva Managed Payments, poi crea due Payment Link, ciascuno con un solo prezzo e quantità fissa a 1: lo sblocco famiglia (4,99 €) e il posto dispositivo aggiuntivo (1,99 €). Su entrambi imposta come URL di successo `https://app.ar.gxware.org/unlock?session_id={CHECKOUT_SESSION_ID}`.
+3. **Webhook Stripe**: aggiungi un endpoint `https://app.ar.gxware.org/api/stripe/webhook` in ascolto su `checkout.session.completed` e `checkout.session.async_payment_succeeded`; il suo signing secret è `STRIPE_WEBHOOK_SECRET`.
 4. Metti i due price id di Stripe in `PRICE_FAMILY` e `PRICE_SLOT` in `[vars]` di `wrangler.app.toml`.
 5. **Ambiente di build** dell'app (letto da Vite durante `npm run deploy:app`, per esempio dalla shell o da `app/.env.production`, da non committare se preferisci): `VITE_PAYMENTS=1` mostra i pulsanti d'acquisto (lascialo vuoto per nasconderli: i codici manuali funzionano comunque), `VITE_STRIPE_LINK_FAMILY` e `VITE_STRIPE_LINK_SLOT` puntano a `https://<la tua app>/api/buy/family` e `/api/buy/slot`. Queste rotte rimandano ai due Payment Link indicati in `PAY_LINK_FAMILY` e `PAY_LINK_SLOT` (`[vars]` di `wrangler.app.toml`) e rifiutano l'acquisto di nuove famiglie quando le registrazioni sono chiuse dalla dashboard. Per vendere da una tua pagina di presentazione imposta anche `SITE_ORIGIN` (potrà chiamare `POST /api/checkout`, il Checkout incorporato).
 6. **Tetto allo spazio foto**: `MAX_TOTAL_PHOTO_BYTES` in `[vars]` di `wrangler.app.toml` (9 000 000 000 se non impostato) è il massimo di byte di foto che il server conserva sommando tutte le famiglie, per restare nei 10 GB gratuiti di R2. Oltre, le nuove foto ricevono `413 limit-storage` (i capi continuano a sincronizzarsi, le foto esistenti restano leggibili); eliminare foto o una famiglia libera spazio. Il totale corrente sta nella tabella `usage` (riga `photo_bytes`), creata e inizializzata da `schema.sql`. Le righe delle foto hanno un flag `ready`: la riga viene scritta (non pronta, nascosta da elenco e lettura) quando i byte vengono riservati e diventa pronta quando l'oggetto R2 esiste, così un caricamento interrotto viene semplicemente rimandato dalla sincronizzazione successiva. Il totale conta tutte le righe, pronte o no.
@@ -119,7 +120,7 @@ I binding di rate limit `RL_STRICT` / `RL_API` sono facoltativi: senza, l'API se
 
 ## Contribuire
 
-Idee, segnalazioni e pull request sono benvenute: leggi [CONTRIBUTING.md](CONTRIBUTING.md), il [Codice di condotta](CODE_OF_CONDUCT.md) e, per le vulnerabilità, [SECURITY.md](SECURITY.md). Non usi GitHub? Scrivi a hello@ar.gioxx.org. Nome e logo di A/R sono regolati da [TRADEMARK.md](TRADEMARK.md).
+Idee, segnalazioni e pull request sono benvenute: leggi [CONTRIBUTING.md](CONTRIBUTING.md), il [Codice di condotta](CODE_OF_CONDUCT.md) e, per le vulnerabilità, [SECURITY.md](SECURITY.md). Non usi GitHub? Scrivi a hello@ar.gxware.org. Nome e logo di A/R sono regolati da [TRADEMARK.md](TRADEMARK.md).
 
 ## Licenza
 

@@ -8,7 +8,7 @@ By participating you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md)
 
 - **Bugs:** open an issue with the *Bug report* template.
 - **Feature ideas:** open an issue with the *Feature request* template.
-- **Not on GitHub?** Write to [hello@ar.gioxx.org](mailto:hello@ar.gioxx.org), in Italian or English.
+- **Not on GitHub?** Write to [hello@ar.gxware.org](mailto:hello@ar.gxware.org), in Italian or English.
 - **Security vulnerabilities:** never in a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Development setup

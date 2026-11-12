@@ -17,7 +17,7 @@ Contribution mechanics are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - Versioning follows [Semantic Versioning](https://semver.org/); the version lives in `app/package.json`.
 - Releases are cut from `main`. There is no fixed cadence.
-- The hosted service at [app.ar.gioxx.org](https://app.ar.gioxx.org) runs the latest `main`.
+- The hosted service at [app.ar.gxware.org](https://app.ar.gxware.org) runs the latest `main`.
 
 ## The hosted service and commercial use
 
