@@ -21,9 +21,10 @@ export function newAddressOf(loc) {
  * Takes over the old origin. With nothing saved here there is nothing to carry: straight to the new
  * address. Otherwise the move screen, with the backup button.
  * @param {HTMLElement} root
- * @param {{hasData: boolean, onExport: () => Promise<boolean>}} o
+ * @param {{hasData: boolean, kitMissing?: boolean, onExport: () => Promise<boolean>}} o
+ *   kitMissing: in a family, but the recovery kit is not here yet (offline, or a join still pending)
  */
-export function renderMoved(root, { hasData, onExport }) {
+export function renderMoved(root, { hasData, kitMissing = false, onExport }) {
   if (!hasData) {
     location.replace(NEW_ORIGIN + '/')
     return
@@ -39,6 +40,7 @@ export function renderMoved(root, { hasData, onExport }) {
       <li>${t('moved.step3')}</li>
     </ol>
     <p class="hint">${t('moved.family')}</p>
+    ${kitMissing ? `<p class="moved-warn" role="alert">${t('moved.kitMissing')}</p>` : ''}
     <button class="primary" id="movedExport">${t(saved ? 'moved.exportAgain' : 'moved.export')}</button>
     <a class="moved-open" id="movedOpen" href="${NEW_ORIGIN}/" rel="noopener">${t('moved.open')}</a>
     <p class="hint">${t('moved.after')}</p>

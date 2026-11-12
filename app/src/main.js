@@ -68,6 +68,7 @@ async function startApp() {
 
   // `force` = redraw even the welcome screen (language change); it keeps the typed name.
   function draw(force = false) {
+    if (oldHost) return; // the move screen owns the page there (a sync reload must not draw the app)
     if (store.tabs.length) renderApp(root, store);
     else if (force || !root.querySelector('.welcome')) { // draw once: a redraw would drop focus while typing
       renderWelcome(root, {
@@ -108,8 +109,18 @@ async function startApp() {
     await load(db);
     if (oldHost) {
       initMenu(db); // runExport works on the database handed to the menu
-      const hasData = store.tabs.length > 0 || !!(await getFamily(db));
-      renderMoved(root, { hasData, onExport: runExport });
+      // In a family: one sync first. It finishes a join/recovery left pending (only this origin
+      // holds its device id), brings the recovery kit to an invited phone and the latest changes,
+      // so the backup carries what the new address needs to rejoin.
+      const fam = await getFamily(db);
+      if (fam && !fam.removed) {
+        await initSync({ db, api: createApi({ getToken: async () => (await getFamily(db))?.token }) }).catch(() => {});
+        await syncNow('start');
+      }
+      const now = await getFamily(db);
+      const kitMissing = !!now && !now.removed && (!!now.pending || !now.recoverySecret);
+      const hasData = store.tabs.length > 0 || !!now;
+      renderMoved(root, { hasData, kitMissing, onExport: runExport });
       return;
     }
     // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).

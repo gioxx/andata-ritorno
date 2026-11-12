@@ -88,6 +88,7 @@ export default {
   'moved.step2': 'Apri il nuovo indirizzo e installa A/R sulla schermata Home, come la prima volta.',
   'moved.step3': 'Nella nuova app tocca <b>Importa un backup</b> e scegli il file: tornano capi, schede, categorie e foto.',
   'moved.family': 'Sei in una famiglia? Il backup contiene il kit di recupero: dopo l\'import A/R ti propone di rientrare. Se la famiglia risulta piena, togli il telefono con il tuo stesso nome: è questa vecchia copia.',
+  'moved.kitMissing': 'Il kit di recupero della famiglia non è ancora su questo telefono, quindi il backup non basterebbe a rientrare. Collegati a internet e riapri questa pagina prima di salvarlo.',
   'moved.export': 'Salva il backup',
   'moved.exportAgain': 'Backup salvato · salvalo di nuovo',
   'moved.open': 'Apri il nuovo indirizzo',

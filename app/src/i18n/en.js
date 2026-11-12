@@ -87,6 +87,7 @@ export default {
   'moved.step2': 'Open the new address and install A/R on the Home screen, like the first time.',
   'moved.step3': 'In the new app tap <b>Import a backup</b> and pick the file: items, tabs, categories and photos come back.',
   'moved.family': 'In a family? The backup holds the recovery kit: after the import A/R offers to rejoin. If the family shows as full, remove the phone with your own name: it is this old copy.',
+  'moved.kitMissing': 'The family recovery kit is not on this phone yet, so the backup would not be enough to rejoin. Go online and reopen this page before saving it.',
   'moved.export': 'Save the backup',
   'moved.exportAgain': 'Backup saved · save it again',
   'moved.open': 'Open the new address',

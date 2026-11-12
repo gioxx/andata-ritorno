@@ -28,4 +28,12 @@ describe('renderMoved', () => {
     await vi.waitFor(() => expect(onExport).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(root.querySelector('#movedExport').textContent).toMatch(/salvato|saved/i))
   })
+  it('warns when the family kit is not on this phone yet', () => {
+    const root = document.createElement('div')
+    renderMoved(root, { hasData: true, kitMissing: true, onExport: async () => true })
+    expect(root.querySelector('.moved-warn')).not.toBeNull()
+    const ok = document.createElement('div')
+    renderMoved(ok, { hasData: true, onExport: async () => true })
+    expect(ok.querySelector('.moved-warn')).toBeNull()
+  })
 })
