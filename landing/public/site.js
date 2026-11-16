@@ -129,7 +129,7 @@ for (const b of document.querySelectorAll('[data-copy-link]')) {
 }
 
 // Privacy policy and terms open over the page, so closing them leaves you here. The text is read
-// from app.ar.gxware.org (one copy, kept with the app) and only this page's language is shown.
+// from this site's own page (one copy) and only this page's language is shown.
 // Ctrl/Cmd-click, no JavaScript or a failed read: a normal link.
 const docLinks = document.querySelectorAll('a[data-doc]')
 if (docLinks.length && 'showModal' in HTMLDialogElement.prototype) {

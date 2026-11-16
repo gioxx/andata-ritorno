@@ -9,18 +9,3 @@
   Strict-Transport-Security: max-age=31536000
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: camera=(self), microphone=(), geolocation=()
-# Privacy policy and terms: the landing site (ar.gxware.org) reads them to show them in a dialog.
-# Read, not framed: a framed page would come from this app's service worker cache on phones that
-# have the app, with that copy's headers.
-/privacy.html
-  Access-Control-Allow-Origin: https://ar.gxware.org
-  Vary: Origin
-/privacy
-  Access-Control-Allow-Origin: https://ar.gxware.org
-  Vary: Origin
-/terms.html
-  Access-Control-Allow-Origin: https://ar.gxware.org
-  Vary: Origin
-/terms
-  Access-Control-Allow-Origin: https://ar.gxware.org
-  Vary: Origin

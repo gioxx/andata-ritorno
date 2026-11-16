@@ -11,6 +11,7 @@ import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
 import { t, getLang, getLangChoice, setLang, onLangChange } from '../i18n.js'
 import { currentPlatform, isStandalone, openExternal } from '../platform.js'
+import { PRIVACY_URL } from '../legal.js'
 import { canPromptInstall, promptInstall } from '../install.js'
 import { openInstallSteps, openUninstallSteps } from './appDialogs.js'
 import { openWipeFlow } from './wipeFlow.js'
@@ -148,7 +149,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => openExternal(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/'), privacy: () => openExternal(new URL('/privacy.html', location.href).href), wipe: () => openWipeFlow({ db, onExport: () => runExport(), leave: leaveBeforeWipe }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => openExternal(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/'), privacy: () => openExternal(`${PRIVACY_URL}?lang=${getLang() === 'it' ? 'it' : 'en'}`), wipe: () => openWipeFlow({ db, onExport: () => runExport(), leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
       kit: () => openKit(), leave: openLeave }[item.dataset.menu]

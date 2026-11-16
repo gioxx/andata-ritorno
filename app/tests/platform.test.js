@@ -123,14 +123,13 @@ describe('banner dismissal redraws the welcome screen', () => {
 })
 
 describe('externalTarget', () => {
-  const url = 'https://app.ar.gxware.org/privacy.html#it'
-  it('sends the installed Android app to a Chrome tab, with the plain URL as fallback', () => {
-    const r = externalTarget(url, { platform: 'android', standalone: true })
-    expect(r.intent).toBe(true)
-    expect(r.url).toBe(`intent://app.ar.gxware.org/privacy.html#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`)
+  const privacy = 'https://ar.gxware.org/privacy.html?lang=en'
+  it('installed Android app: a Chrome tab, with the plain URL as fallback', () => {
+    expect(externalTarget(privacy, { platform: 'android', standalone: true })).toEqual({
+      url: `intent://ar.gxware.org/privacy.html?lang=en#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(privacy)};end`, intent: true })
   })
-  it('keeps the plain URL in the browser and on other platforms', () => {
-    expect(externalTarget(url, { platform: 'android', standalone: false })).toEqual({ url, intent: false })
-    expect(externalTarget(url, { platform: 'ios', standalone: true })).toEqual({ url, intent: false })
+  it('in the browser and on other platforms: the plain URL', () => {
+    expect(externalTarget(privacy, { platform: 'android', standalone: false })).toEqual({ url: privacy, intent: false })
+    expect(externalTarget(privacy, { platform: 'ios', standalone: true })).toEqual({ url: privacy, intent: false })
   })
 })

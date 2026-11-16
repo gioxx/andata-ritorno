@@ -4,6 +4,7 @@
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { familyError } from './familyMenu.js'
+import { PRIVACY_URL, TERMS_URL } from '../legal.js'
 
 /** Copy `text`, then show `okText` (or the failure) in `out`. */
 async function copyInto(out, text, okText) {
@@ -26,8 +27,8 @@ export async function renderUnlockPage(root, { api, sessionId, inSafari }) {
     <h1>${t('page.unlock.title')}</h1>
     <div id="unlockBody"><p>${t('sync.syncing')}</p></div>
     <a class="pageLink" href="/">${t('page.openApp')}</a>
-    <a class="pageLink" href="/privacy.html" target="_blank" rel="noopener">${t('privacy.link')}</a>
-    <a class="pageLink" href="/terms.html" target="_blank" rel="noopener">${t('terms.link')}</a>
+    <a class="pageLink" href="${PRIVACY_URL}" target="_blank" rel="noopener">${t('privacy.link')}</a>
+    <a class="pageLink" href="${TERMS_URL}" target="_blank" rel="noopener">${t('terms.link')}</a>
   </div>`
   const body = root.querySelector('#unlockBody')
   const draw = async () => {
