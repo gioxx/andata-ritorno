@@ -206,6 +206,12 @@ describe('record sync', () => {
     const real = await env.DB.prepare('SELECT COUNT(*) AS n, SUM(length(data)) AS b FROM records WHERE family_id = ?').bind(f.familyId).first();
     expect(fam).toEqual({ records_n: real.n, data_bytes: real.b });
     expect(fam).toEqual({ records_n: 2, data_bytes: 14 });
+    // Concurrent pushes of the same rid: the delta is taken inside each transaction, so it stays exact.
+    const c = rec('EEEE');
+    await Promise.all([post('/api/sync', { records: [c] }, f.token), post('/api/sync', { records: [{ rid: c.rid, data: 'FF' }] }, f.token)]);
+    const after = await env.DB.prepare('SELECT records_n, data_bytes FROM families WHERE id = ?').bind(f.familyId).first();
+    const real2 = await env.DB.prepare('SELECT COUNT(*) AS n, SUM(length(data)) AS b FROM records WHERE family_id = ?').bind(f.familyId).first();
+    expect(after).toEqual({ records_n: real2.n, data_bytes: real2.b });
   });
 
   it('charges full pulled pages to the daily budget and refuses once it is spent', async () => {
@@ -216,10 +222,18 @@ describe('record sync', () => {
     const day = new Date().toISOString().slice(0, 10);
     expect(await env.DB.prepare('SELECT units FROM device_usage WHERE device_id = ? AND day = ?').bind(f.deviceId, day).first('units')).toBe(10);
     expect((await get('/api/sync?since=500', f.token)).status).toBe(200); // an empty page is free
+    // Budget spent: polls still work, in small pages, under the tight limiter.
     await env.DB.prepare('UPDATE device_usage SET units = 4995 WHERE device_id = ?').bind(f.deviceId).run();
-    const res = await get('/api/sync?since=0', f.token);
-    expect(res.status).toBe(429);
-    expect((await res.json()).error).toBe('limit-daily');
+    const small = await (await get('/api/sync?since=0', f.token)).json();
+    expect(small.records).toHaveLength(20);
+    expect(small.more).toBe(true);
+    expect((await get('/api/sync?since=500', f.token)).status).toBe(200);
+    const blocked = await worker.fetch(
+      new Request('https://ar.test/api/sync?since=0', { headers: { authorization: `Bearer ${f.token}` } }),
+      { ...env, RL_STRICT: { limit: async () => ({ success: false }) } },
+      {},
+    );
+    expect(blocked.status).toBe(429);
   });
 
   it('caps the family too, so new device ids bring no fresh budget', async () => {

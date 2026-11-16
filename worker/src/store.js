@@ -43,13 +43,13 @@ export async function spendNow(db, deviceId, units, familyId) {
   if (r[1].meta.changes !== 1) throw new HttpError(429, 'limit-daily');
 }
 
-/** Refuse (429 limit-daily) before doing work that would cost `units`, without spending them. */
-export async function requireBudget(db, deviceId, units, familyId) {
+/** Whether both budgets still hold `units` (nothing is spent). */
+export async function hasBudget(db, deviceId, units, familyId) {
   const over = await db
     .prepare('SELECT 1 FROM device_usage WHERE day = ?1 AND ((device_id = ?2 AND units + ?4 > ?5) OR (device_id = ?3 AND units + ?4 > ?6)) LIMIT 1')
     .bind(today(), deviceId, familyKey(familyId), units, DAILY_UNITS, FAMILY_DAILY_UNITS)
     .first();
-  if (over) throw new HttpError(429, 'limit-daily');
+  return !over;
 }
 
 /**
