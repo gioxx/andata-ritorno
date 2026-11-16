@@ -5,6 +5,7 @@ import { syncRoutes } from './sync.js';
 import { photoRoutes } from './photos.js';
 import { adminRoutes } from './admin.js';
 import { publicRoutes } from './public.js';
+import { sweep } from './store.js';
 
 // Later tasks add routes here as 'METHOD /api/path/:param': async (req, env, ctx, params) => Response.
 export const routes = { ...licenceRoutes, ...familyRoutes, ...syncRoutes, ...photoRoutes, ...adminRoutes, ...publicRoutes };
@@ -33,6 +34,7 @@ function secure(res) {
   out.headers.set('x-content-type-options', 'nosniff');
   out.headers.set('cross-origin-resource-policy', 'same-site');
   out.headers.set('x-frame-options', 'DENY');
+  out.headers.set('strict-transport-security', 'max-age=31536000');
   if (!out.headers.has('content-security-policy')) out.headers.set('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
   return out;
 }
@@ -64,6 +66,10 @@ export default {
     }
     const res = secure(await handle(req, env, ctx));
     return site ? withCors(res, site) : res;
+  },
+  // Daily cron (wrangler.app.toml [triggers]).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sweep(env));
   },
 };
 

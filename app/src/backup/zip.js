@@ -20,6 +20,21 @@ const extOf = (type) => {
 
 const PLACES = ['school', 'home']
 const EPOCH = '1970-01-01T00:00:00.000Z'
+const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/
+
+/**
+ * An id made only of base64url characters, at most 64. Any other id from a file becomes a stable
+ * one derived from it (same input, same id: importing twice does not duplicate): the sync drops
+ * such ids silently and some characters break selectors.
+ * shortcut: ids shorter than 8 characters are kept (the sync still skips them); only hand-made
+ * files have them, every app version writes UUIDs.
+ */
+export function syncableId(id) {
+  if (SAFE_ID.test(id)) return id
+  const u8 = strToU8(id)
+  const rev = u8.slice().reverse()
+  return `im-${crc32(u8).toString(16).padStart(8, '0')}${crc32(rev).toString(16).padStart(8, '0')}`
+}
 const str = (v) => (typeof v === 'string' ? v : '')
 // The file is untrusted: only well-formed dates pass, anything else sorts as "oldest".
 const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v))
@@ -80,8 +95,10 @@ export async function buildZip({ tabs, items, categories = [], getPhoto, now = n
     if (done.has(it.photoId)) continue
     done.add(it.photoId)
     const blob = await getPhoto(it.photoId)
-    const ext = blob && extOf(blob.type)
-    if (!ext) throw new Error(`missing-photo:${it.id}`)
+    if (!blob) throw new Error(`missing-photo:${it.id}`)
+    // A photo of an unexpected type (a family member's upload, an old import) still goes out:
+    // one odd blob must not make every backup fail.
+    const ext = extOf(blob.type) ?? 'bin'
     // Streamed once for the checksum; the Blob itself goes into the archive by reference.
     const m = await measure(blob)
     integrity[it.photoId] = m
@@ -125,7 +142,8 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
   const photoFiles = new Map() // photoId -> { entry, type }
   for (const [path, entry] of index) {
     const m = /^photos\/(.+)\.([a-z0-9]+)$/.exec(path)
-    if (m) photoFiles.set(m[1], { entry, type: TYPE[m[2]] ?? 'application/octet-stream' })
+    // Unknown extensions keep an image type (decodeImage checks the content anyway); 'bin' has none.
+    if (m) photoFiles.set(m[1], { entry, type: TYPE[m[2]] ?? (m[2] === 'bin' ? '' : `image/${m[2]}`) })
   }
   // The `photos` integrity map is additive: a v2 file without it still imports, just unchecked.
   const integrity = json.photos && typeof json.photos === 'object' ? json.photos : {}
@@ -178,4 +196,19 @@ export async function parseZip(blob, { localTabIds = [] } = {}) {
   // Checked only when used (Ripristina famiglia validates it): a bad kit must not block an import.
   const familyKit = typeof json.familyKit === 'string' && json.familyKit ? json.familyKit : null
   return { tabs, categories, items, photos, failures, familyKit }
+}
+
+/** Incoming with every id made syncable (syncableId), references included. */
+export function withSyncableIds(incoming) {
+  const fix = syncableId
+  return {
+    ...incoming,
+    tabs: incoming.tabs.map((t) => ({ ...t, id: fix(t.id) })),
+    categories: (incoming.categories ?? []).map((c) => ({ ...c, id: fix(c.id) })),
+    items: incoming.items.map((it) => ({
+      ...it, id: fix(it.id), tabId: fix(it.tabId), photoId: fix(it.photoId),
+      ...(typeof it.category === 'string' && it.category ? { category: fix(it.category) } : {}),
+    })),
+    photos: new Map([...incoming.photos].map(([k, v]) => [fix(k), v])),
+  }
 }

@@ -17,7 +17,8 @@ export async function sendEmail(env, { to, subject, text }, { idempotencyKey } =
       },
       body: JSON.stringify({ from: FROM, to: [to], subject, text }),
     });
-    if (!res.ok) throw new Error(`resend ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    // Status only: Resend's error text may echo the recipient address into the logs.
+    if (!res.ok) throw new Error(`resend ${res.status}`);
     // Counted for the owner's dashboard (Resend's free plan is limited per day and per month).
     await env.DB?.prepare('INSERT INTO email_usage (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1')
       .bind(new Date().toISOString().slice(0, 10))

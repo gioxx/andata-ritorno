@@ -38,7 +38,8 @@ export function keepFocus(container, fn) {
   const loc = a && a !== document.body && container.contains(a) ? locator(a) : ''
   const out = fn()
   if (loc) {
-    const el = container.querySelector(loc)
+    let el = null
+    try { el = container.querySelector(loc) } catch { /* an id no selector can name: focus is simply not restored */ }
     if (el && !el.disabled) el.focus({ preventScroll: true })
   }
   return out

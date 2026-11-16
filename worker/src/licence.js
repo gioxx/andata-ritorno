@@ -50,6 +50,9 @@ function insertFamilyAndDevice(env, f, licenceId, tokenHash, at, guard, guardArg
 function kindOf(env, session) {
   // Unset prices are a deployment mistake, not someone else's session: fail loudly (500).
   if (!env.PRICE_FAMILY || !env.PRICE_SLOT) throw new Error('PRICE_FAMILY / PRICE_SLOT not configured');
+  // One session, one code: a quantity above 1 would be paid for and not delivered. The payment
+  // links have a fixed quantity; if that ever changes, fail loudly (500, Stripe retries) instead.
+  if (session.line_items.some((li) => (li.quantity ?? 1) > 1)) throw new Error(`session ${session.id} has quantity > 1`);
   const prices = session.line_items.map((li) => li.price?.id);
   if (env.PRICE_FAMILY && prices.includes(env.PRICE_FAMILY)) return 'family';
   if (env.PRICE_SLOT && prices.includes(env.PRICE_SLOT)) return 'slot';
@@ -149,7 +152,9 @@ async function slot(req, env) {
   const body = await readJson(req);
   const code = await findCode(env, body?.code);
   if (code.kind === 'family') throw new HttpError(409, 'code-is-family');
-  const { licence_id: licenceId } = await env.DB.prepare('SELECT licence_id FROM families WHERE id = ?').bind(familyId).first();
+  const fam = await env.DB.prepare('SELECT licence_id FROM families WHERE id = ?').bind(familyId).first();
+  if (!fam) throw new HttpError(401, 'unauthorized');
+  const licenceId = fam.licence_id;
   // Already added to this very licence: a retry whose first answer was lost, not a reuse.
   if (code.redeemed_at && code.licence_id === licenceId) return json({ deviceLimit: await deviceLimit(env, licenceId) });
   if (code.redeemed_at) throw new HttpError(409, 'code-used');
@@ -202,7 +207,11 @@ async function unlockSession(req, env) {
   await strictLimit(env, req);
   const session = await getCheckoutSession(env, new URL(req.url).searchParams.get('id'));
   if (session.payment_status !== 'paid') throw new HttpError(402, 'not-paid');
-  return json(await issueCodeForSession(env, session));
+  const issued = await issueCodeForSession(env, session);
+  // The session id sits in browser history and logs: once the code is used it stops showing it.
+  const used = await env.DB.prepare('SELECT redeemed_at FROM codes WHERE stripe_session = ?').bind(session.id).first('redeemed_at');
+  if (used) throw new HttpError(409, 'code-used');
+  return json(issued);
 }
 
 async function stripeWebhook(req, env, ctx) {
@@ -244,30 +253,41 @@ async function stripeWebhook(req, env, ctx) {
 async function licenceEmail(req, env, ctx) {
   await strictLimit(env, req);
   const { email } = (await readJson(req)) ?? {};
-  if (typeof email !== 'string' || email.length > 320) throw new HttpError(400, 'bad-request');
+  // ASCII only: toLowerCase() folds a few non-ASCII letters (U+212A) onto ASCII ones, which would
+  // let an address that is not the buyer's match the buyer's HMAC.
+  if (typeof email !== 'string' || email.length > 320 || /[^\x20-\x7e]/.test(email)) throw new HttpError(400, 'bad-request');
   // Everything that depends on a match runs after the response, so neither status nor timing tells.
   const work = (async () => {
     const nowIso = new Date().toISOString();
-    const { results } = await env.DB.prepare(
-      `SELECT l.id FROM licences l WHERE l.email_hmac = ?
-       AND (SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = l.id AND k.used_at IS NULL AND k.expires_at > ?) < ?
-       AND (SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = l.id AND k.expires_at > ?) < ?
-       ORDER BY l.created_at LIMIT 5`,
-    )
-      // A link created in the last 24 hours expires after now - 24 h + its lifetime.
-      .bind(await emailHmac(env, email), nowIso, MAX_OPEN_LINKS, new Date(Date.now() - 24 * 60 * 60 * 1000 + LINK_TTL_MS).toISOString(), MAX_DAILY_LINKS)
+    // A link created in the last 24 hours expires after now - 24 h + its lifetime.
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000 + LINK_TTL_MS).toISOString();
+    const caps = `(SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = ?2 AND k.used_at IS NULL AND k.expires_at > ?4) < ?5
+       AND (SELECT COUNT(*) FROM licence_links k WHERE k.licence_id = ?2 AND k.expires_at > ?6) < ?7`;
+    const { results } = await env.DB.prepare(`SELECT l.id FROM licences l WHERE l.email_hmac = ?1 ORDER BY l.created_at LIMIT 5`)
+      .bind(await emailHmac(env, email))
       .all();
     if (!results.length) return;
     const expires = new Date(Date.now() + LINK_TTL_MS).toISOString();
     const links = results.map((r) => ({ licenceId: r.id, token: randomToken() }));
-    await env.DB.batch(
+    // The caps are checked inside each insert, so concurrent requests cannot all pass them.
+    const done = await env.DB.batch(
       await Promise.all(
         links.map(async (l) =>
-          env.DB.prepare('INSERT INTO licence_links (hash, licence_id, expires_at) VALUES (?, ?, ?)').bind(await sha256Hex(l.token), l.licenceId, expires),
+          env.DB.prepare(`INSERT INTO licence_links (hash, licence_id, expires_at) SELECT ?1, ?2, ?3 WHERE ${caps}`).bind(
+            await sha256Hex(l.token),
+            l.licenceId,
+            expires,
+            nowIso,
+            MAX_OPEN_LINKS,
+            dayAgo,
+            MAX_DAILY_LINKS,
+          ),
         ),
       ),
     );
-    await sendEmail(env, { to: email.trim(), ...licenceLinkEmail(links.map((l) => `${env.APP_ORIGIN}/licence#${l.token}`)) });
+    const sent = links.filter((_, i) => done[i].meta.changes === 1);
+    if (!sent.length) return;
+    await sendEmail(env, { to: email.trim(), ...licenceLinkEmail(sent.map((l) => `${env.APP_ORIGIN}/licence#${l.token}`)) });
   })().catch((e) => console.error('licence email failed', e));
   await defer(ctx, work);
   return new Response(null, { status: 202, headers: { 'cache-control': 'no-store' } });

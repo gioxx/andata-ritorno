@@ -61,6 +61,13 @@ async function seed(familyId, table, n) {
   }
 }
 
+// Records seeded straight into D1 bypass the push: bring the family's counters in line, as the
+// migration does for existing families.
+const recount = (familyId) =>
+  env.DB.prepare(
+    'UPDATE families SET records_n = (SELECT COUNT(*) FROM records WHERE family_id = ?1), data_bytes = (SELECT COALESCE(SUM(length(data)), 0) FROM records WHERE family_id = ?1) WHERE id = ?1',
+  ).bind(familyId).run();
+
 describe('record sync', () => {
   it('requires a device', async () => {
     expect((await get('/api/sync?since=0')).status).toBe(401);
@@ -157,6 +164,7 @@ describe('record sync', () => {
         env.DB.prepare("INSERT INTO records (family_id, rid, seq, data) VALUES (?, ?, ?, substr(hex(zeroblob(1000000)), 1, 2000000))").bind(f.familyId, `bulk-${i}-xxxx`, i + 1),
       ),
     );
+    await recount(f.familyId);
     const big = (n) => Array.from({ length: n }, () => rec('A'.repeat(64 * 1024)));
     const res = await post('/api/sync', { records: big(30) }, f.token);
     expect(res.status).toBe(413);
@@ -167,6 +175,7 @@ describe('record sync', () => {
   it('caps a family at 10 000 distinct records; updates do not count twice', async () => {
     const f = await newFamily();
     await seed(f.familyId, 'records', 9999);
+    await recount(f.familyId);
     await env.DB.prepare('UPDATE families SET seq = 9999 WHERE id = ?').bind(f.familyId).run();
     expect((await post('/api/sync', { records: [rec()] }, f.token)).status).toBe(200);
     const over = await post('/api/sync', { records: [rec()] }, f.token);
@@ -178,12 +187,49 @@ describe('record sync', () => {
   it('holds the record cap under concurrent pushes', async () => {
     const f = await newFamily();
     await seed(f.familyId, 'records', 9700);
+    await recount(f.familyId);
     await env.DB.prepare('UPDATE families SET seq = 9700 WHERE id = ?').bind(f.familyId).run();
     const batch = () => post('/api/sync', { records: Array.from({ length: 200 }, () => rec()) }, f.token);
     const statuses = (await Promise.all([batch(), batch()])).map((r) => r.status).sort();
     expect(statuses).toEqual([200, 413]);
     const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM records WHERE family_id = ?').bind(f.familyId).first();
     expect(n).toBe(9900);
+    expect(await env.DB.prepare('SELECT records_n FROM families WHERE id = ?').bind(f.familyId).first('records_n')).toBe(9900);
+  });
+
+  it('keeps the family counters exact across new records and updates', async () => {
+    const f = await newFamily();
+    const a = rec('AAAA');
+    expect((await post('/api/sync', { records: [a, rec('BBBBBB')] }, f.token)).status).toBe(200);
+    expect((await post('/api/sync', { records: [{ rid: a.rid, data: 'CC' }, { rid: a.rid, data: 'DDDDDDDD' }] }, f.token)).status).toBe(200);
+    const fam = await env.DB.prepare('SELECT records_n, data_bytes FROM families WHERE id = ?').bind(f.familyId).first();
+    const real = await env.DB.prepare('SELECT COUNT(*) AS n, SUM(length(data)) AS b FROM records WHERE family_id = ?').bind(f.familyId).first();
+    expect(fam).toEqual({ records_n: real.n, data_bytes: real.b });
+    expect(fam).toEqual({ records_n: 2, data_bytes: 14 });
+  });
+
+  it('charges full pulled pages to the daily budget and refuses once it is spent', async () => {
+    const f = await newFamily();
+    await seed(f.familyId, 'records', 500);
+    await env.DB.prepare('UPDATE families SET seq = 500 WHERE id = ?').bind(f.familyId).run();
+    expect((await get('/api/sync?since=0', f.token)).status).toBe(200);
+    const day = new Date().toISOString().slice(0, 10);
+    expect(await env.DB.prepare('SELECT units FROM device_usage WHERE device_id = ? AND day = ?').bind(f.deviceId, day).first('units')).toBe(10);
+    expect((await get('/api/sync?since=500', f.token)).status).toBe(200); // an empty page is free
+    await env.DB.prepare('UPDATE device_usage SET units = 4995 WHERE device_id = ?').bind(f.deviceId).run();
+    const res = await get('/api/sync?since=0', f.token);
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe('limit-daily');
+  });
+
+  it('caps the family too, so new device ids bring no fresh budget', async () => {
+    const f = await newFamily();
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare('INSERT INTO device_usage (device_id, day, units) VALUES (?, ?, 15000)').bind(`f:${f.familyId}`, day).run();
+    const res = await post('/api/sync', { records: [rec()] }, f.token);
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe('limit-daily');
+    expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM records WHERE family_id = ?').bind(f.familyId).first('n')).toBe(0);
   });
 });
 
@@ -598,5 +644,18 @@ describe('photos', () => {
     expect((await refused[0].json()).error).toBe('limit-photos');
     const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM photos WHERE family_id = ?').bind(f.familyId).first();
     expect(n).toBe(500);
+  });
+});
+
+describe('daily sweep', () => {
+  it('retries queued photo purges and drops stale rows', async () => {
+    const { sweep } = await import('../src/store.js');
+    await env.PHOTOS.put('gone-family-xxxx/p1', 'x');
+    await env.DB.prepare("INSERT INTO pending_purges (family_id, since) VALUES ('gone-family-xxxx', '2026-01-01')").run();
+    await env.DB.prepare("INSERT INTO device_usage (device_id, day, units) VALUES ('old-device-xxxx', '2000-01-01', 5)").run();
+    await sweep(env);
+    expect((await env.PHOTOS.list({ prefix: 'gone-family-xxxx/' })).objects).toHaveLength(0);
+    expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM pending_purges').first('n')).toBe(0);
+    expect(await env.DB.prepare("SELECT 1 FROM device_usage WHERE device_id = 'old-device-xxxx'").first()).toBe(null);
   });
 });

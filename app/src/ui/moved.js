@@ -21,10 +21,12 @@ export function newAddressOf(loc) {
  * Takes over the old origin. With nothing saved here there is nothing to carry: straight to the new
  * address. Otherwise the move screen, with the backup button.
  * @param {HTMLElement} root
- * @param {{hasData: boolean, kitMissing?: boolean, onExport: () => Promise<boolean>}} o
+ * @param {{hasData: boolean, kitMissing?: boolean, onExport: () => Promise<boolean>, onErase?: () => Promise<void>}} o
  *   kitMissing: in a family, but the recovery kit is not here yet (offline, or a join still pending)
+ *   onErase: wipe this origin's copy (key, token, photos). Offered once a backup was saved: left
+ *   here, it would outlive the move on a domain that is closing.
  */
-export function renderMoved(root, { hasData, kitMissing = false, onExport }) {
+export function renderMoved(root, { hasData, kitMissing = false, onExport, onErase }) {
   if (!hasData) {
     location.replace(NEW_ORIGIN + '/')
     return
@@ -44,11 +46,16 @@ export function renderMoved(root, { hasData, kitMissing = false, onExport }) {
     <button class="primary" id="movedExport">${t(saved ? 'moved.exportAgain' : 'moved.export')}</button>
     <a class="moved-open" id="movedOpen" href="${NEW_ORIGIN}/" rel="noopener">${t('moved.open')}</a>
     <p class="hint">${t('moved.after')}</p>
+    ${saved && onErase ? `<button class="danger" id="movedErase">${t('moved.erase')}</button>` : ''}
   </div>`
   }
   draw()
   onLangChange(draw)
   root.addEventListener('click', async (e) => {
+    if (e.target.closest('#movedErase')) {
+      if (confirm(t('moved.eraseConfirm'))) await onErase()
+      return
+    }
     if (!e.target.closest('#movedExport')) return
     if (await onExport()) { saved = true; draw() }
   })

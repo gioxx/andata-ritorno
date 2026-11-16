@@ -37,3 +37,22 @@ describe('renderMoved', () => {
     expect(ok.querySelector('.moved-warn')).toBeNull()
   })
 })
+
+describe('erasing the old copy', () => {
+  it('is offered only once a backup was saved, and asks first', async () => {
+    const root = document.createElement('div')
+    const onErase = vi.fn(async () => {})
+    renderMoved(root, { hasData: true, onExport: async () => true, onErase })
+    expect(root.querySelector('#movedErase')).toBeNull()
+    root.querySelector('#movedExport').click()
+    await vi.waitFor(() => expect(root.querySelector('#movedErase')).not.toBeNull())
+    vi.stubGlobal('confirm', () => false)
+    root.querySelector('#movedErase').click()
+    await Promise.resolve()
+    expect(onErase).not.toHaveBeenCalled()
+    vi.stubGlobal('confirm', () => true)
+    root.querySelector('#movedErase').click()
+    await vi.waitFor(() => expect(onErase).toHaveBeenCalledOnce())
+    vi.unstubAllGlobals()
+  })
+})

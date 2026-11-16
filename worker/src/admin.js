@@ -49,8 +49,13 @@ export async function requireAdmin(env, req, fetchFn = fetch) {
   if (header.alg !== 'RS256') throw hidden;
   const jwk = (await accessKeys(domain, fetchFn, header.kid)).find((k) => k.kid === header.kid);
   if (!jwk) throw hidden;
-  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlBytes(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+  let ok;
+  try {
+    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlBytes(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+  } catch {
+    throw hidden; // a garbage signature must look like any other refusal, not a 500
+  }
   const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   const now = Date.now() / 1000;
   if (!ok || !auds.includes(aud) || payload.iss !== `https://${domain}` || !(payload.exp > now) || typeof payload.email !== 'string') throw hidden;
@@ -123,7 +128,7 @@ async function stats(req, env) {
       one("SELECT bytes FROM usage WHERE key = 'photo_bytes'"),
       one('SELECT COUNT(*) AS open FROM invites WHERE used_at IS NULL AND expires_at > ?', iso(now)),
       one("SELECT value FROM settings WHERE key = 'registrations'"),
-      one('SELECT COUNT(*) AS devices, MAX(units) AS top, SUM(units) AS units FROM device_usage WHERE day = ?', iso(now).slice(0, 10)),
+      one("SELECT COUNT(*) AS devices, MAX(units) AS top, SUM(units) AS units FROM device_usage WHERE day = ? AND device_id NOT LIKE 'f:%'", iso(now).slice(0, 10)),
     ]);
   const row = (r) => r.results[0] ?? {};
   // Anonymous weekly pings from phones without a family (issue #35): the last 12 whole weeks plus

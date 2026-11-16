@@ -12,5 +12,6 @@ export default defineConfig({
       },
     }),
   ],
-  test: { setupFiles: ['./test/setup.js'] },
+  // testTimeout: the D1-heavy tests (10 000-record caps) can take over 5 s on a busy machine (CI).
+  test: { setupFiles: ['./test/setup.js'], testTimeout: 30000 },
 });

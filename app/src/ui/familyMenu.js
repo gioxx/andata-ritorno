@@ -10,7 +10,7 @@ export const FAMILY_ERROR_CODES = [
   'offline', 'bad-request', 'bad-signature', 'unauthorized', 'not-paid', 'bad-kit', 'bad-code', 'bad-session', 'not-found',
   'code-is-family', 'code-is-slot', 'code-used', 'family-full', 'invite-expired', 'link-expired',
   'limit-photos', 'limit-photo-size', 'limit-storage', 'limit-record-size', 'limit-records', 'limit-daily', 'too-large', 'rate-limited',
-  'already-in-family', 'registrations-closed', 'unsupported-media-type', 'forbidden-origin',
+  'already-in-family', 'registrations-closed', 'unsupported-media-type', 'forbidden-origin', 'too-many-invites',
 ]
 
 /** User-facing message for an ApiError (or any error): unknown codes get a generic line. */
@@ -19,8 +19,9 @@ export function familyError(e) {
   return FAMILY_ERROR_CODES.includes(code) ? t(`family.err.${code}`) : t('family.err.unknown')
 }
 
-/** "2 / 4"; the count shows a dash until the family has been read from the server. */
-export const devicesText = (devices, limit) => t('family.devicesCount', { n: devices ? devices.length : '–', m: limit ?? '–' })
+/** "2 / 4"; the count shows a dash until the family has been read from the server. Number(): the
+ * limit comes from the server and ends up in innerHTML. */
+export const devicesText = (devices, limit) => t('family.devicesCount', { n: devices ? devices.length : '–', m: limit == null ? '–' : Number(limit) })
 
 // Same markup as the menu's own rows (menu.js cannot be imported from here: it imports this file).
 const row = (act, icon, label, { sub = '', pill = '', cls = '' } = {}) =>

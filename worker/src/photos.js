@@ -1,6 +1,6 @@
 import { HttpError, json, readBody } from './http.js';
 import { randomToken, requireApiDevice } from './auth.js';
-import { PHOTO_UNITS, spendDaily } from './store.js';
+import { OP_UNITS, PHOTO_UNITS, spendDaily, spendNow } from './store.js';
 import { ID } from './validate.js';
 
 const MAX_PHOTO = 3 * 1024 * 1024;
@@ -61,7 +61,8 @@ async function put(req, env, ctx, { pid }) {
   // and a new photo still fits the family's count (both computed inside the statement, so
   // concurrent uploads cannot both pass; replacing a photo never grows the count, and one that
   // does not grow the total always fits), and the row is written only if that happened. The
-  // row starts as not ready (invisible to list and get) and turns ready once the R2 object is
+  // row starts (or, replacing a photo, goes back to) not ready (invisible to list and get: its key
+  // names an object not written yet) and turns ready once the R2 object is
   // written, so an interrupted upload is re-sent by the next sync instead of leaving a dangling row.
   // The R2 write comes after the reservation, so a refusal never leaves an object behind.
   const size = body.byteLength;
@@ -78,7 +79,7 @@ async function put(req, env, ctx, { pid }) {
     AND (EXISTS (SELECT 1 FROM photos WHERE family_id = ?2 AND pid = ?3) OR (SELECT COUNT(*) FROM photos WHERE family_id = ?2) < ?5)
     AND (${delta} <= 0 OR (SELECT COALESCE(SUM(size), 0) FROM photos WHERE family_id = ?2) + ${delta} <= ?6))`;
   const results = await env.DB.batch([
-    env.DB.prepare('SELECT size, uploaded_at FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
+    env.DB.prepare('SELECT size, uploaded_at, ready FROM photos WHERE family_id = ? AND pid = ?').bind(familyId, pid),
     // Which limit refused it, if one did (same snapshot as the reservation below).
     env.DB.prepare(
       `SELECT EXISTS (SELECT 1 FROM families WHERE id = ?2) AS family,
@@ -87,7 +88,7 @@ async function put(req, env, ctx, { pid }) {
     ).bind(size, familyId, pid, null, MAX_PHOTOS, MAX_FAMILY_PHOTO_BYTES),
     env.DB.prepare("INSERT OR IGNORE INTO usage (key, bytes) SELECT 'photo_bytes', COALESCE(SUM(size), 0) FROM photos"),
     // The device's daily budget comes first: the reservation below runs only if it was spent.
-    spendDaily(env.DB, deviceId, PHOTO_UNITS),
+    ...spendDaily(env.DB, deviceId, PHOTO_UNITS, familyId),
     env.DB.prepare(`UPDATE usage SET bytes = bytes + ${delta} WHERE ${USAGE} AND changes() = 1 AND ${fits} AND (${delta} <= 0 OR bytes + ${delta} <= ?4)`).bind(
       size,
       familyId,
@@ -98,11 +99,11 @@ async function put(req, env, ctx, { pid }) {
     ),
     env.DB.prepare(
       `INSERT INTO photos (family_id, pid, size, uploaded_at, ready) SELECT ?1, ?2, ?3, ?4, 0 WHERE changes() = 1
-       ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at`,
+       ON CONFLICT(family_id, pid) DO UPDATE SET size = excluded.size, uploaded_at = excluded.uploaded_at, ready = 0`,
     ).bind(familyId, pid, size, token),
   ]);
-  if (results[3].meta.changes !== 1) throw new HttpError(429, 'limit-daily');
-  if (results[4].meta.changes !== 1) {
+  if (results[4].meta.changes !== 1) throw new HttpError(429, 'limit-daily');
+  if (results[5].meta.changes !== 1) {
     const why = results[1].results[0];
     if (!why.family) throw new HttpError(401, 'unauthorized');
     throw new HttpError(413, why.ok ? 'limit-storage' : 'limit-photos');
@@ -124,13 +125,14 @@ async function put(req, env, ctx, { pid }) {
             ]
           : [
               env.DB.prepare(`UPDATE usage SET bytes = MAX(0, bytes - ?4 + ?5) WHERE ${USAGE} AND ${mine}`).bind(familyId, pid, token, size, old.size),
-              env.DB.prepare('UPDATE photos SET size = ?5, uploaded_at = ?6 WHERE family_id = ?1 AND pid = ?2 AND uploaded_at = ?3 AND size = ?4').bind(
+              env.DB.prepare('UPDATE photos SET size = ?5, uploaded_at = ?6, ready = ?7 WHERE family_id = ?1 AND pid = ?2 AND uploaded_at = ?3 AND size = ?4').bind(
                 familyId,
                 pid,
                 token,
                 size,
                 old.size,
                 old.uploaded_at,
+                old.ready,
               ),
             ],
       );
@@ -196,8 +198,9 @@ async function list(req, env) {
 }
 
 async function remove(req, env, ctx, { pid }) {
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireApiDevice(env, req);
   checkPid(pid);
+  await spendNow(env.DB, deviceId, OP_UNITS, familyId);
   await dropUploads(env, familyId, pid, '\uffff', { inclusive: true });
   await env.DB.batch([
     env.DB.prepare(

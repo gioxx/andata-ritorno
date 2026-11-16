@@ -277,7 +277,7 @@ describe('mergeRemote: orphan items and tabs', () => {
     expect(plan.tabsPut).toHaveLength(1)
     const t = plan.tabsPut[0]
     expect(t).toMatchObject({ name: 'Guardaroba', order: 0, createdAt: NOW, updatedAt: NOW })
-    expect(t.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(t.id).toBe('default-home-tab')
     expect(plan.itemsPut).toEqual([item('i1', t.id, { updatedAt: NOW })])
     expect(plan.movedOrphans).toBe(1)
     expect(keys(plan.pushBack)).toEqual(['item:i1', `tab:${t.id}`])

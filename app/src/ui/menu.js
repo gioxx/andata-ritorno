@@ -1,7 +1,7 @@
 // Side drawer (slides from the right): backup info, export/import, tabs, "Da rifare", theme, language.
 import { store, load, runExclusive } from '../store.js'
 import { getMeta, setMeta } from '../db.js'
-import { exportBackup, backupFileName, markBackupDone } from '../backup/exporter.js'
+import { exportBackup, backupFileName, markBackupDone, familyKitOf } from '../backup/exporter.js'
 import { hooks } from './render.js'
 import { openTabManager } from './tabs.js'
 import { openCategoryManager } from './categories.js'
@@ -145,7 +145,7 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => window.open(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/', '_blank', 'noopener'), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: runExport, leave: leaveBeforeWipe }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => window.open(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/', '_blank', 'noopener'), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: () => runExport(), leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
       invite: openInvite, slot: () => openCodeDialog({ buyLink: payments ? import.meta.env.VITE_STRIPE_LINK_SLOT : null }), kit: () => openKit(), leave: openLeave }[item.dataset.menu]
@@ -165,14 +165,16 @@ function build() {
  * @returns {Promise<boolean>} true only once the backup surely reached the user (shared, or a
  *   download the user confirmed finding): replacing data with the family's depends on it.
  */
-export async function runExport() {
+export async function runExport({ includeKit } = {}) {
   const now = new Date()
   let result, saved = 0
+  // In a family, the recovery kit goes in only if the user says so (the moving page always wants it).
+  if (includeKit === undefined) includeKit = !!(await familyKitOf(db).catch(() => null)) && confirm(t('export.askKit'))
   try {
     // Exclusive: a move during the export would be counted, then zeroed with the counter.
     result = await withBusy(() => runExclusive(async () => {
       saved = (await getMeta(db, 'unsavedCount')) ?? 0
-      return exportBackup(db, { now })
+      return exportBackup(db, { now, includeKit })
     }))
   } catch (e) {
     alert(exportErrorMessage(e, store))
@@ -227,6 +229,6 @@ async function renderTodo() {
 export function initMenu(database) {
   db = database
   hooks.onMenu = openMenu
-  hooks.onExport = runExport
+  hooks.onExport = () => runExport()
   hooks.onImportFile = (file) => importFile(db, file)
 }

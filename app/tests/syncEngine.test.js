@@ -921,6 +921,19 @@ describe('sync engine (two phones)', () => {
     expect(await getMeta(a.db, 'orphanSeen')).toEqual({})
   })
 
+  it('never sweeps orphans on a phone that skipped a record it could not read', async () => {
+    const a = await phone()
+    await seed(a, 'tab-home-a', ['item-a01'])
+    const meta = await familyOf(a)
+    await a.sync()
+    await deleteItems(a.db, ['item-a01'], tick())
+    await updateFamily(a.db, await getFamily(a.db), { skippedRecords: true })
+    await a.sync()
+    tick(31 * DAY)
+    await a.sync()
+    expect([...server.families.get(meta.familyId).photos.keys()]).toEqual(['ph-item-a01'])
+  })
+
   it('offers again a photo the server lost while a local item still uses it', async () => {
     const a = await phone()
     await seed(a, 'tab-home-a', ['item-a01'])

@@ -40,8 +40,19 @@ export function json(obj, status = 200) {
   });
 }
 
-/** The client's IP as Cloudflare saw it. */
-export const clientIp = (req) => req.headers.get('cf-connecting-ip') || 'unknown';
+/**
+ * The client's address as Cloudflare saw it, as a rate-limit key. IPv6 is cut to its /64: one host
+ * usually owns a whole /64, so per-address buckets would let it rotate past every limit.
+ */
+export function clientIp(req) {
+  const ip = req.headers.get('cf-connecting-ip') || 'unknown';
+  if (!ip.includes(':')) return ip;
+  const [head, tail = ''] = ip.toLowerCase().split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const full = ip.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${full.slice(0, 4).map((x) => x.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
 
 /**
  * Read a request body, stopping as soon as it exceeds maxBytes (so a chunked body without
@@ -104,7 +115,11 @@ export function route(req, table) {
     const params = {};
     const ok = parts.every((p, i) => {
       if (p.startsWith(':')) {
-        params[p.slice(1)] = decodeURIComponent(path[i]);
+        try {
+          params[p.slice(1)] = decodeURIComponent(path[i]);
+        } catch {
+          return false; // malformed percent-encoding: no match (404), not a URIError (500)
+        }
         return path[i] !== '';
       }
       return p === path[i];
@@ -114,9 +129,14 @@ export function route(req, table) {
   return null;
 }
 
-/** Rate limiting is optional: without the binding there is simply no limiting. */
+/** Rate limiting is optional: without the binding there is simply no limiting (warned once). */
+let warnedUnbound = false;
 export async function limited(binding, key) {
-  if (!binding) return false;
+  if (!binding) {
+    if (!warnedUnbound) console.warn('rate limiter binding missing: requests are not limited');
+    warnedUnbound = true;
+    return false;
+  }
   const { success } = await binding.limit({ key });
   return !success;
 }

@@ -40,6 +40,7 @@ const PULL_FORMAT = 1
 const REFUSED = 'photosRefused' // meta: {[pid]: {code, at}} photos refused by the server, still owed
 const ID = /^[A-Za-z0-9_-]{8,64}$/
 const DECODE_STEP = 50 // pulled records decoded between two progress reports
+const MAX_PULL_PAGES = 40 // twice the most a family can hold (10 000 records, pages of 500)
 // Push order: a device pulling between two batches never sees an item before its tab, nor a tab
 // deletion before the deletions of its items (it would move them to another tab, reviving them).
 const PUT_RANK = { [KIT_KIND]: 0, tab: 0, category: 1, item: 2 }
@@ -152,22 +153,27 @@ export function createSyncEngine({
     let cursor = meta.pullFormat === PULL_FORMAT ? (meta.cursor ?? 0) : 0
     // The server does not say how many records wait: no total until the last page is in.
     progress('pull', 0, null)
-    for (;;) {
+    // A server that keeps saying "more" (or does not move the cursor) must not grow this forever:
+    // a family holds at most 10 000 records, 20 pages of 500.
+    for (let pages = 1; ; pages++) {
       const page = await api.pull(cursor)
       raw.push(...page.records)
+      const moved = page.next > cursor
       cursor = page.next
-      if (!page.more) break
+      if (!page.more || !moved || pages >= MAX_PULL_PAGES) break
       progress('pull', raw.length, null)
     }
     // Nothing arrived (the usual autosync after an edit): no "receiving" left on screen.
     if (!raw.length) emit({ progress: null })
     const remote = []
+    let skipped = false
     for (const [i, r] of raw.entries()) {
       if (i % DECODE_STEP === 0) progress('pull', i, raw.length)
       try {
         remote.push(await decodeRecord(key, meta.familyId, r))
       } catch (e) {
         console.warn('sync: skipped a record that could not be read', r.rid, e?.message)
+        skipped = true
       }
     }
     if (raw.length) progress('pull', raw.length, raw.length)
@@ -178,7 +184,7 @@ export function createSyncEngine({
       if (r.kind !== KIT_KIND) wardrobe.push(r)
       else if (isRecoverySecret(r.value?.recoverySecret)) secret = r.value.recoverySecret
     }
-    return { remote: wardrobe, cursor, secret }
+    return { remote: wardrobe, cursor, secret, skipped }
   }
 
   /** Merge everything pulled in one step, alone in the mutation queue, and write it in one tx. */
@@ -341,7 +347,8 @@ export function createSyncEngine({
       stored.add(pid)
       if (referenced.has(pid)) continue
       const first = seen[pid] ?? at
-      if (Date.parse(at) - Date.parse(first) >= ORPHAN_MS) await api.deletePhoto(pid)
+      // Not if this phone skipped a record it could not read: its photo looks unreferenced here.
+      if (Date.parse(at) - Date.parse(first) >= ORPHAN_MS && !meta.skippedRecords) await api.deletePhoto(pid)
       else next[pid] = first
     }
     await setMeta(db, 'orphanSeen', next)
@@ -423,7 +430,7 @@ export function createSyncEngine({
   async function syncFamily(meta) {
     const api = pinned(meta)
     const key = await familyKey(meta)
-    const { remote, cursor, secret } = await pull(api, key, meta)
+    const { remote, cursor, secret, skipped } = await pull(api, key, meta)
     /** @type {SyncPlan|null} */
     const plan = remote.length ? await merge(meta, remote) : null
     const kit = secret && secret !== meta.recoverySecret ? { recoverySecret: secret } : {}
@@ -431,7 +438,8 @@ export function createSyncEngine({
     // from the old cursor, so the marker is never judged against a pull missing the family's tabs.
     if (!sameMembership(await getFamily(db), meta)) throw new MembershipChanged()
     const droppedTabs = await discardEmptyTabs(remote)
-    meta = await updateFamily(db, meta, { cursor, pullFormat: PULL_FORMAT, ...kit })
+    // A skipped record may reference photos: remembered, so this phone never sweeps them as orphans.
+    meta = await updateFamily(db, meta, { cursor, pullFormat: PULL_FORMAT, ...kit, ...(skipped ? { skippedRecords: true } : {}) })
     if (!meta) throw new MembershipChanged()
     if ((plan && changesLocal(plan)) || droppedTabs) await onApplied()
 
@@ -441,7 +449,8 @@ export function createSyncEngine({
     const pending = await outboxSize()
     if (!pending) refused.push(...(await sweepOrphans(api, key, meta, items)))
 
-    const view = await describeFamily(key, await api.family())
+    // The ids this phone already knows, not the server's: they bind the decryption of the names.
+    const view = await describeFamily(key, { ...(await api.family()), familyId: meta.familyId, you: meta.deviceId })
     const lastSyncAt = now()
     if (!(await updateFamily(db, meta, { lastSyncAt, deviceLimit: view.deviceLimit }))) throw new MembershipChanged()
     emit({
@@ -469,7 +478,13 @@ export function createSyncEngine({
     // A background poll stays quiet: the status line only changes when the run ends.
     if (show) emit({ state: 'syncing' })
     try {
-      if (meta.pending) meta = await resumePending(db, api)
+      if (meta.pending) {
+        // A 'replace' join empties the wardrobe when the server accepts it: the screen must follow
+        // even if the family then brings nothing new.
+        const replaced = meta.pending.op === 'join' && meta.pending.mode === 'replace'
+        meta = await resumePending(db, api)
+        if (replaced) await onApplied()
+      }
       await syncFamily(meta)
     } catch (e) {
       status.progress = null // the emit below (every branch has one) tells the listeners

@@ -66,11 +66,16 @@ simple = { limit = 600, period = 60 }
 # EMAIL_HMAC_KEY, CODE_HMAC_KEY, RESEND_API_KEY.
 # Optional: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (owner notification on each purchase).
 
+# Daily housekeeping: retry failed photo purges, drop stale budget and link rows (store.js sweep).
+[triggers]
+crons = ["17 3 * * *"]
+
 # Test copy on its own origin, database and bucket: `--env test` (`npm run deploy:test`), with
 # Stripe in test mode.
 # Bindings, vars and routes are not inherited by environments, so they are repeated.
 [env.test]
 routes = [{ pattern = "ar-test.gioxx.org", custom_domain = true }]
+triggers = { crons = ["17 3 * * *"] }
 
 [env.test.vars]
 APP_ORIGIN = "https://ar-test.gioxx.org"
