@@ -143,6 +143,9 @@ export async function readIndex(blob) {
   return index
 }
 
+/** Largest uncompressed entry read back (backup.json of a big wardrobe is a few MB, photos ~1 MB). */
+export const MAX_ENTRY_BYTES = 64 * 1024 * 1024
+
 /**
  * Feed the uncompressed content of one entry to `fn`, chunk by chunk.
  * Throws 'bad-entry' when this entry alone is unreadable.
@@ -157,9 +160,12 @@ async function streamEntry(blob, e, fn) {
   const data = blob.slice(start, start + e.csize)
   if (e.method === 0) return eachChunk(data, fn)
   if (e.method !== 8) throw new Error('bad-entry')
+  // A tiny deflated entry can claim to expand to gigabytes: refuse past the cap, and inflate into a
+  // buffer of the declared size only (anything longer is cut, then fails the CRC check).
+  if (e.usize > MAX_ENTRY_BYTES) throw new Error('bad-entry')
   let bytes
   try {
-    bytes = inflateSync(await bytesOf(data))
+    bytes = inflateSync(await bytesOf(data), { out: new Uint8Array(e.usize) })
   } catch {
     throw new Error('bad-entry')
   }

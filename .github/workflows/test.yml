@@ -1,0 +1,29 @@
+# Runs both test suites on every pull request (Dependabot's included) and on pushes to main.
+name: test
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [app, worker]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.project }}
+      - run: npm test
+        working-directory: ${{ matrix.project }}
+      - if: matrix.project == 'worker'
+        run: node redirect/check.mjs

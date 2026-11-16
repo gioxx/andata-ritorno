@@ -35,7 +35,7 @@ export async function markBackupDone(db, now, saved) {
 }
 
 /** The kit of the family this phone is in, if it has one yet (an invited phone gets it by sync). */
-async function familyKitOf(db) {
+export async function familyKitOf(db) {
   const meta = await getFamily(db)
   if (!meta || meta.pending) return null
   try { return kitOf(meta) } catch { return null }
@@ -44,12 +44,15 @@ async function familyKitOf(db) {
 /**
  * Side effects are injectable for tests. Meta is only touched once the file surely reached the
  * user (shared). A download gives the page no answer: the caller asks, then calls markBackupDone.
+ * includeKit: put the family's recovery kit in the file. Off unless the user chose it: whoever
+ * gets the file can then enter the family and read all its data.
  * @returns {Promise<'shared'|'downloaded'|'cancelled'>}
  */
-export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date() } = {}) {
+export async function exportBackup(db, { share = defaultShare, download = defaultDownload, now = new Date(), includeKit = false } = {}) {
   const saved = (await getMeta(db, 'unsavedCount')) ?? 0
   const { tabs, items, categories } = await loadAll(db)
-  const blob = await buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id), now, familyKit: await familyKitOf(db) })
+  const familyKit = includeKit ? await familyKitOf(db) : null
+  const blob = await buildZip({ tabs, items, categories, getPhoto: (id) => getPhoto(db, id), now, familyKit })
   const name = backupFileName(now)
   const file = new File([blob], name, { type: 'application/zip' })
 

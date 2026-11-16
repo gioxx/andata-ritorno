@@ -17,6 +17,7 @@ import { watchClipboard } from './ui/clipboard.js';
 import { initAddFlow } from './ui/add.js';
 import { initViewer } from './ui/viewer.js';
 import { initMenu, runExport } from './ui/menu.js';
+import { wipeAll } from './wipe.js';
 import { initFamilyUi, familyHooks } from './ui/familyDialogs.js';
 import { renderUnlockPage, landOn } from './ui/pages.js';
 import { routeOf } from './routes.js';
@@ -31,7 +32,7 @@ import { initStatsNotice } from './ui/statsNotice.js';
 import { maybePing } from './stats.js';
 import { VERSION } from './ui/about.js';
 import { t, onLangChange } from './i18n.js';
-import { isOldHost, newAddressOf, renderMoved } from './ui/moved.js';
+import { isOldHost, newAddressOf, renderMoved, NEW_ORIGIN } from './ui/moved.js';
 
 // A waiting version is announced, never applied by surprise; ignored, it applies on the next full reopen.
 initUpdateToast((handlers) => registerSW(handlers));
@@ -120,7 +121,12 @@ async function startApp() {
       const now = await getFamily(db);
       const kitMissing = !!now && !now.removed && (!!now.pending || !now.recoverySecret);
       const hasData = store.tabs.length > 0 || !!now;
-      renderMoved(root, { hasData, kitMissing, onExport: runExport });
+      // Moving: the kit must travel, or the new address cannot rejoin the family.
+      renderMoved(root, {
+        hasData, kitMissing, onExport: () => runExport({ includeKit: true }),
+        // Local only: leaving the family from here could purge it before the new address rejoins.
+        onErase: async () => { await wipeAll({ db }); location.replace(NEW_ORIGIN + '/'); },
+      });
       return;
     }
     // Banner steps move to the welcome screen once dismissed: force a redraw (it keeps the typed name).
@@ -160,7 +166,7 @@ async function startApp() {
     };
     // The engine stays up but idle: with no family its run resets the status and touches nothing.
     const stopSync = () => { inFamily = false; hooks.onSyncLine = () => {}; syncNow('menu'); draw(); };
-    initFamilyUi({ db, api, onEntered: startSync, onLeft: stopSync, onExport: runExport });
+    initFamilyUi({ db, api, onEntered: startSync, onLeft: stopSync, onExport: () => runExport() });
     if (await getFamily(db)) await startSync();
     // Opened from an invite or a licence link: its screen goes over the app (or the welcome screen).
     // Anonymous weekly count (issue #35): only without a family, only after the one-time notice.

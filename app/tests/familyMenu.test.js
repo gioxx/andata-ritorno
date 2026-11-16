@@ -83,6 +83,7 @@ describe('familyMenuHtml', () => {
 describe('devicesText', () => {
   it('shows n / m', () => {
     expect(devicesText([{}, {}, {}], 4)).toBe('3 / 4')
+    expect(devicesText([{}], '<img src=x>')).not.toContain('<') // a server value never becomes markup
     expect(devicesText(undefined, 4)).toBe('– / 4')
   })
 })

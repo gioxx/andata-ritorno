@@ -325,6 +325,10 @@ describe('Stripe', () => {
     expect(res.status).toBe(200);
     const lic = await env.DB.prepare('SELECT l.email_hmac FROM licences l JOIN codes c ON c.licence_id = l.id WHERE c.stripe_session = ?').bind(id).first();
     expect(lic.email_hmac).toBe(await hmacHex(SECRETS.EMAIL_HMAC_KEY, 'hook@example.com'));
+    // Once used, the session id no longer reveals the code.
+    const again = await call(`/api/unlock/session?id=${id}`);
+    expect(again.status).toBe(409);
+    expect((await again.json()).error).toBe('code-used');
   });
 
   it('refuses unpaid and unknown sessions; price decides the kind', async () => {
@@ -597,6 +601,14 @@ describe('licence recovery', () => {
     const emails = mockFetch({});
     for (let i = 0; i < 5; i++) expect((await post('/api/licence/email', { email: 'flood@example.com' })).status).toBe(202);
     expect(emails).toHaveLength(3);
+  });
+
+  it('holds the open-link cap under concurrent requests and refuses non-ASCII addresses', async () => {
+    await paidFamily('race@example.com');
+    const emails = mockFetch({});
+    await Promise.all(Array.from({ length: 6 }, () => post('/api/licence/email', { email: 'race@example.com' })));
+    expect(emails.length).toBeLessThanOrEqual(3);
+    expect((await post('/api/licence/email', { email: 'race@exaKmple.com' })).status).toBe(400);
   });
 });
 

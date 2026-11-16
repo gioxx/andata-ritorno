@@ -26,6 +26,9 @@ export const PING_BUCKETS = Object.freeze({
   moves: ['0', '1-5', '6-20', '21+'],
 });
 const VERSION_RE = /^\d{1,3}\.\d{1,3}$/;
+/** Pings counted per week at most (a phone pings once a week); override with env PING_WEEKLY_CAP. */
+export const PING_WEEKLY_CAP = 5000;
+const MAX_VERSIONS = 20;
 
 /** ISO 8601 week of a date, as '2026-W45' (weeks start on Monday; week 1 holds the first Thursday). */
 export function isoWeek(date) {
@@ -53,10 +56,21 @@ async function ping(req, env) {
   const p = validPing(await readJson(req, 256));
   if (!p) throw new HttpError(400, 'bad-request');
   const week = isoWeek(new Date());
+  // Global brake: past the weekly cap pings are accepted and dropped, so rotating addresses cannot
+  // spend the database's daily write allowance (one read per ping instead of four writes).
+  const seen = await env.DB.prepare("SELECT n FROM usage_weekly WHERE week = ? AND metric = 'phones' AND bucket = 'all'").bind(week).first('n');
+  if ((seen ?? 0) >= (Number(env.PING_WEEKLY_CAP) || PING_WEEKLY_CAP)) return new Response(null, { status: 204 });
   const add = env.DB.prepare('INSERT INTO usage_weekly (week, metric, bucket, n) VALUES (?, ?, ?, 1) ON CONFLICT (week, metric, bucket) DO UPDATE SET n = n + 1');
   await env.DB.batch([
     add.bind(week, 'phones', 'all'),
-    add.bind(week, 'version', p.v),
+    // A new version bucket only while the week has fewer than MAX_VERSIONS: made-up versions
+    // cannot grow the table.
+    env.DB.prepare(
+      `INSERT INTO usage_weekly (week, metric, bucket, n) SELECT ?1, 'version', ?2, 1
+       WHERE EXISTS (SELECT 1 FROM usage_weekly WHERE week = ?1 AND metric = 'version' AND bucket = ?2)
+          OR (SELECT COUNT(*) FROM usage_weekly WHERE week = ?1 AND metric = 'version') < ?3
+       ON CONFLICT (week, metric, bucket) DO UPDATE SET n = n + 1`,
+    ).bind(week, p.v, MAX_VERSIONS),
     add.bind(week, 'items', p.items),
     add.bind(week, 'moves', p.moves),
   ]);

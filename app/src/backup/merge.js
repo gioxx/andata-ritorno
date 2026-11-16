@@ -115,10 +115,12 @@ export function buildPlan(local, incoming) {
     return rest
   }
 
+  // Photos local items already use: a file sharing their id must not overwrite them.
+  const localPhotos = new Set(local.items.map((i) => i.photoId))
   const needPhoto = (item) => {
     const blob = incoming.photos.get(item.photoId)
     if (!blob) throw new Error(`missing-photo:${item.id}`) // importer must validate; never orphan
-    plan.photosPut.set(item.photoId, blob)
+    if (!localPhotos.has(item.photoId)) plan.photosPut.set(item.photoId, blob)
   }
 
   for (const inc of collapse(incoming.items, mergeItem).values()) {
@@ -138,5 +140,10 @@ export function buildPlan(local, incoming) {
     plan.itemsPut.push(strip(merged))
     plan.updated++
   }
+  // A replaced photo is deleted only if no item keeps using it after the import.
+  const after = new Map(localItems)
+  for (const it of plan.itemsPut) after.set(it.id, it)
+  const used = new Set([...after.values()].map((it) => it.photoId))
+  plan.photosDelete = [...new Set(plan.photosDelete)].filter((p) => !used.has(p))
   return plan
 }

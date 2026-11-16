@@ -13,6 +13,7 @@ import { byOrder } from '../order.js'
 /** @typedef {{rid:string, seq:number, kind:string, value?:any, tombstone?:Tombstone, by:string}} DecodedRecord */
 
 const KINDS = ['tab', 'category', 'item']
+export const DEFAULT_TAB_ID = 'default-home-tab'
 
 /** Newest moment a record was touched: what a tombstone's deletedAt must beat. */
 function stamp(kind, r) {
@@ -126,7 +127,8 @@ export function mergeRemote(local, remote, { now, defaultTabName, deviceId }) {
   // Items are never lost with their tab: they move to the first remaining one (a new one if none is left).
   let home = [...state.tab.values()].sort(byOrder)[0]
   if (!home) {
-    home = { id: crypto.randomUUID(), name: defaultTabName, order: 0, createdAt: now, updatedAt: now }
+    // A fixed id: two devices left without tabs at once create the same tab, not two of them.
+    home = { id: DEFAULT_TAB_ID, name: defaultTabName, order: 0, createdAt: now, updatedAt: now }
     state.tab.set(home.id, home)
     pushBack.add(`tab:${home.id}`)
   }

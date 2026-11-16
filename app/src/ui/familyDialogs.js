@@ -150,7 +150,7 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
       const { deviceLimit } = await ctx.api.slot(code)
       // Nothing left to do here: the form gives way to the outcome and a way out.
       d.querySelector('form').innerHTML = `<h3>${t('family.slot')}</h3>
-        <p class="plain" role="status">${t('family.slotCode.done', { n: deviceLimit })}</p>
+        <p class="plain" role="status">${t('family.slotCode.done', { n: Number(deviceLimit) })}</p>
         <button value="" class="primary">${t('common.close')}</button>`
       labelDialog(d)
       d.querySelector('button').focus()
@@ -242,7 +242,7 @@ export async function openInvite() {
       link = inviteLink(inv.token, meta)
     } catch (e) { body.innerHTML = ''; setError(d, e); return }
     body.innerHTML = `<p class="plain">${t('family.invite.body')}</p><div class="qr">${qrSvg(link)}</div>
-      <p class="plain">${t('family.invite.seat', { n: inv.used + 1, m: inv.limit })}</p><p class="plain" id="famInvLeft"></p><p class="plain warn">${t('family.invite.warn')}</p>
+      <p class="plain">${t('family.invite.seat', { n: Number(inv.used) + 1, m: Number(inv.limit) })}</p><p class="plain" id="famInvLeft"></p><p class="plain warn">${t('family.invite.warn')}</p>
       <button type="button" class="primary" data-share>${t('family.invite.share')}</button>`
     const left = body.querySelector('#famInvLeft')
     const share = body.querySelector('[data-share]')

@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index.js';
 import { coarse, isoWeek, validPing } from '../src/public.js';
+import { clientIp } from '../src/http.js';
 
 describe('public stats', () => {
   it('rounds down to ten and hides anything below ten', () => {
@@ -86,6 +87,35 @@ describe('anonymous weekly ping', () => {
     const blocked = { RL_STRICT: { limit: async ({ key }) => ({ success: !key.endsWith('198.51.100.1') }) } };
     expect((await ping({ v: '3.1', items: '0', moves: '0' }, '198.51.100.1', { ...env, ...blocked })).status).toBe(429);
     expect((await ping({ v: '3.1', items: '0', moves: '0' }, '198.51.100.2', { ...env, ...blocked })).status).toBe(204);
+  });
+
+  it('keys IPv6 addresses on their /64, so rotating inside it does not reset the limit', () => {
+    const ip = (a) => clientIp(new Request('https://ar.test/', { headers: { 'cf-connecting-ip': a } }));
+    expect(ip('203.0.113.7')).toBe('203.0.113.7');
+    expect(ip('2001:db8:0:1:aaaa::1')).toBe('2001:db8:0:1::/64');
+    expect(ip('2001:0db8:0000:0001:ffff:1:2:3')).toBe('2001:db8:0:1::/64');
+    expect(ip('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(ip('::1')).toBe('0:0:0:0::/64');
+  });
+
+  it('drops pings past the weekly cap without writing', async () => {
+    const week = isoWeek(new Date());
+    const before = await env.DB.prepare("SELECT n FROM usage_weekly WHERE week = ? AND metric = 'phones'").bind(week).first('n');
+    expect((await ping({ v: '3.1', items: '0', moves: '0' }, '203.0.113.9', { ...env, PING_WEEKLY_CAP: String(before) })).status).toBe(204);
+    expect(await env.DB.prepare("SELECT n FROM usage_weekly WHERE week = ? AND metric = 'phones'").bind(week).first('n')).toBe(before);
+  });
+
+  it('stops adding new version buckets after twenty in a week', async () => {
+    const week = isoWeek(new Date());
+    for (let i = 0; i < 25; i++) await ping({ v: `9.${i}`, items: '0', moves: '0' }, `203.0.113.${100 + i}`);
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usage_weekly WHERE week = ? AND metric = 'version'").bind(week).first('n');
+    expect(n).toBe(20);
+    await ping({ v: '3.1', items: '0', moves: '0' }); // an existing bucket still counts
+    expect(await env.DB.prepare("SELECT n FROM usage_weekly WHERE week = ? AND metric = 'version' AND bucket = '3.1'").bind(week).first('n')).toBeGreaterThan(2);
+  });
+
+  it('answers 404, not 500, on malformed percent-encoding', async () => {
+    expect((await worker.fetch(new Request('https://ar.test/api/photos/%E0%A4%A'), env, {})).status).toBe(404);
   });
 
   it('shows last week on the public numbers, rounded and hidden below ten', async () => {

@@ -1,5 +1,6 @@
 // Reader for the mockup's JSON backup ({ app:'andata-ritorno', version:1, items:[…] }).
 import { dataUrlToBlob, decodeImage } from '../photos.js'
+import { syncableId } from './zip.js'
 
 /** @typedef {import('../types.js').Tab} Tab */
 /** @typedef {import('../types.js').Item} Item */
@@ -11,14 +12,19 @@ const EPOCH = '1970-01-01T00:00:00.000Z'
 const PLACES = ['school', 'home']
 const tabNameFor = (child) => (child === 'nido' ? 'Nido' : child === 'materna' ? 'Materna' : child)
 const str = (v) => (typeof v === 'string' ? v : '')
+// The file is untrusted: a garbage or far-future movedAt would win every later move.
+const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v)) && Date.parse(v) <= Date.now() + 2 * 864e5
 // New tabs: Nido, Materna, then any other child alphabetically (not file order).
 const RANK = { nido: 0, materna: 1 }
 const byChild = ([a], [b]) => (RANK[a] ?? 2) - (RANK[b] ?? 2) || a.localeCompare(b)
+
+const MAX_V1_BYTES = 200 * 1024 * 1024
 
 /** Read the first bytes to tell a v2 ZIP from a v1 JSON. */
 export async function detectFormat(file) {
   const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
   if (head.length === 4 && head[0] === 0x50 && head[1] === 0x4b && head[2] === 3 && head[3] === 4) return 'v2'
+  if (file.size > MAX_V1_BYTES) return 'unknown' // read whole as text: a huge file would crash the tab
   try {
     const data = JSON.parse(await file.text())
     if (data?.app === 'andata-ritorno' && data.version === 1) return 'v1'
@@ -69,10 +75,10 @@ export async function parseV1(json, { childMap, now, tabs = [] }) {
       fail('unreadable-photo'); continue
     }
     const photoId = crypto.randomUUID()
-    const movedAt = str(raw.movedAt) || EPOCH
+    const movedAt = isIso(raw.movedAt) ? raw.movedAt : EPOCH
     photos.set(photoId, blob)
     items.push({
-      id: raw.id, tabId: tabFor(child).id, location: raw.location, label: str(raw.label),
+      id: syncableId(raw.id), tabId: tabFor(child).id, location: raw.location, label: str(raw.label),
       photoId, createdAt: movedAt, movedAt, updatedAt: EPOCH,
     })
     used.add(child)

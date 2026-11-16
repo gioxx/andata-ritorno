@@ -193,3 +193,18 @@ describe('mergeItem photoAt', () => {
     expect('photoAt' in m).toBe(false)
   })
 })
+
+describe('buildPlan with photo ids shared across items', () => {
+  it('never overwrites a photo a local item uses, nor deletes one still in use', () => {
+    const a = item('a', { photoId: 'p-shared' })
+    const b = item('b', { photoId: 'p-shared' })
+    const local = { tabs: [tab('t1')], items: [a, b], categories: [] }
+    // A new item in the file reuses the id with other bytes: the local blob stays.
+    const plan1 = buildPlan(local, incoming([item('c', { photoId: 'p-shared' })]))
+    expect(plan1.photosPut.has('p-shared')).toBe(false)
+    // a's photo is replaced by a newer one; b still uses the old one, so it is kept.
+    const plan2 = buildPlan(local, incoming([item('a', { photoId: 'p-new', photoAt: d(9), updatedAt: d(9) })]))
+    expect(plan2.itemsPut[0].photoId).toBe('p-new')
+    expect(plan2.photosDelete).toEqual([])
+  })
+})

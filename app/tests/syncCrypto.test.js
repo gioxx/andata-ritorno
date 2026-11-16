@@ -57,9 +57,9 @@ describe('crypto', () => {
 describe('records', () => {
   it('builds the record AAD', () => expect(recordAad('f', 'r')).toBe('f:r'))
   it.each([
-    ['item', { id: 'i1', title: 'x' }],
-    ['tab', { id: 't1', name: 'T' }],
-    ['category', { id: 'c1', name: 'C' }],
+    ['item', { id: 'item-0001', tabId: 'tab-00001', photoId: 'photo-0001', location: 'home', label: 'x', movedAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }],
+    ['tab', { id: 'tab-00001', name: 'T', order: 0, updatedAt: '2026-01-01T00:00:00.000Z' }],
+    ['category', { id: 'cat-00001', name: 'C', order: 1, updatedAt: '2026-01-01T00:00:00.000Z' }],
   ])('round-trips a %s', async (kind, value) => {
     const key = await mkKey()
     const { rid, data } = await encodeRecord(key, FAM, { kind, value, by: 'dev1' })
@@ -92,5 +92,28 @@ describe('records', () => {
   it('wrong key fails', async () => {
     const { rid, data } = await encodeRecord(await mkKey(), FAM, { kind: 'item', value: { id: 'a' }, by: 'd' })
     await expect(decodeRecord(await mkKey(), FAM, { rid, seq: 1, data })).rejects.toThrow('decrypt-failed')
+  })
+  it('refuses malformed records of known kinds, so the sync skips them instead of stopping', async () => {
+    const key = await mkKey()
+    const T = '2026-01-01T00:00:00.000Z'
+    const good = { id: 'item-0001', tabId: 'tab-00001', photoId: 'photo-0001', location: 'home', label: 'x', movedAt: T, updatedAt: T }
+    const future = new Date(Date.now() + 30 * 864e5).toISOString()
+    const bad = [
+      { k: 'item' },                                      // no value at all
+      { k: 'item', v: { ...good, id: 'other-0001' } },    // id differs from rid
+      { k: 'item', v: { ...good, location: 'nonna' } },
+      { k: 'item', v: { ...good, updatedAt: future } },   // would win every merge forever
+      { k: 'item', v: { ...good, updatedAt: 'garbage' } },
+      { k: 'tab', v: { id: 'item-0001', name: 'T', order: 'x', updatedAt: T } },
+      { k: 'item', dead: { id: 'item-0001', deletedAt: future } },
+      { k: 'item', dead: { id: 'other-0001', deletedAt: T } },
+    ]
+    for (const p of bad) {
+      const data = await encryptJson(key, recordAad(FAM, 'item-0001'), p)
+      await expect(decodeRecord(key, FAM, { rid: 'item-0001', seq: 1, data })).rejects.toThrow('malformed record')
+    }
+    // A kind from a newer app version passes untouched.
+    const data = await encryptJson(key, recordAad(FAM, 'item-0001'), { k: 'newkind', v: { anything: 1 } })
+    expect((await decodeRecord(key, FAM, { rid: 'item-0001', seq: 1, data })).kind).toBe('newkind')
   })
 })

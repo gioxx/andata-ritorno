@@ -425,3 +425,35 @@ describe('v2 zip', () => {
     await expect(prepareImport(dst, asFile(new Blob([zip])))).rejects.toThrow('bad-file')
   })
 })
+
+describe('untrusted backups (security review)', () => {
+  it('makes odd ids syncable, stably', async () => {
+    const { syncableId } = await import('../src/backup/zip.js')
+    expect(syncableId('a1b2c3d4-0001-4000-8000-000000000001')).toBe('a1b2c3d4-0001-4000-8000-000000000001')
+    const odd = syncableId('id.with\nnewline')
+    expect(odd).toMatch(/^[A-Za-z0-9_-]{8,64}$/)
+    expect(syncableId('id.with\nnewline')).toBe(odd)
+    expect(syncableId('x'.repeat(65))).toMatch(/^im-[0-9a-f]{16}$/)
+  })
+
+  it('refuses an entry that claims to inflate past the cap', async () => {
+    const { MAX_ENTRY_BYTES } = await import('../src/backup/zipio.js')
+    const dst = await fresh()
+    const zip = zipSync({ 'backup.json': strToU8('{}') })
+    // Patch the central directory's uncompressed size of the only entry.
+    const view = new DataView(zip.buffer)
+    for (let p = zip.length - 22; p >= 0; p--) {
+      if (view.getUint32(p, true) === 0x02014b50) { view.setUint32(p + 24, MAX_ENTRY_BYTES + 1, true); break }
+    }
+    await expect(prepareImport(dst, asFile(new Blob([zip])))).rejects.toThrow('bad-file')
+  })
+
+  it('exports a photo of a non-image type instead of failing every backup', async () => {
+    const zip = await buildZip({
+      tabs: [{ id: 'tab-a', name: 'N', order: 0, createdAt: T, updatedAt: T }],
+      items: [{ id: 'i1', tabId: 'tab-a', location: 'home', label: 'x', photoId: 'p1', createdAt: T, movedAt: T, updatedAt: T }],
+      getPhoto: async () => new Blob([new Uint8Array([1, 2, 3])], { type: 'application/octet-stream' }),
+    })
+    expect(Object.keys(unzipSync(await bytesOf(zip)))).toContain('photos/p1.bin')
+  })
+})

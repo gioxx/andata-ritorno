@@ -4,7 +4,7 @@ CREATE INDEX licences_email ON licences(email_hmac);
 CREATE TABLE codes (hash TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('family','slot')), source TEXT NOT NULL,
   stripe_session TEXT UNIQUE, email_hmac TEXT, created_at TEXT NOT NULL, redeemed_at TEXT, licence_id TEXT);
 CREATE TABLE families (id TEXT PRIMARY KEY, licence_id TEXT NOT NULL, name_enc TEXT NOT NULL, recovery_hash TEXT NOT NULL,
-  seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+  seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, records_n INTEGER NOT NULL DEFAULT 0, data_bytes INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE devices (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, name_enc TEXT NOT NULL,
   created_at TEXT NOT NULL, last_seen_at TEXT NOT NULL);
 CREATE INDEX devices_family ON devices(family_id);
@@ -23,3 +23,4 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE email_usage (day TEXT PRIMARY KEY, n INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS usage_weekly (week TEXT NOT NULL, metric TEXT NOT NULL, bucket TEXT NOT NULL, n INTEGER NOT NULL,
   PRIMARY KEY (week, metric, bucket));
+CREATE TABLE IF NOT EXISTS pending_purges (family_id TEXT PRIMARY KEY, since TEXT NOT NULL);

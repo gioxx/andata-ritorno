@@ -91,7 +91,7 @@ describe('family kit in backups', () => {
 
   async function exported(db) {
     let file = null
-    await exportBackup(db, { share: async () => false, download: (f) => { file = f } })
+    await exportBackup(db, { share: async () => false, download: (f) => { file = f }, includeKit: true })
     return file
   }
 
@@ -106,6 +106,15 @@ describe('family kit in backups', () => {
     expect(prepared.incoming.familyKit).toBe(kitOf(kitMeta))
     const summary = await commitImport(dst.db, prepared, { partial: false })
     expect(summary.familyKit).toBe(kitOf(kitMeta))
+  })
+
+  it('in a family, the kit stays out unless asked for', async () => {
+    const db = await seeded()
+    await setFamily(db, kitMeta)
+    let file = null
+    await exportBackup(db, { share: async () => false, download: (f) => { file = f } })
+    const json = JSON.parse(strFromU8(unzipSync(new Uint8Array(await file.arrayBuffer()))['backup.json']))
+    expect('familyKit' in json).toBe(false)
   })
 
   it('outside a family there is no kit', async () => {

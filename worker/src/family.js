@@ -1,12 +1,14 @@
 import { HttpError, json, readJson, strictLimit } from './http.js';
 import { randomToken, requireApiDevice, sha256Hex } from './auth.js';
-import { deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen } from './store.js';
+import { OP_UNITS, deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen, spendNow } from './store.js';
 import { ENC, ID, isSecret } from './validate.js';
 
 const INVITE_TTL_MS = 10 * 60 * 1000;
+const MAX_OPEN_INVITES = 10;
 // A used invite stays this long so the device that used it can still get its token if the answer
-// was lost and the phone only comes back later (a family member could remove a device anyway).
-const REPLAY_MS = 30 * 24 * 60 * 60 * 1000;
+// was lost. Kept short: until then the invite plus the device id (which every member sees) rotates
+// that device's token.
+const REPLAY_MS = 24 * 60 * 60 * 1000;
 const replaySince = () => new Date(Date.now() - REPLAY_MS).toISOString();
 
 // SQL fragments over a family `f` joined to its licence `l`.
@@ -48,14 +50,17 @@ async function family(req, env) {
   const row = await env.DB.prepare(`SELECT f.name_enc, ${LIMIT} AS lim FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
     .bind(familyId)
     .first();
+  if (!row) throw new HttpError(401, 'unauthorized'); // the family was purged meanwhile
   return json({ familyId, familyNameEnc: row.name_enc, deviceLimit: row.lim, you: deviceId, devices: await devicesOf(env, familyId) });
 }
 
 async function createInvite(req, env) {
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireApiDevice(env, req);
+  await spendNow(env.DB, deviceId, 2 * OP_UNITS, familyId); // a delete and an insert
   const row = await env.DB.prepare(`SELECT ${USED} AS used, ${LIMIT} AS lim FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
     .bind(familyId)
     .first();
+  if (!row) throw new HttpError(401, 'unauthorized');
   if (row.used >= row.lim) throw new HttpError(409, 'family-full');
   const token = randomToken();
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
@@ -67,8 +72,13 @@ async function createInvite(req, env) {
       new Date().toISOString(),
       replaySince(),
     ),
-    env.DB.prepare('INSERT INTO invites (hash, family_id, expires_at) VALUES (?, ?, ?)').bind(await sha256Hex(token), familyId, expiresAt),
-  ]);
+    // At most MAX_OPEN_INVITES open links per family: more is never needed and only grows the table.
+    env.DB.prepare(
+      'INSERT INTO invites (hash, family_id, expires_at) SELECT ?1, ?2, ?3 WHERE (SELECT COUNT(*) FROM invites WHERE family_id = ?2 AND used_at IS NULL AND expires_at > ?4) < ?5',
+    ).bind(await sha256Hex(token), familyId, expiresAt, new Date().toISOString(), MAX_OPEN_INVITES),
+  ]).then((r) => {
+    if (r[1].meta.changes !== 1) throw new HttpError(429, 'too-many-invites');
+  });
   return json({ token, expiresAt, used: row.used, limit: row.lim });
 }
 
@@ -135,7 +145,9 @@ async function replayJoin(env, inv, deviceId) {
 }
 
 async function licenceOf(env, familyId) {
-  return (await env.DB.prepare('SELECT licence_id FROM families WHERE id = ?').bind(familyId).first()).licence_id;
+  const row = await env.DB.prepare('SELECT licence_id FROM families WHERE id = ?').bind(familyId).first();
+  if (!row) throw new HttpError(401, 'unauthorized');
+  return row.licence_id;
 }
 
 async function removeDevice(req, env, ctx, params) {
@@ -164,6 +176,7 @@ async function removeDevice(req, env, ctx, params) {
     return json({ purged });
   }
   if (results.at(-1).meta.changes !== 1) throw new HttpError(404, 'not-found');
+  await env.DB.prepare('DELETE FROM device_usage WHERE device_id = ?').bind(params.id).run();
   return json({ purged });
 }
 
@@ -213,7 +226,8 @@ async function recoverRemoveDevice(req, env) {
   const body = await readJson(req);
   const kit = await checkKit(env, body);
   // No purge here even if no device is left: whoever holds the kit can still recover the data.
-  await env.DB.prepare('DELETE FROM devices WHERE id = ? AND family_id = ?').bind(body.deviceId, kit.familyId).run();
+  const { meta } = await env.DB.prepare('DELETE FROM devices WHERE id = ? AND family_id = ?').bind(body.deviceId, kit.familyId).run();
+  if (meta.changes === 1) await env.DB.prepare('DELETE FROM device_usage WHERE device_id = ?').bind(body.deviceId).run();
   return json({ ok: true });
 }
 

@@ -22,5 +22,6 @@ export default defineConfig({
       },
     }),
   ],
-  test: { environment: 'node', setupFiles: ['tests/setup.js'] },
+  // testTimeout: the two-phone sync tests run real crypto and IndexedDB and can take over 5 s on a busy machine (CI).
+  test: { environment: 'node', setupFiles: ['tests/setup.js'], testTimeout: 20000 },
 });
