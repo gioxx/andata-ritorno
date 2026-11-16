@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const html = readFileSync(new URL('../public/privacy.html', import.meta.url), 'utf8')
-const headers = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8')
+const html = readFileSync(new URL('../../landing/public/privacy.html', import.meta.url), 'utf8')
+const headers = readFileSync(new URL('../../landing/public/_headers', import.meta.url), 'utf8')
 
 describe('privacy.html', () => {
-  it('has no scripts, no inline styles and no third-party resources (CSP: script-src/style-src self)', () => {
-    expect(html).not.toMatch(/<script/i)
+  it('only its own language script, no inline styles and no third-party resources (CSP: script-src/style-src self)', () => {
+    expect([...html.matchAll(/<script[^>]*>/gi)].map((m) => m[0])).toEqual(['<script src="/doc-lang.js" defer>'])
     expect(html).not.toMatch(/<style/i)
     expect(html).not.toMatch(/\sstyle=/i)
     expect(html).not.toMatch(/\son\w+=/i)
@@ -31,5 +31,14 @@ describe('privacy.html', () => {
     expect(html).toContain('when it was last active')
     expect(html).toContain('sessione di pagamento Stripe')
     expect(html).toContain('Stripe Checkout session id')
+  })
+})
+
+describe('legal pages on the landing site', () => {
+  const appRedirects = readFileSync(new URL('../public/_redirects', import.meta.url), 'utf8')
+  const landingRedirects = readFileSync(new URL('../../landing/public/_redirects', import.meta.url), 'utf8')
+  it('the app sends its old addresses to the landing, and the landing no longer sends them back', () => {
+    for (const p of ['/privacy.html', '/privacy', '/terms.html', '/terms']) expect(appRedirects).toMatch(new RegExp(`^${p.replace('.', '\\.')} https://ar\\.gxware\\.org/`, 'm'))
+    expect(landingRedirects).not.toMatch(/privacy|terms/)
   })
 })

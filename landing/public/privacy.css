@@ -1,4 +1,4 @@
-/* Standalone stylesheet for privacy.html (the app's CSP allows no inline <style>). Same tokens as src/styles.css. */
+/* Standalone stylesheet for privacy.html and terms.html (the CSP allows no inline <style>). Same tokens as the app's styles.css. */
 :root {
   color-scheme: light;
   --bg: #fbf7f1; --fg: #2b2620; --muted: #6a6052; --chip: #efe7db; --tile: #fff;
@@ -23,7 +23,8 @@ li { margin-bottom: 6px; }
 a { color: var(--accent-strong); font-weight: 600; }
 a:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; border-radius: 4px; }
 .meta { color: var(--muted); font-size: 0.875rem; }
-nav.langs { display: flex; gap: 8px; margin: 12px 0 8px; }
+nav.langs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
 nav.langs a { padding: 8px 14px; border-radius: 999px; background: var(--chip); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 section + section { margin-top: 48px; padding-top: 24px; border-top: 2px solid var(--chip); }
 .back { display: inline-block; padding: 12px 0; }
+

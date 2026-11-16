@@ -3,7 +3,7 @@
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { ago } from './syncLine.js'
-import { usersIcon, refreshIcon, keyIcon, userPlusIcon, plusIcon, lifeBuoyIcon, ticketIcon, mailIcon, smartphoneIcon, logOutIcon } from './icons.js'
+import { usersIcon, refreshIcon, keyIcon, userPlusIcon, lifeBuoyIcon, ticketIcon, mailIcon, smartphoneIcon, logOutIcon } from './icons.js'
 
 /** Every `ApiError.code` the Worker can answer with, plus 'offline' (the request got no answer). */
 export const FAMILY_ERROR_CODES = [
@@ -24,9 +24,10 @@ export function familyError(e) {
 export const devicesText = (devices, limit) => t('family.devicesCount', { n: devices ? devices.length : '–', m: limit == null ? '–' : Number(limit) })
 
 // Same markup as the menu's own rows (menu.js cannot be imported from here: it imports this file).
-const row = (act, icon, label, { sub = '', pill = '', cls = '' } = {}) =>
+// clip: one line with an ellipsis (a family name can be as long as the user wants).
+const row = (act, icon, label, { sub = '', pill = '', cls = '', clip = false } = {}) =>
   `<button type="button" class="menuItem${cls}" data-menu="${act}"><span class="ic">${icon}</span>` +
-  `<span class="txt">${label}${sub ? `<small>${sub}</small>` : ''}</span>${pill ? `<span class="badge">${pill}</span>` : ''}</button>`
+  `<span class="txt">${clip ? `<span class="clip">${label}</span>` : label}${sub ? `<small>${sub}</small>` : ''}</span>${pill ? `<span class="badge">${pill}</span>` : ''}</button>`
 
 const leaveRow = () => row('leave', logOutIcon, t('family.leave'), { cls: ' danger' })
 
@@ -53,12 +54,22 @@ export function familyMenuHtml({ family, info = null, payments, now = new Date()
   const last = info?.lastSyncAt ?? family.lastSyncAt
   const lastText = t('family.lastSync', { ago: last ? ago(last, now) : t('family.neverSynced') })
   return [
-    row('sync', refreshIcon, esc(fam?.name ?? t('family.defaultName')), { sub: esc(lastText), pill: t('family.syncNow') }),
+    row('sync', refreshIcon, esc(fam?.name ?? t('family.defaultName')), { sub: esc(lastText), pill: t('family.syncNow'), clip: true }),
+    // Inviting a phone and adding a seat live in the devices dialog, under the list they extend.
     row('devices', smartphoneIcon, t('family.devices'), { pill: devicesText(fam?.devices, fam?.deviceLimit ?? family.deviceLimit) }),
-    row('invite', userPlusIcon, t('family.invite')),
-    // One row for both ways: buy a seat (with payments on) or type an extra-seat code.
-    row('slot', plusIcon, t('family.slot'), { pill: payments ? t('family.slotPrice') : '' }),
     row('kit', keyIcon, t('family.kit')),
     leaveRow(),
   ].join('')
+}
+
+/**
+ * Actions under the devices list: invite while a seat is free, and always a way to add one
+ * (buy it with payments on, or type an extra-seat code).
+ * @param {{devices: unknown[], deviceLimit: number}} fam @param {boolean} payments
+ * @returns {string}
+ */
+export function devicesActions(fam, payments) {
+  const free = fam.devices.length < Number(fam.deviceLimit)
+  return `<div class="famDevActions">${free ? `<button type="button" data-invite>${t('family.invite')}</button>` : `<p class="plain">${t('family.devices.full')}</p>`}` +
+    `<button type="button" class="${free ? 'cancel' : ''}" data-slot>${t('family.slot')}${payments ? ` · ${t('family.slotPrice')}` : ''}</button></div>`
 }

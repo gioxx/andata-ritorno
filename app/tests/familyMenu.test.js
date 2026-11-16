@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { familyMenuHtml, familyError, devicesText, FAMILY_ERROR_CODES } from '../src/ui/familyMenu.js'
+import { familyMenuHtml, familyError, devicesText, devicesActions, FAMILY_ERROR_CODES } from '../src/ui/familyMenu.js'
 import { qrSvg } from '../src/ui/familyDialogs.js'
 import { setLang } from '../src/i18n.js'
 import it_ from '../src/i18n/it.js'
@@ -33,24 +33,32 @@ describe('familyMenuHtml', () => {
     expect(acts(familyMenuHtml({ family: { ...family, pending: { op: 'redeem', body: {} } }, payments: false }))[0]).toBe('unlock')
   })
 
-  it('active: name, last sync, devices count, slot price only with payments', () => {
+  it('active: name (clipped to one line), last sync, devices count; invite and seats live in the devices dialog', () => {
     const info = { state: 'idle', lastSyncAt: '2026-10-25T11:55:00Z', family: { name: 'Famiglia Rossi', deviceLimit: 4, devices: [{ id: 'a' }, { id: 'b' }] } }
     const on = familyMenuHtml({ family, info, payments: true, now: NOW })
-    expect(acts(on)).toEqual(['sync', 'devices', 'invite', 'slot', 'kit', 'leave'])
-    expect(on).toContain('Famiglia Rossi')
+    expect(acts(on)).toEqual(['sync', 'devices', 'kit', 'leave'])
+    expect(on).toContain('<span class="clip">Famiglia Rossi</span>')
     expect(on).toContain('Sincronizzata: 5 min fa')
     expect(on).toContain('2 / 4')
-    expect(on).toContain('1,99 €')
-    expect(familyMenuHtml({ family, info, payments: false, now: NOW })).not.toContain('1,99')
-    expect(acts(familyMenuHtml({ family, info, payments: false, now: NOW }))).toContain('slot') // manual seat codes always work
   })
 
-  it('a code row only when locked; when active, one "add a seat" row takes the extra-seat code', () => {
+  it('devices dialog: invite while a seat is free, add a seat always, price only with payments', () => {
+    const free = { deviceLimit: 4, devices: [{}, {}] }
+    const full = { deviceLimit: 2, devices: [{}, {}] }
+    expect(devicesActions(free, false)).toContain('data-invite')
+    expect(devicesActions(free, false)).toContain('Aggiungi un posto')
+    expect(devicesActions(free, false)).not.toContain('1,99')
+    expect(devicesActions(free, true)).toContain('1,99 €')
+    expect(devicesActions(full, false)).not.toContain('data-invite')
+    expect(devicesActions(full, false)).toContain('data-slot')
+    expect(devicesActions(full, false)).toContain('Tutti i posti sono occupati')
+  })
+
+  it('a code row only when locked', () => {
     const row = (html, act) => new DOMParser().parseFromString(html, 'text/html').querySelector(`[data-menu="${act}"]`)?.textContent
     const info = { state: 'idle', lastSyncAt: null, family: { name: 'F', deviceLimit: 4, devices: [] } }
     expect(row(familyMenuHtml({ family: null, payments: false }), 'code')).toBe('Ho già un codice')
     expect(row(familyMenuHtml({ family, info, payments: false, now: NOW }), 'code')).toBeUndefined()
-    expect(row(familyMenuHtml({ family, info, payments: false, now: NOW }), 'slot')).toBe('Aggiungi un posto')
     setLang('en')
     expect(row(familyMenuHtml({ family: null, payments: false }), 'code')).toBe('I already have a code')
   })

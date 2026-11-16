@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { platformOf, installSteps } from '../src/platform.js'
+import { platformOf, installSteps, externalTarget } from '../src/platform.js'
 import { renderWelcome } from '../src/ui/welcome.js'
 import { t, setLang } from '../src/i18n.js'
 import { shouldShowIosBanner, dismissIosBanner, initIosBanner } from '../src/ui/iosBanner.js'
@@ -119,5 +119,17 @@ describe('banner dismissal redraws the welcome screen', () => {
     document.querySelector('.ios-ok').click()
     expect(root.querySelector('.install').textContent).toMatch(/Condividi/)
     expect(root.querySelector('#firstTab').value).toBe('Nido')
+  })
+})
+
+describe('externalTarget', () => {
+  const privacy = 'https://ar.gxware.org/privacy.html?lang=en'
+  it('installed Android app: a Chrome tab, with the plain URL as fallback', () => {
+    expect(externalTarget(privacy, { platform: 'android', standalone: true })).toEqual({
+      url: `intent://ar.gxware.org/privacy.html?lang=en#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(privacy)};end`, intent: true })
+  })
+  it('in the browser and on other platforms: the plain URL', () => {
+    expect(externalTarget(privacy, { platform: 'android', standalone: false })).toEqual({ url: privacy, intent: false })
+    expect(externalTarget(privacy, { platform: 'ios', standalone: true })).toEqual({ url: privacy, intent: false })
   })
 })

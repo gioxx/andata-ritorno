@@ -2,6 +2,7 @@
 // shown and answered: "OK" keeps them on, "Turn off" turns them off; the menu can change it later.
 import { t, getLang, onLangChange } from '../i18n.js'
 import { statsOn, setStatsOn, noticeSeen, markNoticeSeen } from '../stats.js'
+import { PRIVACY_URL } from '../legal.js'
 
 /**
  * @param {{ shouldShow: () => Promise<boolean>|boolean, onAnswered: () => void }} a
@@ -14,7 +15,7 @@ export function initStatsNotice({ shouldShow, onAnswered }) {
   el.hidden = true
   const draw = () => {
     el.setAttribute('aria-label', t('stats.stripLabel'))
-    el.innerHTML = `<p>${t('stats.strip')} <a href="/privacy.html#${getLang() === 'it' ? 'it' : 'en'}-stats" target="_blank" rel="noopener">${t('stats.more')}</a></p>
+    el.innerHTML = `<p>${t('stats.strip')} <a href="${PRIVACY_URL}#${getLang() === 'it' ? 'it' : 'en'}-stats" target="_blank" rel="noopener">${t('stats.more')}</a></p>
       <button type="button" class="strip-off">${t('stats.off')}</button>
       <button type="button" class="strip-go">${t('stats.ok')}</button>`
   }

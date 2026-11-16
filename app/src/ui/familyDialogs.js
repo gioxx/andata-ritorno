@@ -4,7 +4,10 @@ import { renderSVG } from 'uqr'
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { openModal, reportError, labelDialog } from './dialogs.js'
-import { familyError } from './familyMenu.js'
+import { familyError, devicesActions } from './familyMenu.js'
+import { PRIVACY_URL, TERMS_URL } from '../legal.js'
+
+const payments = import.meta.env.VITE_PAYMENTS === '1'
 import { ago, enableSyncLine } from './syncLine.js'
 import { scanButton, scanQr } from './scan.js'
 import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
@@ -136,7 +139,7 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
     <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
     ${inFamily ? '' : `<input type="text" id="famName" aria-label="${t('family.code.name')}" placeholder="${esc(t('family.code.nameHint'))}" maxlength="60" autocomplete="off">
     <input type="text" id="famDevice" aria-label="${t('family.code.device')}" placeholder="${esc(t('family.code.deviceHint'))}" maxlength="40" autocomplete="off">`}
-    <p class="plain"><a href="/privacy.html" target="_blank" rel="noopener">${t('privacy.link')}</a> · <a href="/terms.html" target="_blank" rel="noopener">${t('terms.link')}</a></p>
+    <p class="plain"><a href="${PRIVACY_URL}" target="_blank" rel="noopener">${t('privacy.link')}</a> · <a href="${TERMS_URL}" target="_blank" rel="noopener">${t('terms.link')}</a></p>
     <p class="plain err" role="alert"></p>
     <button type="button" class="primary" data-go>${t(inFamily ? 'family.slotCode.go' : 'family.code.go')}</button>
     <button value="" class="cancel">${t('common.cancel')}</button></form>`)
@@ -183,8 +186,8 @@ const devicesBody = () => {
     return `<p class="plain">${familyError(syncStatus.errorCode ?? 'offline')}</p><button type="button" data-retry>${t('family.retry')}</button>`
   }
   const now = new Date()
-  return `<ul class="famDevices">${fam.devices.map((v) => `<li><span class="txt"><b>${esc(v.name || t('family.devices.unnamed'))}</b>${v.isThis ? ` <span class="tag">${t('family.devices.this')}</span>` : ''}<small>${esc(t('family.devices.lastSeen', { ago: ago(v.lastSeenAt, now) }))}</small></span>${
-    v.isThis ? '' : `<button type="button" class="danger" data-remove="${esc(v.id)}">${t('family.devices.remove')}</button>`}</li>`).join('')}</ul>`
+  return `<ul class="famDevices">${fam.devices.map((v) => `<li><span class="txt"><span class="name"><b>${esc(v.name || t('family.devices.unnamed'))}</b>${v.isThis ? `<span class="tag">${t('family.devices.this')}</span>` : ''}</span><small>${esc(t('family.devices.lastSeen', { ago: ago(v.lastSeenAt, now) }))}</small></span>${
+    v.isThis ? '' : `<button type="button" class="danger" data-remove="${esc(v.id)}">${t('family.devices.remove')}</button>`}</li>`).join('')}</ul>${devicesActions(fam, payments)}`
 }
 
 export function openDevices() {
@@ -199,6 +202,8 @@ export function openDevices() {
   syncNow('menu')
   body.addEventListener('click', (e) => {
     if (e.target.closest('[data-retry]')) { syncNow('menu'); return }
+    if (e.target.closest('[data-invite]')) { d.close(); openInvite().catch(reportError); return }
+    if (e.target.closest('[data-slot]')) { d.close(); openCodeDialog({ buyLink: payments ? import.meta.env.VITE_STRIPE_LINK_SLOT : null }).catch(reportError); return }
     const id = e.target.closest('[data-remove]')?.dataset.remove
     const dev = syncStatus.family?.devices.find((v) => v.id === id)
     if (dev) confirmRemove(d, dev)

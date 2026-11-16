@@ -23,7 +23,7 @@ describe('/unlock page', () => {
   it('links the privacy policy in a new tab', async () => {
     const api = { unlockSession: vi.fn(async () => ({ code: 'AR-ABCD-EFGH-JK12', kind: 'family' })) }
     await renderUnlockPage(root, { api, sessionId: 'cs_test_1', inSafari: false })
-    const a = root.querySelector('a[href="/privacy.html"]')
+    const a = root.querySelector('a[href="https://ar.gxware.org/privacy.html"]')
     expect(a.textContent).toBe('Informativa sulla privacy')
     expect(a.rel).toContain('noopener')
   })
