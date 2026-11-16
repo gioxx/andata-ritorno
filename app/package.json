@@ -2,12 +2,11 @@
   "name": "andata-ritorno-app",
   "private": true,
   "license": "AGPL-3.0-only",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:test": "vite build --mode staging",
     "preview": "vite preview",
     "test": "vitest run"
   },
