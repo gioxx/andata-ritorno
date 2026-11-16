@@ -10,7 +10,7 @@ import { keepFocus } from './focus.js'
 import { withBusy, importFile, pickImportFile } from './importFlow.js'
 import { getTheme, setTheme } from '../theme.js'
 import { t, getLang, getLangChoice, setLang, onLangChange } from '../i18n.js'
-import { currentPlatform, isStandalone } from '../platform.js'
+import { currentPlatform, isStandalone, openExternal } from '../platform.js'
 import { canPromptInstall, promptInstall } from '../install.js'
 import { openInstallSteps, openUninstallSteps } from './appDialogs.js'
 import { openWipeFlow } from './wipeFlow.js'
@@ -18,7 +18,7 @@ import { menuFooter } from './about.js'
 import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
-import { familyHooks, openCodeDialog, openDevices, openInvite, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
+import { familyHooks, openCodeDialog, openDevices, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon, statsIcon, closeIcon } from './icons.js'
 import { statsOn, setStatsOn, markNoticeSeen } from '../stats.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
@@ -76,6 +76,8 @@ async function refresh() {
   const family = await getFamily(db)
   // In an active family the server keeps an encrypted copy: no backup reminders (export stays).
   const synced = !!family && !family.pending && !family.removed && syncStatus.state !== 'removed'
+  // The cloud copy makes the local backup secondary: start that section folded (it can be reopened).
+  dlg.querySelector('#backupSection').open = !synced
   dlg.querySelector('#backupInfo').textContent = backupInfoLine(store.items.length, last, synced)
   dlg.querySelector('#persistInfo').textContent = ''
   // Backups made in a family carry its recovery kit (backup.json is plain text).
@@ -100,10 +102,11 @@ async function openMenu() {
 const menuHtml = () => `<h3>${t('menu.title')} <button type="button" class="close" data-menu="close" aria-label="${t('common.close')}">${closeIcon}</button></h3>
     <h4>${t('menu.family')}</h4>
     <div id="familySection"></div>
-    <h4>${t('menu.backup')}</h4>
+    <details id="backupSection" open><summary><h4>${t('menu.backup')}</h4></summary>
     <div class="info"><span id="backupInfo"></span><br><span id="persistInfo"></span><span id="kitInfo" class="kitInfo"></span></div>
     ${menuItem('export', downloadIcon, t('menu.export'))}
     ${menuItem('import', uploadIcon, t('menu.import'))}
+    </details>
     <h4>${t('menu.tabsSection')}</h4>
     ${menuItem('tabs', layersIcon, t('menu.manageTabs'))}
     ${menuItem('categories', tagsIcon, t('menu.manageCategories'))}
@@ -145,10 +148,10 @@ function build() {
     const item = e.target.closest('[data-menu]')
     if (!item) return
     dlg.close()
-    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => window.open(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/', '_blank', 'noopener'), privacy: () => window.open('/privacy.html', '_blank', 'noopener'), wipe: () => openWipeFlow({ db, onExport: () => runExport(), leave: leaveBeforeWipe }),
+    const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => openExternal(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/'), privacy: () => openExternal(new URL('/privacy.html', location.href).href), wipe: () => openWipeFlow({ db, onExport: () => runExport(), leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
-      invite: openInvite, slot: () => openCodeDialog({ buyLink: payments ? import.meta.env.VITE_STRIPE_LINK_SLOT : null }), kit: () => openKit(), leave: openLeave }[item.dataset.menu]
+      kit: () => openKit(), leave: openLeave }[item.dataset.menu]
     Promise.resolve(run()).catch(reportError)
   })
   // Swipe right on the drawer to close it.

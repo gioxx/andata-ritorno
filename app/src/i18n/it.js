@@ -171,7 +171,7 @@ export default {
   'viewer.pending': 'Rotazione in sospeso: Salva o Annulla',
 
   'menu.title': 'Menu',
-  'menu.backup': 'Backup',
+  'menu.backup': 'Backup locale',
   'menu.export': 'Esporta backup',
   'menu.import': 'Importa backup',
   'menu.tabsSection': 'Schede',
@@ -348,6 +348,7 @@ export default {
   'family.slotCode.go': 'Aggiungi',
   'family.slotCode.done': 'Fatto: la famiglia può avere fino a {n} telefoni.',
   'family.devices.title': 'Dispositivi',
+  'family.devices.full': 'Tutti i posti sono occupati: aggiungine uno per invitare un altro telefono.',
   'family.devices.this': 'questo',
   'family.devices.unnamed': 'Telefono senza nome',
   'family.devices.lastSeen': 'Visto {ago}',

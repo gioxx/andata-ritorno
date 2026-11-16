@@ -37,3 +37,26 @@ export const currentPlatform = () => platformOf({ ua: navigator.userAgent, maxTo
 
 export const isStandalone = () =>
   (window.matchMedia?.('(display-mode: standalone)').matches ?? false) || navigator.standalone === true
+
+/**
+ * Where to send a link meant for the browser. In an app installed from Chrome on Android, a
+ * plain new window stays inside the app (same origin) or in an overlay with no way back to it:
+ * an intent: URL aimed at Chrome opens a real browser tab, and the app stays where it was.
+ * Elsewhere (and when Chrome is missing, via the fallback) the plain URL is used.
+ * @param {string} url absolute https URL
+ * @param {{platform: string, standalone: boolean}} env
+ * @returns {{url: string, intent: boolean}}
+ */
+export function externalTarget(url, { platform, standalone }) {
+  if (platform !== 'android' || !standalone || !url.startsWith('https://')) return { url, intent: false }
+  const u = new URL(url)
+  const fallback = encodeURIComponent(url)
+  return { url: `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${fallback};end`, intent: true }
+}
+
+/** Open a page in the browser, outside the installed app when there is one. */
+export function openExternal(url) {
+  const target = externalTarget(url, { platform: currentPlatform(), standalone: isStandalone() })
+  if (target.intent) location.href = target.url
+  else window.open(target.url, '_blank', 'noopener')
+}

@@ -170,7 +170,7 @@ export default {
   'viewer.pending': 'Rotation pending: Save or Cancel',
 
   'menu.title': 'Menu',
-  'menu.backup': 'Backup',
+  'menu.backup': 'Local backup',
   'menu.export': 'Export backup',
   'menu.import': 'Import backup',
   'menu.tabsSection': 'Tabs',
@@ -347,6 +347,7 @@ export default {
   'family.slotCode.go': 'Add',
   'family.slotCode.done': 'Done: the family can have up to {n} phones.',
   'family.devices.title': 'Devices',
+  'family.devices.full': 'Every seat is taken: add one to invite another phone.',
   'family.devices.this': 'this one',
   'family.devices.unnamed': 'Unnamed phone',
   'family.devices.lastSeen': 'Seen {ago}',

@@ -182,6 +182,10 @@ dialog .edit-preview[hidden] { display: none; }
 #menu h3 .close { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 4px; background: none; color: var(--muted); }
 #menu .info { font-size: 0.8125rem; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
 #menu h4 { margin: 14px 0 8px; text-align: left; font-size: 0.875rem; }
+#menu details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+#menu details > summary::-webkit-details-marker { display: none; }
+#menu details > summary::after { content: ''; width: 7px; height: 7px; margin: 6px 4px 0 0; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform 0.15s; }
+#menu details[open] > summary::after { transform: rotate(-135deg); margin-top: 10px; }
 #menu h3 + h4 { margin-top: 4px; }
 #menu .menuItem { flex: none; min-height: 44px; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px; margin-bottom: 8px; border-radius: 14px; background: var(--chip); font-size: 0.9375rem; font-weight: 600; }
 #menu .menuItem .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--holder); color: var(--accent); }
@@ -189,7 +193,8 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .menuItem[hidden] { display: none; }
 #menu .menuItem .txt { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 #menu .menuItem .txt small { font-size: 0.75rem; font-weight: 400; color: var(--muted); }
-#menu .menuItem .badge { white-space: nowrap; }
+#menu .menuItem .badge { white-space: nowrap; flex: none; }
+#menu .menuItem .txt .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #menu .menuItem.danger { color: var(--danger); }
 #menu .menuItem.danger .ic { color: var(--danger); }
 .seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); }
@@ -313,8 +318,11 @@ dialog .famDevices { list-style: none; margin: 0 0 8px; padding: 0; }
 dialog .famDevices li { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
 dialog .famDevices .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 dialog .famDevices small { color: var(--muted); font-size: 0.75rem; }
-dialog .famDevices .tag { font-size: 0.6875rem; padding: 1px 8px; border-radius: var(--r-pill); background: var(--chip); }
+dialog .famDevices .name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+dialog .famDevices .name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dialog .famDevices .tag { flex: none; font-size: 0.6875rem; font-weight: 600; line-height: 1.5; padding: 0 8px; border-radius: var(--r-pill); background: var(--chip); }
 dialog .famDevices button.danger { width: auto; padding: 8px 12px; }
+dialog .famDevActions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 dialog button.primary { display: block; width: 100%; margin-top: 8px; }
 dialog .row > button.primary { width: auto; margin-top: 0; }
 dialog button[data-go] + p.plain { margin-top: 16px; }
