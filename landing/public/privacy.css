@@ -1,4 +1,4 @@
-/* Standalone stylesheet for privacy.html and terms.html (the CSP allows no inline <style>). Same tokens as the app's styles.css. */
+/* Standalone stylesheet for legal/privacy.html and legal/terms.html (the CSP allows no inline <style>). Same tokens as the app's styles.css. */
 :root {
   color-scheme: light;
   --bg: #fbf7f1; --fg: #2b2620; --muted: #6a6052; --chip: #efe7db; --tile: #fff;

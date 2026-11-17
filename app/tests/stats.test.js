@@ -149,7 +149,7 @@ describe('one-time notice', () => {
     await check()
     const strip = document.querySelector('.stats-strip')
     expect(strip.hidden).toBe(false)
-    expect(strip.querySelector('a').getAttribute('href')).toMatch(/privacy\.html#(it|en)-stats$/)
+    expect(strip.querySelector('a').getAttribute('href')).toMatch(/^https:\/\/ar\.gxware\.org\/legal\/privacy#(it|en)-stats$/)
     strip.querySelector('.strip-off').click()
     expect(strip.hidden).toBe(true)
     expect(noticeSeen()).toBe(true)

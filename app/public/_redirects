@@ -1,6 +1,7 @@
 # Privacy policy and terms live on the landing site: outside the installed app, a phone opens them
-# in a browser tab with a way back to the app.
-/privacy.html https://ar.gxware.org/privacy.html 301
-/privacy https://ar.gxware.org/privacy.html 301
-/terms.html https://ar.gxware.org/terms.html 301
-/terms https://ar.gxware.org/terms.html 301
+# in a browser tab with a way back to the app. Temporary (302) on purpose: browsers keep a 301
+# forever, and an old 301 between these two sites once sent phones round in a loop.
+/privacy.html https://ar.gxware.org/legal/privacy 302
+/privacy https://ar.gxware.org/legal/privacy 302
+/terms.html https://ar.gxware.org/legal/terms 302
+/terms https://ar.gxware.org/legal/terms 302
