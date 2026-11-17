@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const html = readFileSync(new URL('../../landing/public/privacy.html', import.meta.url), 'utf8')
+const html = readFileSync(new URL('../../landing/public/legal/privacy.html', import.meta.url), 'utf8')
 const headers = readFileSync(new URL('../../landing/public/_headers', import.meta.url), 'utf8')
 
 describe('privacy.html', () => {
@@ -37,8 +37,13 @@ describe('privacy.html', () => {
 describe('legal pages on the landing site', () => {
   const appRedirects = readFileSync(new URL('../public/_redirects', import.meta.url), 'utf8')
   const landingRedirects = readFileSync(new URL('../../landing/public/_redirects', import.meta.url), 'utf8')
-  it('the app sends its old addresses to the landing, and the landing no longer sends them back', () => {
-    for (const p of ['/privacy.html', '/privacy', '/terms.html', '/terms']) expect(appRedirects).toMatch(new RegExp(`^${p.replace('.', '\\.')} https://ar\\.gxware\\.org/`, 'm'))
-    expect(landingRedirects).not.toMatch(/privacy|terms/)
+  it('old addresses on both sites lead to /legal/ on the landing, with temporary redirects', () => {
+    // 302, never 301: browsers keep a 301 forever, and an old one between the two sites made a loop.
+    for (const p of ['/privacy.html', '/privacy', '/terms.html', '/terms']) {
+      const page = p.startsWith('/privacy') ? 'privacy' : 'terms'
+      expect(appRedirects).toContain(`\n${p} https://ar.gxware.org/legal/${page} 302\n`)
+      expect(landingRedirects).toContain(`\n${p} /legal/${page} 302\n`)
+    }
+    expect(appRedirects + landingRedirects).not.toMatch(/(privacy|terms)\S* 301/)
   })
 })

@@ -4,3 +4,9 @@
 /licence https://app.ar.gxware.org/licence 302
 /admin https://app.ar.gxware.org/admin/ 302
 /admin/ https://app.ar.gxware.org/admin/ 302
+# Privacy policy and terms live under /legal/. Their old addresses here once sent visitors to the app
+# with a 301 that browsers may still remember, so the pages moved to a fresh address (302 from here).
+/privacy.html /legal/privacy 302
+/privacy /legal/privacy 302
+/terms.html /legal/terms 302
+/terms /legal/terms 302

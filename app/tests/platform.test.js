@@ -123,10 +123,10 @@ describe('banner dismissal redraws the welcome screen', () => {
 })
 
 describe('externalTarget', () => {
-  const privacy = 'https://ar.gxware.org/privacy.html?lang=en'
+  const privacy = 'https://ar.gxware.org/legal/privacy?lang=en'
   it('installed Android app: a Chrome tab, with the plain URL as fallback', () => {
     expect(externalTarget(privacy, { platform: 'android', standalone: true })).toEqual({
-      url: `intent://ar.gxware.org/privacy.html?lang=en#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(privacy)};end`, intent: true })
+      url: `intent://ar.gxware.org/legal/privacy?lang=en#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(privacy)};end`, intent: true })
   })
   it('in the browser and on other platforms: the plain URL', () => {
     expect(externalTarget(privacy, { platform: 'android', standalone: false })).toEqual({ url: privacy, intent: false })
