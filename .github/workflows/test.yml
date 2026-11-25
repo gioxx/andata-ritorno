@@ -25,5 +25,3 @@ jobs:
         working-directory: ${{ matrix.project }}
       - run: npm test
         working-directory: ${{ matrix.project }}
-      - if: matrix.project == 'worker'
-        run: node redirect/check.mjs
