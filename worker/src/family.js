@@ -1,5 +1,5 @@
 import { HttpError, json, readJson, strictLimit } from './http.js';
-import { randomToken, requireActiveDevice, requireApiDevice, sha256Hex } from './auth.js';
+import { isExpired, randomToken, requireActiveDevice, requireApiDevice, sha256Hex } from './auth.js';
 import { OP_UNITS, deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen, spendNow } from './store.js';
 import { ENC, ID, isSecret } from './validate.js';
 
@@ -14,6 +14,13 @@ const replaySince = () => new Date(Date.now() - REPLAY_MS).toISOString();
 // SQL fragments over a family `f` joined to its licence `l`.
 const LIMIT = 'l.base_limit + l.extra_slots';
 const USED = '(SELECT COUNT(*) FROM devices d WHERE d.family_id = f.id)';
+// The licence is lifetime or still running at ?: an invite made just before the end cannot bring
+// in a phone that could not sync anyway.
+const ACTIVE = '(l.expires_at IS NULL OR l.expires_at > ?)';
+
+function licenceExpired(expiresAt) {
+  throw new HttpError(402, 'licence-expired', { expiresAt });
+}
 
 const nowIso = () => new Date().toISOString();
 
@@ -88,12 +95,13 @@ async function inviteInfo(req, env) {
   const t = new URL(req.url).searchParams.get('t');
   if (!isSecret(t)) inviteExpired();
   const row = await env.DB.prepare(
-    `SELECT f.name_enc, ${USED} AS used, ${LIMIT} AS lim FROM invites i JOIN families f ON f.id = i.family_id JOIN licences l ON l.id = f.licence_id
+    `SELECT f.name_enc, ${USED} AS used, ${LIMIT} AS lim, l.expires_at FROM invites i JOIN families f ON f.id = i.family_id JOIN licences l ON l.id = f.licence_id
      WHERE i.hash = ? AND i.used_at IS NULL AND i.expires_at > ?`,
   )
     .bind(await sha256Hex(t), nowIso())
     .first();
   if (!row) inviteExpired();
+  if (isExpired(row.expires_at)) licenceExpired(row.expires_at);
   return json({ familyNameEnc: row.name_enc, used: row.used, limit: row.lim });
 }
 
@@ -119,14 +127,16 @@ async function join(req, env) {
     env.DB.prepare(
       `INSERT INTO devices (id, family_id, token_hash, name_enc, created_at, last_seen_at)
        SELECT ?, f.id, ?, ?, ?, ? FROM invites i JOIN families f ON f.id = i.family_id JOIN licences l ON l.id = f.licence_id
-       WHERE i.hash = ? AND i.used_at IS NULL AND i.expires_at > ? AND ${USED} < ${LIMIT}`,
-    ).bind(deviceId, tokenHash, deviceNameEnc, at, at, hash, at),
+       WHERE i.hash = ? AND i.used_at IS NULL AND i.expires_at > ? AND ${USED} < ${LIMIT} AND ${ACTIVE}`,
+    ).bind(deviceId, tokenHash, deviceNameEnc, at, at, hash, at, at),
     env.DB.prepare('UPDATE invites SET used_at = ? WHERE hash = ? AND EXISTS (SELECT 1 FROM devices WHERE token_hash = ?)').bind(at, hash, tokenHash),
   ]);
   if (results[0].meta.changes !== 1) {
     const latest = await env.DB.prepare('SELECT family_id, expires_at, used_at FROM invites WHERE hash = ?').bind(hash).first();
     if (latest?.used_at) return replayJoin(env, latest, deviceId);
     if (!latest || latest.expires_at <= at) inviteExpired();
+    const lic = await env.DB.prepare('SELECT l.expires_at FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?').bind(latest.family_id).first();
+    if (isExpired(lic?.expires_at)) licenceExpired(lic.expires_at);
     throw new HttpError(409, 'family-full');
   }
   return json({ token, deviceLimit: await deviceLimit(env, await licenceOf(env, inv.family_id)) });
