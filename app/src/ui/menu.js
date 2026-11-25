@@ -19,7 +19,7 @@ import { menuFooter } from './about.js'
 import { getFamily } from '../sync/family.js'
 import { syncStatus, syncNow, subscribeSync, isProgressOnly } from '../sync/engine.js'
 import { familyMenuHtml } from './familyMenu.js'
-import { familyHooks, openCodeDialog, openDevices, openKit, openLeave, leaveBeforeWipe } from './familyDialogs.js'
+import { familyHooks, openCodeDialog, openDevices, openKit, openLeave, openRenew, leaveBeforeWipe } from './familyDialogs.js'
 import { downloadIcon, uploadIcon, layersIcon, tagsIcon, todoIcon, monitorIcon, sunIcon, moonIcon, smartphoneIcon, uninstallIcon, eraseIcon, shieldIcon, guideIcon, statsIcon, closeIcon } from './icons.js'
 import { statsOn, setStatsOn, markNoticeSeen } from '../stats.js'
 import { backupInfoLine, persistLine, removeTodo, failureRow, exportErrorMessage } from './model.js'
@@ -152,7 +152,7 @@ function build() {
     const run = { close: () => {}, export: () => runExport(), import: () => pickImportFile(db), tabs: () => openTabManager(), categories: openCategoryManager, todo: openTodo, install: runInstall, uninstall: () => openUninstallSteps(), guide: () => openExternal(getLang() === 'it' ? 'https://ar.gxware.org/guida/' : 'https://ar.gxware.org/en/guide/'), privacy: () => openExternal(`${PRIVACY_URL}?lang=${getLang() === 'it' ? 'it' : 'en'}`), wipe: () => openWipeFlow({ db, onExport: () => runExport(), leave: leaveBeforeWipe }),
       unlock: () => openPayment(import.meta.env.VITE_STRIPE_LINK_FAMILY), code: openCodeDialog, 'invite-have': () => familyHooks.onJoinInvite(),
       restore: () => familyHooks.onRestore(), licence: () => familyHooks.onLicence(), sync: () => syncNow('menu'), devices: openDevices,
-      kit: () => openKit(), leave: openLeave }[item.dataset.menu]
+      kit: () => openKit(), renew: () => openRenew(), leave: openLeave }[item.dataset.menu]
     Promise.resolve(run()).catch(reportError)
   })
   // Swipe right on the drawer to close it.

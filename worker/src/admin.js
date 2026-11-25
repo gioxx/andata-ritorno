@@ -65,7 +65,9 @@ export async function requireAdmin(env, req, fetchFn = fetch) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RANGES = [7, 30, 90, 365];
 // List prices, for an estimate of gross sales (Stripe, as merchant of record, keeps its share).
-const PRICE_EUR = { family: 4.99, slot: 1.99 };
+// Promotion codes lower the real amount: the estimate is at list price. year = yearly family code,
+// lifetime = family codes sold before yearly licences.
+const PRICE_EUR = { year: 6.99, lifetime: 4.99, slot: 1.99 };
 
 /**
  * Dashboard numbers for the last `days` (7, 30, 90 or 365) and the period before it, bucketed by
@@ -98,7 +100,12 @@ async function stats(req, env) {
          FROM devices`,
         from, prevFrom, iso(now - DAY_MS), iso(now - 7 * DAY_MS), iso(now - 30 * DAY_MS),
       ),
-      one('SELECT COUNT(*) AS total, SUM(family_id IS NOT NULL) AS inUse, COALESCE(SUM(extra_slots), 0) AS extraSlots FROM licences'),
+      one(
+        `SELECT COUNT(*) AS total, SUM(family_id IS NOT NULL) AS inUse, COALESCE(SUM(extra_slots), 0) AS extraSlots,
+           SUM(expires_at IS NULL) AS lifetime, SUM(expires_at > ?1) AS yearlyActive, SUM(expires_at <= ?1) AS expired
+         FROM licences`,
+        iso(now),
+      ),
       one(
         `SELECT kind, source, COUNT(*) AS issued, SUM(redeemed_at IS NOT NULL) AS redeemed,
            SUM(created_at >= ?1) AS inRange, SUM(created_at >= ?2 AND created_at < ?1) AS prevRange
@@ -113,7 +120,7 @@ async function stats(req, env) {
         from, bucket,
       ),
       one(
-        `SELECT substr(created_at, 1, 7) AS month, SUM(kind = 'family') AS family, SUM(kind = 'slot') AS slot
+        `SELECT substr(created_at, 1, 7) AS month, SUM(kind = 'family') AS family, SUM(kind = 'family' AND term IS NULL) AS lifetime, SUM(kind = 'slot') AS slot
          FROM codes WHERE source = 'stripe' GROUP BY month ORDER BY month DESC LIMIT 12`,
       ),
       // One row per family: phones, records, photo bytes. Only the histograms below leave the Worker.
@@ -142,7 +149,7 @@ async function stats(req, env) {
   const cap = Number(env.MAX_TOTAL_PHOTO_BYTES);
   const hist = (values, edges) => edges.map(([label, lo, hi]) => ({ label, n: values.filter((v) => v >= lo && v < hi).length }));
   const fams = perFamily.results;
-  const sold = (r) => r.family * PRICE_EUR.family + r.slot * PRICE_EUR.slot;
+  const sold = (r) => (r.family - r.lifetime) * PRICE_EUR.year + r.lifetime * PRICE_EUR.lifetime + r.slot * PRICE_EUR.slot;
   return json({
     at: iso(now),
     days,

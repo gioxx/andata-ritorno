@@ -1,5 +1,5 @@
 import { HttpError, json, limited, readJson } from './http.js';
-import { requireApiDevice } from './auth.js';
+import { requireActiveDevice } from './auth.js';
 import { PULL_UNITS, hasBudget, spendDaily, spendNow } from './store.js';
 import { ID } from './validate.js';
 
@@ -13,7 +13,7 @@ const MAX_FAMILY_DATA = 30 * 1024 * 1024;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 
 async function pull(req, env) {
-  const { familyId, deviceId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireActiveDevice(env, req);
   const raw = new URL(req.url).searchParams.get('since') ?? '0';
   const since = Number(raw);
   if (!/^\d+$/.test(raw) || !Number.isSafeInteger(since)) throw new HttpError(400, 'bad-request');
@@ -32,7 +32,7 @@ async function pull(req, env) {
 }
 
 async function push(req, env) {
-  const { familyId, deviceId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireActiveDevice(env, req);
   const body = await readJson(req, MAX_PUSH * (MAX_DATA + 128));
   const records = body?.records;
   if (!Array.isArray(records)) throw new HttpError(400, 'bad-request');

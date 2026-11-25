@@ -1,5 +1,5 @@
 import { HttpError, json, readJson, strictLimit } from './http.js';
-import { randomToken, requireApiDevice, sha256Hex } from './auth.js';
+import { randomToken, requireActiveDevice, requireApiDevice, sha256Hex } from './auth.js';
 import { OP_UNITS, deviceLimit, purgePhotos, purgeStatements, requireRegistrationsOpen, spendNow } from './store.js';
 import { ENC, ID, isSecret } from './validate.js';
 
@@ -47,15 +47,16 @@ function rotateToken(env, familyId, deviceId, tokenHash, at, guard = '1', guardA
 
 async function family(req, env) {
   const { deviceId, familyId } = await requireApiDevice(env, req);
-  const row = await env.DB.prepare(`SELECT f.name_enc, ${LIMIT} AS lim FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
+  const row = await env.DB.prepare(`SELECT f.name_enc, ${LIMIT} AS lim, l.expires_at FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
     .bind(familyId)
     .first();
   if (!row) throw new HttpError(401, 'unauthorized'); // the family was purged meanwhile
-  return json({ familyId, familyNameEnc: row.name_enc, deviceLimit: row.lim, you: deviceId, devices: await devicesOf(env, familyId) });
+  // expiresAt: end of a yearly licence, null for a lifetime one.
+  return json({ familyId, familyNameEnc: row.name_enc, deviceLimit: row.lim, expiresAt: row.expires_at ?? null, you: deviceId, devices: await devicesOf(env, familyId) });
 }
 
 async function createInvite(req, env) {
-  const { familyId, deviceId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireActiveDevice(env, req);
   await spendNow(env.DB, deviceId, 2 * OP_UNITS, familyId); // a delete and an insert
   const row = await env.DB.prepare(`SELECT ${USED} AS used, ${LIMIT} AS lim FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?`)
     .bind(familyId)

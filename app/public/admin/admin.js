@@ -289,6 +289,7 @@ function render() {
     kpi(n(s.families.total), `famiglie · ${n(s.families.inRange)} nuove ${period}`, delta(s.families.inRange, s.families.prevRange)),
     kpi(n(s.devices.total), `telefoni · ${n(s.devices.inRange)} nuovi ${period}`, delta(s.devices.inRange, s.devices.prevRange)),
     kpi(n(s.devices.activeInRange), `telefoni attivi ${period}`),
+    kpi(n(s.licences.yearlyActive ?? 0), `licenze annuali attive · ${n(s.licences.lifetime ?? 0)} a vita · ${n(s.licences.expired ?? 0)} scadute`),
     kpi(n(sum(codes, 'inRange')), `codici emessi ${period}`, delta(sum(codes, 'inRange'), sum(codes, 'prevRange'))),
     kpi(eur.format(s.salesByMonth.reduce((a, m) => a + m.eur, 0)), 'vendite Stripe lorde, ultimi 12 mesi (stima a listino)'),
     kpi(gb(p.counted), `spazio foto · ${used.toFixed(1)}% del tetto`),

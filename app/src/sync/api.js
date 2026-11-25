@@ -84,6 +84,8 @@ export function createApi({ fetchFn = (...a) => fetch(...a), getToken = () => nu
     withToken: (token) => createApi({ fetchFn, base, getToken: () => token }),
     redeem: (body) => post('/api/redeem', body),
     slot: (code) => post('/api/slot', { code }, true),
+    /** @returns {Promise<{expiresAt: string|null}>} */
+    renew: (code) => post('/api/renew', { code }, true),
     unlockSession: (id) => call('GET', `/api/unlock/session?id=${q(id)}`),
     family: () => call('GET', '/api/family', authed),
     createInvite: () => call('POST', '/api/invites', authed),

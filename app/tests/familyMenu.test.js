@@ -16,17 +16,40 @@ const family = { familyId: 'f', deviceId: 'd', token: 'x', keyRaw: 'k', recovery
 const NOW = new Date('2026-10-25T12:00:00Z')
 
 describe('familyMenuHtml', () => {
-  it('locked: unlock, code, invite, restore, licence; price pill only with payments on', () => {
-    const on = familyMenuHtml({ family: null, payments: true })
+  it('locked: unlock, code, invite, restore, licence; price pill and offer only with payments on', () => {
+    const during = new Date('2026-12-01T12:00:00+01:00')
+    const on = familyMenuHtml({ family: null, payments: true, now: during })
     expect(acts(on)).toEqual(['unlock', 'code', 'invite-have', 'restore', 'licence'])
     expect(on).toContain('Condivisione famiglia')
     expect(on).toContain('Stesso guardaroba su più telefoni, cifrato')
-    expect(on).toContain('4,99 €')
-    expect(familyMenuHtml({ family: null, payments: true })).toContain('Prezzo per i primi utenti') // a real early price, no made-up crossed-out one
-    const off = familyMenuHtml({ family: null, payments: false })
-    expect(off).not.toContain('4,99')
-    expect(off).not.toContain('primi utenti')
+    expect(on).toContain('6,99 €/anno')
+    expect(on).toContain('Con il codice CALZINO il primo anno costa 4,99 € (fino al 7 dicembre 2026)')
+    // The offer line goes away by itself once it is over.
+    expect(familyMenuHtml({ family: null, payments: true, now: new Date('2026-12-08T00:00:00+01:00') })).not.toContain('CALZINO')
+    const off = familyMenuHtml({ family: null, payments: false, now: during })
+    expect(off).not.toContain('6,99')
+    expect(off).not.toContain('CALZINO')
     expect(off).not.toContain('badge')
+  })
+
+  it('renew row: only for a yearly licence, highlighted near and past the end', () => {
+    const now = new Date('2026-12-01T00:00:00Z')
+    const at = (expiresAt) => familyMenuHtml({ family: { ...family, expiresAt }, payments: false, now })
+    expect(acts(at(undefined))).not.toContain('renew') // not read from the server yet
+    expect(acts(at(null))).not.toContain('renew') // lifetime
+    const far = at('2027-11-30T00:00:00Z')
+    expect(acts(far)).toContain('renew')
+    expect(far).toContain('Attiva fino al 30 novembre 2027')
+    expect(far).not.toContain('attention')
+    const soon = at('2026-12-20T00:00:00Z')
+    expect(soon).toContain('In scadenza')
+    expect(soon).toContain('attention')
+    const gone = at('2026-11-20T00:00:00Z')
+    expect(gone).toContain('Scaduta il 20 novembre 2026')
+    expect(gone).toContain('>Scaduta<')
+    // The server's answer wins over the stored date.
+    const fresh = familyMenuHtml({ family: { ...family, expiresAt: '2026-11-20T00:00:00Z' }, info: { family: { name: 'F', deviceLimit: 4, expiresAt: null, devices: [] } }, payments: false, now })
+    expect(acts(fresh)).not.toContain('renew')
   })
 
   it('a redeem still waiting for its answer shows the locked rows', () => {

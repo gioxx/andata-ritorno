@@ -100,6 +100,30 @@ export async function purgePhotos(env, familyId) {
   }
 }
 
+// Days a family's server copy is kept after its yearly licence ended: renewing within them picks up
+// where it stopped. Then the copy is deleted like a family whose last phone left; the licence stays.
+export const EXPIRED_KEEP_DAYS = 90;
+const PURGES_PER_SWEEP = 20;
+
+/** Delete the server copy of families whose licence ended more than EXPIRED_KEEP_DAYS ago. */
+export async function purgeExpired(env, now = Date.now()) {
+  const before = new Date(now - EXPIRED_KEEP_DAYS * 864e5).toISOString();
+  const { results } = await env.DB.prepare('SELECT family_id, id FROM licences WHERE expires_at IS NOT NULL AND expires_at < ? AND family_id IS NOT NULL LIMIT ?')
+    .bind(before, PURGES_PER_SWEEP)
+    .all();
+  for (const { family_id: familyId, id } of results) {
+    // Guard: still expired when the batch runs (a renewal meanwhile wins). Not on licences.family_id,
+    // which the purge itself clears halfway through.
+    const guard = 'EXISTS (SELECT 1 FROM licences WHERE id = ? AND expires_at < ?)';
+    try {
+      const done = await env.DB.batch(purgeStatements(env.DB, familyId, guard, [id, before]));
+      if (done.at(-2).meta.changes === 1) await purgePhotos(env, familyId);
+    } catch (e) {
+      console.error('expired purge failed', familyId, e);
+    }
+  }
+}
+
 /**
  * Daily housekeeping (cron): retry queued photo purges and drop rows nothing reads any more
  * (yesterday's budgets, licence links past their last use).
@@ -119,6 +143,7 @@ export async function sweep(env) {
       console.error('photo purge retry failed', id, e);
     }
   }
+  await purgeExpired(env);
   const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
   await env.DB.batch([

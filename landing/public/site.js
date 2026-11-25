@@ -1,6 +1,13 @@
 // Page polish, all optional: without this script every section is visible and anchors still work.
 // - sections fade in as they scroll into view (skipped with reduced motion);
 // - a "back to top" button shows once the hero is out of sight.
+// Launch offer lines ship hidden: shown only until their end date, so a stale copy of the page
+// (or one without this script) never advertises an expired code.
+for (const el of document.querySelectorAll('[data-promo-until]')) {
+  if (Date.now() < Date.parse(el.dataset.promoUntil)) el.hidden = false
+  else el.remove()
+}
+
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches
 
 if (!calm && 'IntersectionObserver' in window) {

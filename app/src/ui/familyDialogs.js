@@ -4,7 +4,7 @@ import { renderSVG } from 'uqr'
 import { t } from '../i18n.js'
 import { esc } from './esc.js'
 import { openModal, reportError, labelDialog } from './dialogs.js'
-import { familyError, devicesActions } from './familyMenu.js'
+import { familyError, devicesActions, dateText, licenceState, promoText } from './familyMenu.js'
 import { PRIVACY_URL, TERMS_URL } from '../legal.js'
 
 const payments = import.meta.env.VITE_PAYMENTS === '1'
@@ -16,7 +16,7 @@ import { load, runExclusive, store, addTab } from '../store.js'
 import { parseLicenceLink } from '../routes.js'
 import {
   getFamily, createFamily, resumePending, leaveFamily, kitOf, inviteLink, parseInvite, parseKit,
-  inviteFamilyName, joinFamily, recoverFamily, restartFromLicence,
+  inviteFamilyName, joinFamily, recoverFamily, restartFromLicence, updateFamily,
 } from '../sync/family.js'
 
 /**
@@ -135,7 +135,7 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
   const buy = inFamily && buyLink
   const d = show(`<form method="dialog"><h3>${t(inFamily ? 'family.slot' : 'family.code.title')}</h3>
     <p class="plain">${t(inFamily ? (buy ? 'family.slotCode.bodyBuy' : 'family.slotCode.body') : 'family.code.body')}</p>
-    ${buy ? `<button type="button" data-buy>${t('family.slotCode.buy', { price: t('family.slotPrice') })}<small>${t('family.earlyPrice')}</small></button>` : ''}
+    ${buy ? `<button type="button" data-buy>${t('family.slotCode.buy', { price: t('family.slotPrice') })}<small>${t('family.slotCode.buySub')}</small></button>` : ''}
     <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
     ${inFamily ? '' : `<input type="text" id="famName" aria-label="${t('family.code.name')}" placeholder="${esc(t('family.code.nameHint'))}" maxlength="60" autocomplete="off">
     <input type="text" id="famDevice" aria-label="${t('family.code.device')}" placeholder="${esc(t('family.code.deviceHint'))}" maxlength="40" autocomplete="off">`}
@@ -173,6 +173,46 @@ export async function openCodeDialog({ fromWelcome = false, buyLink = null } = {
     d.close()
     openKit({ first: true }).catch(reportError)
     Promise.resolve(ctx.onEntered()).catch(reportError)
+  }))
+  openModal(d)
+}
+
+// ---- Renew: a family code adds a year to the family's yearly licence ----------------------
+
+/**
+ * The family's licence end date, a way to buy a year (payments on) and the field for its code.
+ * Works on an expired licence too: that is how the family gets its sync back.
+ */
+export async function openRenew() {
+  const meta = await getFamily(ctx.db)
+  if (!meta || meta.pending) return
+  const expiresAt = syncStatus.family ? syncStatus.family.expiresAt : meta.expiresAt
+  const state = licenceState(expiresAt)
+  const status = state ? t(state === 'expired' ? 'family.renew.expiredBody' : 'family.renew.untilBody', { date: dateText(expiresAt) }) : ''
+  const buyLink = payments ? import.meta.env.VITE_STRIPE_LINK_FAMILY : null
+  const promo = buyLink ? promoText() : ''
+  const d = show(`<form method="dialog"><h3>${t('family.renew')}</h3>
+    ${status ? `<p class="plain">${status}</p>` : ''}
+    <p class="plain">${t(buyLink ? 'family.renew.bodyBuy' : 'family.renew.body')}</p>
+    ${buyLink ? `<button type="button" data-buy>${t('family.renew.buy', { price: t('family.price') })}${promo ? `<small>${promo}</small>` : ''}</button>` : ''}
+    <input type="text" id="famCode" aria-label="${t('family.code.label')}" placeholder="AR-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <p class="plain"><a href="${TERMS_URL}" target="_blank" rel="noopener">${t('terms.link')}</a></p>
+    <p class="plain err" role="alert"></p>
+    <button type="button" class="primary" data-go>${t('family.renew.go')}</button>
+    <button value="" class="cancel">${t('common.cancel')}</button></form>`)
+  enterGoes(d)
+  d.querySelector('[data-buy]')?.addEventListener('click', () => window.open(buyLink, '_blank', 'noopener'))
+  d.querySelector('[data-go]').addEventListener('click', () => busy(d, async () => {
+    const code = d.querySelector('#famCode').value.trim()
+    if (!code) return
+    const { expiresAt: until } = await ctx.api.renew(code)
+    await updateFamily(ctx.db, meta, { expiresAt: until })
+    d.querySelector('form').innerHTML = `<h3>${t('family.renew')}</h3>
+      <p class="plain" role="status">${until ? t('family.renew.done', { date: dateText(until) }) : t('family.renew.doneLifetime')}</p>
+      <button value="" class="primary">${t('common.close')}</button>`
+    labelDialog(d)
+    d.querySelector('button').focus()
+    syncNow('menu') // the sync picks up again and refreshes the menu
   }))
   openModal(d)
 }

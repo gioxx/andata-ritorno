@@ -1,8 +1,10 @@
 CREATE TABLE licences (id TEXT PRIMARY KEY, base_limit INTEGER NOT NULL DEFAULT 3, extra_slots INTEGER NOT NULL DEFAULT 0,
-  email_hmac TEXT, family_id TEXT, created_at TEXT NOT NULL);
+  email_hmac TEXT, family_id TEXT, created_at TEXT NOT NULL, expires_at TEXT);
 CREATE INDEX licences_email ON licences(email_hmac);
+CREATE INDEX licences_expires ON licences(expires_at);
 CREATE TABLE codes (hash TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('family','slot')), source TEXT NOT NULL,
-  stripe_session TEXT UNIQUE, email_hmac TEXT, created_at TEXT NOT NULL, redeemed_at TEXT, licence_id TEXT);
+  stripe_session TEXT UNIQUE, email_hmac TEXT, created_at TEXT NOT NULL, redeemed_at TEXT, licence_id TEXT,
+  term TEXT CHECK (term IS NULL OR term = 'year'));
 CREATE TABLE families (id TEXT PRIMARY KEY, licence_id TEXT NOT NULL, name_enc TEXT NOT NULL, recovery_hash TEXT NOT NULL,
   seq INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, records_n INTEGER NOT NULL DEFAULT 0, data_bytes INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE devices (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, name_enc TEXT NOT NULL,

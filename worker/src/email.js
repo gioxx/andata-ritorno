@@ -31,9 +31,10 @@ export async function sendEmail(env, { to, subject, text }, { idempotencyKey } =
   }
 }
 
-/** @param {string} code @param {'family'|'slot'} kind */
-export function codeEmail(code, kind) {
+/** @param {string} code @param {'family'|'slot'} kind @param {'year'|null} [term] */
+export function codeEmail(code, kind, term = null) {
   const slot = kind === 'slot';
+  const year = !slot && term === 'year';
   return {
     subject: slot ? 'A/R: il tuo codice per un posto in più / your extra seat code' : 'A/R: il tuo codice famiglia / your family code',
     text: [
@@ -44,6 +45,12 @@ export function codeEmail(code, kind) {
       slot
         ? 'Apri A/R su un telefono già in famiglia, vai in Menu → Famiglia → "Aggiungi un posto" e incolla lì il codice.'
         : 'Apri A/R, vai in Menu → Famiglia → "Ho già un codice" e incolla il codice.',
+      ...(year
+        ? [
+            'Il codice vale un anno di condivisione in famiglia, dal giorno in cui lo usi. Nessun rinnovo automatico: alla scadenza A/R te lo ricorda e decidi tu.',
+            'Hai già una famiglia? Usa il codice da Menu → Famiglia → "Rinnova": aggiunge un anno alla scadenza attuale.',
+          ]
+        : []),
       'Il codice si può usare una sola volta.',
       '',
       slot
@@ -60,6 +67,12 @@ export function codeEmail(code, kind) {
       slot
         ? 'Open A/R on a phone already in the family, go to Menu → Family → "Add a seat" and paste the code there.'
         : 'Open A/R, go to Menu → Family → "I already have a code" and paste the code.',
+      ...(year
+        ? [
+            'The code gives one year of family sharing, from the day you use it. No automatic renewal: when it ends A/R reminds you and you decide.',
+            'Already in a family? Use the code from Menu → Family → "Renew": it adds a year to the current end date.',
+          ]
+        : []),
       'The code can be used only once.',
       '',
       slot

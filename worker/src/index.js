@@ -19,6 +19,7 @@ const deviceRoutes = new Set([
   familyRoutes['POST /api/invites'],
   familyRoutes['DELETE /api/devices/:id'],
   licenceRoutes['POST /api/slot'],
+  licenceRoutes['POST /api/renew'],
 ]);
 
 // The landing site (SITE_ORIGIN) opens Checkout in a modal and shows the public numbers: it may call

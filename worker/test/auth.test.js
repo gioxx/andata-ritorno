@@ -66,7 +66,7 @@ describe('requireDevice', async () => {
       .bind(await sha256Hex(token))
       .run();
     const out = await requireDevice(env, new Request('https://ar.test/x', { headers: { authorization: `Bearer ${token}` } }));
-    expect(out).toEqual({ deviceId: 'd1', familyId: 'f1' });
+    expect(out).toEqual({ deviceId: 'd1', familyId: 'f1', expiresAt: null });
     const row = await env.DB.prepare("SELECT last_seen_at FROM devices WHERE id='d1'").first();
     expect(row.last_seen_at > '2020-01-01T00:00:00.000Z').toBe(true);
   });
