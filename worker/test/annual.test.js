@@ -99,6 +99,24 @@ describe('yearly licence', () => {
   });
 });
 
+describe('invites around the end date', () => {
+  it('an invite made before the end can neither be inspected nor used once the licence expired', async () => {
+    const { token, licenceId } = await newFamily('year');
+    const inv = await (await post('/api/invites', {}, token)).json();
+    const past = new Date(Date.now() - 1000).toISOString();
+    await setExpiry(licenceId, past);
+    const info = await call(`/api/invites/info?t=${inv.token}`);
+    expect(info.status).toBe(402);
+    expect(await info.json()).toEqual({ error: 'licence-expired', expiresAt: past });
+    const join = await post('/api/join', { inviteToken: inv.token, deviceId: rid(), deviceNameEnc: 'ZGV2aWNl' });
+    expect(join.status).toBe(402);
+    expect(await join.json()).toEqual({ error: 'licence-expired', expiresAt: past });
+    // Renewed: the same invite works again.
+    await setExpiry(licenceId, '2099-01-01T00:00:00.000Z');
+    expect((await post('/api/join', { inviteToken: inv.token, deviceId: rid(), deviceNameEnc: 'ZGV2aWNl' })).status).toBe(200);
+  });
+});
+
 describe('POST /api/renew', () => {
   it('adds a year to a running licence, from today to an expired one', async () => {
     const { token, licenceId } = await newFamily('year');
