@@ -67,7 +67,6 @@ Cambia il pattern `routes` in `worker/wrangler.app.toml` per pubblicarla su un t
 app/       l'app (src/, tests/, public/ icone e manifest)
 worker/    il Cloudflare Worker: hosting dell'app e API `/api/*` della condivisione in famiglia
 landing/   pagina di presentazione e guida su ar.gxware.org (statica, con un suo Worker: `cd landing && npx wrangler deploy`)
-redirect/  301 dai vecchi indirizzi su gioxx.org a gxware.org (`cd redirect && npx wrangler deploy`)
 legacy/    il primo prototipo in un solo file, tenuto solo come riferimento per il suo formato di backup
 docs/      note di progetto e piano di implementazione
 ```

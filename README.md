@@ -67,7 +67,6 @@ Change the `routes` pattern in `worker/wrangler.app.toml` to deploy it on your o
 app/       the app (src/, tests/, public/ icons and manifest)
 worker/    the Cloudflare Worker: app hosting and the `/api/*` family sharing API
 landing/   the product page and guide on ar.gxware.org (static, its own Worker: `cd landing && npx wrangler deploy`)
-redirect/  301 from the old gioxx.org addresses to gxware.org (`cd redirect && npx wrangler deploy`)
 legacy/    the first single-file prototype, kept only as reference for its backup format
 docs/      design notes and the implementation plan
 ```

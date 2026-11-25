@@ -5,11 +5,8 @@ compatibility_date = "2026-10-01"
 # One origin only: IndexedDB is per-origin, so a second hostname would show an empty app.
 workers_dev = false
 preview_urls = false
-# app.ar.gioxx.org is the old address, kept only while users move their data: there the app shows
-# the "moved" screen (app/src/ui/moved.js) instead of running. Then it goes to redirect/wrangler.toml.
 routes = [
   { pattern = "app.ar.gxware.org", custom_domain = true },
-  { pattern = "app.ar.gioxx.org", custom_domain = true },
 ]
 
 [assets]
