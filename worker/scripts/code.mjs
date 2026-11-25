@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Owner tool, run with the owner's Wrangler login (no admin endpoint on the internet):
 //   node scripts/code.mjs family|slot [--remote]   new manual code (Ko-fi, Satispay, PayPal, gifts)
+//   node scripts/code.mjs family --lifetime [--remote]  family code that never expires (default: one year)
 //   node scripts/code.mjs recover <code> [--remote] licence link for the licence that code belongs to
 // Without --remote it works on the local D1 used by `wrangler dev`.
 import { execFileSync } from 'node:child_process';
@@ -16,7 +17,8 @@ const DB_NAME = 'andata-ritorno';
 const workerDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const where = args.includes('--remote') ? '--remote' : '--local';
-const [cmd, arg] = args.filter((a) => a !== '--remote');
+const lifetime = args.includes('--lifetime');
+const [cmd, arg] = args.filter((a) => a !== '--remote' && a !== '--lifetime');
 
 /** Run one SQL statement through wrangler and return its result rows. Values are generated or hex-validated locally. */
 function d1(sql) {
@@ -29,14 +31,15 @@ function d1(sql) {
 }
 
 function usage() {
-  console.error('usage: node scripts/code.mjs family|slot [--remote]\n       node scripts/code.mjs recover <code> [--remote]');
+  console.error('usage: node scripts/code.mjs family [--lifetime] [--remote]\n       node scripts/code.mjs slot [--remote]\n       node scripts/code.mjs recover <code> [--remote]');
   process.exit(2);
 }
 
 if (cmd === 'family' || cmd === 'slot') {
   const code = newCode();
   const hash = await hashCode(code);
-  d1(`INSERT INTO codes (hash, kind, source, created_at) VALUES ('${hash}', '${cmd}', 'manual', '${new Date().toISOString()}')`);
+  const term = cmd === 'family' && !lifetime ? "'year'" : 'NULL';
+  d1(`INSERT INTO codes (hash, kind, term, source, created_at) VALUES ('${hash}', '${cmd}', ${term}, 'manual', '${new Date().toISOString()}')`);
   console.log(code);
 } else if (cmd === 'recover') {
   const code = normaliseCode(arg);

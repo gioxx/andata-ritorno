@@ -68,6 +68,8 @@ export async function createEmbeddedSession(env, price, returnUrl) {
     'line_items[0][price]': price,
     'line_items[0][quantity]': '1',
     'managed_payments[enabled]': 'true',
+    // Lets the buyer type a promotion code (campaigns are set up on Stripe, not here).
+    allow_promotion_codes: 'true',
     redirect_on_completion: 'if_required',
     return_url: returnUrl,
   });

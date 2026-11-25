@@ -1,5 +1,5 @@
 import { HttpError, json, readBody } from './http.js';
-import { randomToken, requireApiDevice } from './auth.js';
+import { randomToken, requireActiveDevice } from './auth.js';
 import { OP_UNITS, PHOTO_UNITS, spendDaily, spendNow } from './store.js';
 import { ID } from './validate.js';
 
@@ -53,7 +53,7 @@ function totalCap(env) {
 }
 
 async function put(req, env, ctx, { pid }) {
-  const { familyId, deviceId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireActiveDevice(env, req);
   checkPid(pid);
   const body = await readBody(req, MAX_PHOTO, 'limit-photo-size');
   if (body.byteLength === 0) throw new HttpError(400, 'bad-request');
@@ -162,7 +162,7 @@ async function put(req, env, ctx, { pid }) {
 }
 
 async function get(req, env, ctx, { pid }) {
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId } = await requireActiveDevice(env, req);
   checkPid(pid);
   const row = await env.DB.prepare('SELECT uploaded_at FROM photos WHERE family_id = ? AND pid = ? AND ready = 1').bind(familyId, pid).first();
   const obj = row && (await env.PHOTOS.get(objectKey(familyId, pid, row.uploaded_at)));
@@ -188,7 +188,7 @@ async function reclaimStale(env, familyId) {
 }
 
 async function list(req, env) {
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId } = await requireActiveDevice(env, req);
   // Every sync lists the photos first, so a family's abandoned uploads never outlive its phones' use.
   await reclaimStale(env, familyId);
   const { results } = await env.DB.prepare('SELECT pid, size, substr(uploaded_at, 1, 24) AS uploadedAt FROM photos WHERE family_id = ? AND ready = 1 ORDER BY uploaded_at, pid')
@@ -198,7 +198,7 @@ async function list(req, env) {
 }
 
 async function remove(req, env, ctx, { pid }) {
-  const { familyId, deviceId } = await requireApiDevice(env, req);
+  const { familyId, deviceId } = await requireActiveDevice(env, req);
   checkPid(pid);
   await spendNow(env.DB, deviceId, OP_UNITS, familyId);
   await dropUploads(env, familyId, pid, '\uffff', { inclusive: true });

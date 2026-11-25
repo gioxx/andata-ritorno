@@ -1,5 +1,5 @@
 import { HttpError, json, readBody, readJson, strictLimit } from './http.js';
-import { hmacHex, randomToken, requireApiDevice, sha256Hex } from './auth.js';
+import { hmacHex, randomToken, requireActiveDevice, requireApiDevice, sha256Hex } from './auth.js';
 import { codeFromHmac, hashCode, normaliseCode } from './codes.js';
 import { createEmbeddedSession, getCheckoutSession, verifyWebhook } from './stripe.js';
 import { codeEmail, licenceLinkEmail, sendEmail } from './email.js';
@@ -16,6 +16,16 @@ const MAX_DAILY_LINKS = 5;
 // Devices a new licence allows; extra slots are bought on top.
 const BASE_LIMIT = 3;
 const PAID_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
+
+/**
+ * End of a yearly term that starts at `from` (ISO): the same day and time a year later. 29 February
+ * becomes 1 March, as Date does.
+ */
+export function addYear(from) {
+  const d = new Date(from);
+  d.setUTCFullYear(d.getUTCFullYear() + 1);
+  return d.toISOString();
+}
 
 /** Validate the fields shared by redeem and restart: the new family and its first device. */
 function newFamilyFields(body) {
@@ -46,7 +56,12 @@ function insertFamilyAndDevice(env, f, licenceId, tokenHash, at, guard, guardArg
   ];
 }
 
-/** @returns {'family'|'slot'} the kind bought by the session's price; 404 bad-session otherwise. */
+/**
+ * The kind bought by the session's price, and for a family code its term: PRICE_FAMILY sells one
+ * year, PRICE_FAMILY_LIFETIME (the old price, optional) is still honoured for sessions paid before
+ * the switch. 404 bad-session for any other price.
+ * @returns {{kind: 'family'|'slot', term: 'year'|null}}
+ */
 function kindOf(env, session) {
   // Unset prices are a deployment mistake, not someone else's session: fail loudly (500).
   if (!env.PRICE_FAMILY || !env.PRICE_SLOT) throw new Error('PRICE_FAMILY / PRICE_SLOT not configured');
@@ -54,8 +69,9 @@ function kindOf(env, session) {
   // links have a fixed quantity; if that ever changes, fail loudly (500, Stripe retries) instead.
   if (session.line_items.some((li) => (li.quantity ?? 1) > 1)) throw new Error(`session ${session.id} has quantity > 1`);
   const prices = session.line_items.map((li) => li.price?.id);
-  if (env.PRICE_FAMILY && prices.includes(env.PRICE_FAMILY)) return 'family';
-  if (env.PRICE_SLOT && prices.includes(env.PRICE_SLOT)) return 'slot';
+  if (prices.includes(env.PRICE_FAMILY)) return { kind: 'family', term: 'year' };
+  if (env.PRICE_FAMILY_LIFETIME && prices.includes(env.PRICE_FAMILY_LIFETIME)) return { kind: 'family', term: null };
+  if (prices.includes(env.PRICE_SLOT)) return { kind: 'slot', term: null };
   throw new HttpError(404, 'bad-session');
 }
 
@@ -63,23 +79,23 @@ function kindOf(env, session) {
  * The code for a paid Checkout Session, created on first call. Idempotent on the session id: the
  * code is derived from it (CODE_HMAC_KEY), so the page, the webhook and their retries all get the
  * same code and the UNIQUE stripe_session column keeps a single row.
- * @returns {Promise<{code: string, kind: 'family'|'slot'}>}
+ * @returns {Promise<{code: string, kind: 'family'|'slot', term: 'year'|null}>}
  */
 export async function issueCodeForSession(env, session) {
   if (!env.CODE_HMAC_KEY) throw new Error('CODE_HMAC_KEY not set');
-  const kind = kindOf(env, session);
+  const { kind, term } = kindOf(env, session);
   const code = await codeFromHmac(env.CODE_HMAC_KEY, session.id);
   const hash = await hashCode(code);
   const email = session.customer_details?.email;
   await env.DB.prepare(
-    "INSERT INTO codes (hash, kind, source, stripe_session, email_hmac, created_at) VALUES (?, ?, 'stripe', ?, ?, ?) ON CONFLICT DO NOTHING",
+    "INSERT INTO codes (hash, kind, term, source, stripe_session, email_hmac, created_at) VALUES (?, ?, ?, 'stripe', ?, ?, ?) ON CONFLICT DO NOTHING",
   )
-    .bind(hash, kind, session.id, email ? await emailHmac(env, email) : null, new Date().toISOString())
+    .bind(hash, kind, term, session.id, email ? await emailHmac(env, email) : null, new Date().toISOString())
     .run();
-  const row = await env.DB.prepare('SELECT hash, kind FROM codes WHERE stripe_session = ?').bind(session.id).first();
+  const row = await env.DB.prepare('SELECT hash, kind, term FROM codes WHERE stripe_session = ?').bind(session.id).first();
   // A mismatch means the stored row was made with another key; the plaintext is then unrecoverable.
   if (!row || row.hash !== hash) throw new Error(`code for ${session.id} does not match the stored hash`);
-  return { code, kind: row.kind };
+  return { code, kind: row.kind, term: row.term ?? null };
 }
 
 /**
@@ -107,7 +123,7 @@ async function findCode(env, input) {
   const code = normaliseCode(input);
   if (!code) throw new HttpError(404, 'bad-code');
   const hash = await hashCode(code);
-  const row = await env.DB.prepare('SELECT kind, redeemed_at, licence_id FROM codes WHERE hash = ?').bind(hash).first();
+  const row = await env.DB.prepare('SELECT kind, term, redeemed_at, licence_id FROM codes WHERE hash = ?').bind(hash).first();
   if (!row) throw new HttpError(404, 'bad-code');
   return { hash, ...row };
 }
@@ -130,8 +146,8 @@ async function redeem(req, env) {
   const results = await env.DB.batch([
     env.DB.prepare('UPDATE codes SET redeemed_at = ?, licence_id = ? WHERE hash = ? AND redeemed_at IS NULL').bind(at, licenceId, code.hash),
     env.DB.prepare(
-      'INSERT INTO licences (id, base_limit, email_hmac, family_id, created_at) SELECT ?, ?, email_hmac, ?, ? FROM codes WHERE hash = ? AND licence_id = ?',
-    ).bind(licenceId, BASE_LIMIT, f.familyId, at, code.hash, licenceId),
+      'INSERT INTO licences (id, base_limit, email_hmac, family_id, created_at, expires_at) SELECT ?, ?, email_hmac, ?, ?, ? FROM codes WHERE hash = ? AND licence_id = ?',
+    ).bind(licenceId, BASE_LIMIT, f.familyId, at, code.term === 'year' ? addYear(at) : null, code.hash, licenceId),
     ...insertFamilyAndDevice(env, f, licenceId, await sha256Hex(token), at, won, [code.hash, licenceId]),
   ]);
   if (results[0].meta.changes !== 1) {
@@ -148,7 +164,7 @@ function codeUsed() {
 
 async function slot(req, env) {
   await strictLimit(env, req);
-  const { familyId } = await requireApiDevice(env, req);
+  const { familyId } = await requireActiveDevice(env, req);
   const body = await readJson(req);
   const code = await findCode(env, body?.code);
   if (code.kind === 'family') throw new HttpError(409, 'code-is-family');
@@ -168,6 +184,52 @@ async function slot(req, env) {
   ]);
   if (results[0].meta.changes !== 1) throw new HttpError(409, 'code-used');
   return json({ deviceLimit: await deviceLimit(env, licenceId) });
+}
+
+/**
+ * A family code used by a phone already in a family: it extends the family's licence instead of
+ * starting a new one. A yearly code adds a year to the current end date, or to today once that has
+ * passed; a lifetime code (manual, or sold before yearly licences) makes the licence lifetime.
+ * Works on an expired licence: that is the way back. A lifetime licence has nothing to renew (409).
+ */
+async function renew(req, env) {
+  await strictLimit(env, req);
+  const { familyId } = await requireApiDevice(env, req);
+  const body = await readJson(req);
+  const code = await findCode(env, body?.code);
+  if (code.kind === 'slot') throw new HttpError(409, 'code-is-slot');
+  const lic = await env.DB.prepare('SELECT l.id, l.expires_at FROM families f JOIN licences l ON l.id = f.licence_id WHERE f.id = ?').bind(familyId).first();
+  if (!lic) throw new HttpError(401, 'unauthorized');
+  const answer = async () => {
+    const row = await env.DB.prepare('SELECT expires_at FROM licences WHERE id = ?').bind(lic.id).first();
+    return json({ expiresAt: row?.expires_at ?? null });
+  };
+  // Already used on this very licence: a retry whose first answer was lost, not a reuse.
+  if (code.redeemed_at && code.licence_id === lic.id) return answer();
+  if (code.redeemed_at) codeUsed();
+  if (lic.expires_at == null) throw new HttpError(409, 'licence-lifetime');
+
+  const at = new Date().toISOString();
+  const start = lic.expires_at > at ? lic.expires_at : at;
+  const until = code.term === 'year' ? addYear(start) : null;
+  // The end date read above must still be current: two renewals at once would otherwise both add
+  // their year to the same date and one year would be lost (the loser gets 409 and may retry).
+  const results = await env.DB.batch([
+    env.DB.prepare('UPDATE codes SET redeemed_at = ?, licence_id = ? WHERE hash = ? AND redeemed_at IS NULL AND EXISTS (SELECT 1 FROM licences WHERE id = ? AND expires_at = ?)').bind(
+      at,
+      lic.id,
+      code.hash,
+      lic.id,
+      lic.expires_at,
+    ),
+    env.DB.prepare('UPDATE licences SET expires_at = ? WHERE id = ? AND changes() = 1').bind(until, lic.id),
+  ]);
+  if (results[0].meta.changes !== 1) {
+    const now = await env.DB.prepare('SELECT licence_id FROM codes WHERE hash = ?').bind(code.hash).first();
+    if (now?.licence_id === lic.id) return answer();
+    throw new HttpError(409, now?.licence_id ? 'code-used' : 'retry');
+  }
+  return answer();
 }
 
 /**
@@ -238,7 +300,7 @@ async function stripeWebhook(req, env, ctx) {
   const to = session.customer_details.email;
   // Sent before answering: if it fails, Stripe retries the delivery and the same code goes out
   // again (once only, thanks to the idempotency key), instead of the buyer never getting it.
-  if (to && !(await sendEmail(env, { to, ...codeEmail(issued.code, issued.kind) }, { idempotencyKey: `code-${session.id}` }))) {
+  if (to && !(await sendEmail(env, { to, ...codeEmail(issued.code, issued.kind, issued.term) }, { idempotencyKey: `code-${session.id}` }))) {
     throw new Error('code email not sent');
   }
   // Only from the webhook (the page may issue the code first) and only once the buyer has their
@@ -345,6 +407,7 @@ async function licenceRestart(req, env) {
 export const licenceRoutes = {
   'POST /api/redeem': redeem,
   'POST /api/slot': slot,
+  'POST /api/renew': renew,
   'POST /api/checkout': checkout,
   'GET /api/buy/:kind': buy,
   'GET /api/unlock/session': unlockSession,

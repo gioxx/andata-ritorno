@@ -168,6 +168,7 @@ section > .wrap > h2 + .lead { margin-bottom: var(--space-lg); }
 .plan li { margin-bottom: var(--space-xs); }
 .plan .actions { margin-top: auto; padding-top: var(--space-lg); }
 .plan .fine { margin: var(--space-sm) 0 0; }
+.plan .promo { margin: var(--space-sm) 0 0; padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-tile); background: color-mix(in srgb, var(--color-accent) 14%, transparent); font-size: var(--text-sm); }
 .note { font-size: var(--text-sm); color: var(--color-muted); }
 .after-plans { margin-top: var(--space-lg); display: grid; gap: var(--space-xs); }
 .after-plans p { margin: 0; }

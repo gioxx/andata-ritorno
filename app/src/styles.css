@@ -195,6 +195,8 @@ dialog .edit-preview[hidden] { display: none; }
 #menu .menuItem .txt .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #menu .menuItem.danger { color: var(--danger); }
 #menu .menuItem.danger .ic { color: var(--danger); }
+/* A yearly licence near or past its end: the renewal row draws the eye (its pill already says why). */
+#menu .menuItem.attention .ic { color: var(--accent-strong); }
 .seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); }
 #menu .seg button { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 4px; border-radius: 9px; background: none; font-size: 0.875rem; font-weight: 600; }
 #menu .seg button.active { background: var(--accent-strong); color: var(--bg); }

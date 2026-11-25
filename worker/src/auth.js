@@ -60,7 +60,12 @@ export async function requireDevice(env, req) {
     throw new HttpError(401, 'unauthorized');
   };
   if (!hash) return refuse();
-  const row = await env.DB.prepare('SELECT id, family_id, last_seen_at FROM devices WHERE token_hash = ?').bind(hash).first();
+  const row = await env.DB.prepare(
+    `SELECT d.id, d.family_id, d.last_seen_at, l.expires_at FROM devices d
+     LEFT JOIN families f ON f.id = d.family_id LEFT JOIN licences l ON l.id = f.licence_id WHERE d.token_hash = ?`,
+  )
+    .bind(hash)
+    .first();
   if (!row) {
     knownTokens.delete(hash);
     return refuse();
@@ -71,12 +76,26 @@ export async function requireDevice(env, req) {
       .bind(new Date(now).toISOString(), row.id)
       .run();
   }
-  return { deviceId: row.id, familyId: row.family_id };
+  return { deviceId: row.id, familyId: row.family_id, expiresAt: row.expires_at ?? null };
 }
 
 /** requireDevice plus the per-device API rate limit (a no-op when RL_API is not bound). */
 export async function requireApiDevice(env, req) {
   const dev = await requireDevice(env, req);
   if (await limited(env.RL_API, `device:${dev.deviceId}`)) throw new HttpError(429, 'rate-limited');
+  return dev;
+}
+
+/** A yearly licence past its end date (a lifetime licence, expiresAt null, never is). */
+export const isExpired = (expiresAt, now = Date.now()) => expiresAt != null && Date.parse(expiresAt) <= now;
+
+/**
+ * requireApiDevice for the routes that move data (sync, photos, invites, seats): once the family's
+ * yearly licence has ended they answer 402 licence-expired until someone renews it. Each phone keeps
+ * its own copy meanwhile; the family's server copy waits (store.js EXPIRED_KEEP_DAYS).
+ */
+export async function requireActiveDevice(env, req) {
+  const dev = await requireApiDevice(env, req);
+  if (isExpired(dev.expiresAt)) throw new HttpError(402, 'licence-expired', { expiresAt: dev.expiresAt });
   return dev;
 }

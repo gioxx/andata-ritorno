@@ -9,8 +9,9 @@ import { generateKeyRaw, importKey, encryptJson, decryptJson, b64url, randomToke
  * (the invite carries the key only). pending: a redeem/restart/join/recover sent but not yet
  * answered (mode: how a join treats the local wardrobe).
  * removed: the server no longer knows this device (sync stops until it leaves or rejoins).
+ * expiresAt: end of the family's yearly licence, null for a lifetime one, absent until first read.
  * @typedef {{ familyId:string, deviceId:string, token:string|null, keyRaw:string, recoverySecret:string|null,
- *   cursor:number, lastSyncAt:string|null, licenceKind:'family', deviceLimit?:number,
+ *   cursor:number, lastSyncAt:string|null, licenceKind:'family', deviceLimit?:number, expiresAt?:string|null,
  *   pending?:{op:'redeem'|'restart'|'join'|'recover', body:object, mode?:'merge'|'replace'}, removed?:boolean }} FamilyMeta
  */
 
@@ -84,6 +85,7 @@ export async function describeFamily(key, res) {
   return {
     name: await openName(key, familyNameAad(res.familyId), res.familyNameEnc),
     deviceLimit: res.deviceLimit,
+    expiresAt: res.expiresAt ?? null,
     devices: await openDevices(key, res.familyId, res.devices, res.you),
   }
 }

@@ -21,10 +21,13 @@ APP_ORIGIN = "https://app.ar.gxware.org"
 # The landing site, allowed to open Checkout (POST /api/checkout) and read the code it produced.
 SITE_ORIGIN = "https://ar.gxware.org"
 # Stripe payment links behind GET /api/buy/family and /api/buy/slot (closed registrations stop family sales).
-PAY_LINK_FAMILY = "https://buy.stripe.com/cNi8wOcBM4lV3Na6ts5EY00"
+PAY_LINK_FAMILY = "https://buy.stripe.com/cNi5kC0T4aKjgzW8BA5EY02"
 PAY_LINK_SLOT = "https://buy.stripe.com/6oUeVcdFQ3hRbfC4lk5EY01"
 # Stripe price ids (not secret); set the real ones at deploy time.
-PRICE_FAMILY = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
+# PRICE_FAMILY sells one year (6,99 €); PRICE_FAMILY_LIFETIME is the 4,99 € one-off price sold until
+# 2026-11-25, still honoured for sessions paid before the switch (their codes never expire).
+PRICE_FAMILY = "price_1Ufo3kCfwq1bSlj7zweKpm6M"
+PRICE_FAMILY_LIFETIME = "price_1UX1rBCfwq1bSlj7kUtZDqVK"
 PRICE_SLOT = "price_1UX1rBCfwq1bSlj7mAr3JtPY"
 # Global cap on stored photo bytes across all families (R2 free tier is 10 GB; default 9 GB when unset).
 MAX_TOTAL_PHOTO_BYTES = "9000000000"

@@ -20,7 +20,7 @@ import { t } from '../i18n.js'
  * @typedef {{ state:'idle'|'syncing'|'offline'|'removed'|'error', lastSyncAt:string|null, pending:number,
  *   lastChanges:{count:number, by:string|null}, movedOrphans:number, movedOrphansTab:string|null, errorCode:string|null,
  *   member:boolean, deviceNames:Map<string,string|null>, progress:SyncProgress|null, photoDownloads:{done:number, total:number}|null,
- *   family:{name:string|null, deviceLimit:number, devices:{id:string, name:string|null, createdAt:string, lastSeenAt:string, isThis:boolean}[]}|null }} SyncStatus
+ *   family:{name:string|null, deviceLimit:number, expiresAt:string|null, devices:{id:string, name:string|null, createdAt:string, lastSeenAt:string, isThis:boolean}[]}|null }} SyncStatus
  */
 /**
  * Where a run is: `total` null while it is not known yet (pull pages before the last one).
@@ -452,7 +452,7 @@ export function createSyncEngine({
     // The ids this phone already knows, not the server's: they bind the decryption of the names.
     const view = await describeFamily(key, { ...(await api.family()), familyId: meta.familyId, you: meta.deviceId })
     const lastSyncAt = now()
-    if (!(await updateFamily(db, meta, { lastSyncAt, deviceLimit: view.deviceLimit }))) throw new MembershipChanged()
+    if (!(await updateFamily(db, meta, { lastSyncAt, deviceLimit: view.deviceLimit, expiresAt: view.expiresAt }))) throw new MembershipChanged()
     emit({
       // A refused photo still owed keeps the error showing between its retries.
       state: refused.length || owed ? 'error' : 'idle', errorCode: refused[0] ?? owed ?? null, lastSyncAt, pending, progress: null, member: true,
@@ -502,6 +502,12 @@ export function createSyncEngine({
         emit({ state: 'removed', errorCode: null, member: false })
       } else if (e?.status === 0) {
         emit({ state: 'offline', pending: await outboxSize() })
+      } else if (e?.code === 'licence-expired') {
+        // The yearly licence ended: nothing moves until someone renews it (Menu → Family). The
+        // data stays on this phone; the menu reads the end date from the stored family.
+        const expiresAt = typeof e.extra?.expiresAt === 'string' ? e.extra.expiresAt : meta.expiresAt
+        await updateFamily(db, meta, { expiresAt })
+        emit({ state: 'error', errorCode: 'licence-expired', pending: await outboxSize() })
       } else if (e?.code === 'limit-daily') {
         // This phone used up today's server budget: no quick retries, the next syncs try again
         // (and go through once the day has turned).

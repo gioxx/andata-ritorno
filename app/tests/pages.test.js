@@ -14,7 +14,7 @@ describe('/unlock page', () => {
     expect(api.unlockSession).toHaveBeenCalledWith('cs_test_1')
     expect(root.querySelector('.unlockCode').textContent).toBe('AR-ABCD-EFGH-JK12')
     expect(root.querySelector('[data-copy]').textContent).toBe('Copia')
-    expect(root.textContent).toContain("Apri A/R e inseriscilo in Menu → Famiglia → Ho già un codice. Te l'abbiamo mandato anche per email.")
+    expect(root.textContent).toContain("Apri A/R e inseriscilo in Menu → Famiglia → Ho già un codice. Hai già una famiglia? Usalo in Menu → Famiglia → Rinnova. Te l'abbiamo mandato anche per email.")
     expect(root.textContent).not.toContain('questa pagina è in Safari')
     await renderUnlockPage(root, { api, sessionId: 'cs_test_1', inSafari: true })
     expect(root.textContent).toContain('Se hai installato A/R, aprila dalla schermata Home: questa pagina è in Safari.')
